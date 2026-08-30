@@ -1,0 +1,30 @@
+# Java / Maven / Gradle
+target/
+build/
+*.class
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+*.local
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+application-local.yml
+application-local.properties
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
