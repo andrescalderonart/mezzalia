@@ -75,6 +75,26 @@
   <button onclick="peticionLibre()">Enviar</button>
 </div>
 
+<div class="card">
+  <h2>6. Menú rápido (crea datos de prueba)</h2>
+  <button onclick="crearCategoriaDePrueba()">1) Crear categoría "Entradas"</button>
+  <button onclick="crearItemDePrueba()">2) Crear ítem "Ceviche" en esa categoría ($35000)</button>
+  <button onclick="listarCategoriasEItems()">Listar categorías + ítems</button>
+  <div id="menuIds" style="font-size:12px; font-family:monospace; margin-top:6px;">
+    ultimaCategoriaId: (ninguna) &nbsp; | &nbsp; ultimoItemId: (ninguno)
+  </div>
+</div>
+
+<div class="card">
+  <h2>7. Subir imagen a un ítem</h2>
+  <label>Item id</label>
+  <input id="imgItemId" type="text" placeholder="usa el ultimoItemId de arriba" style="width:120px"><br>
+  <label>Archivo</label>
+  <input id="imgArchivo" type="file" accept="image/jpeg,image/png,image/webp"><br>
+  <button onclick="subirImagen()">Subir imagen (ADMIN_RESTAURANTE)</button>
+  <div id="imgResultado" style="font-size:12px; margin-top:6px;"></div>
+</div>
+
 <h2>Log</h2>
 <button onclick="copiarLog()">Copiar log completo</button>
 <button onclick="limpiarLog()">Limpiar log</button>
@@ -176,7 +196,11 @@ async function probarRateLimit() {
 
 async function peticionLibre() {
   const metodo = document.getElementById('freeMethod').value;
-  const path = document.getElementById('freePath').value;
+  const path = document.getElementById('freePath').value.trim();
+  if (!path) {
+    agregarLog('peticionLibre', '-', 'Falta poner una ruta (ej. /api/admin/menu/categorias). No se envio nada.', true);
+    return;
+  }
   const usarAuth = document.getElementById('freeAuth').checked;
   const cuerpoTexto = document.getElementById('freeBody').value.trim();
   let cuerpo = undefined;
@@ -185,6 +209,90 @@ async function peticionLibre() {
     catch (e) { agregarLog('peticionLibre', '-', 'El body no es JSON valido: ' + e, true); return; }
   }
   await llamar(metodo, path, cuerpo, usarAuth);
+}
+
+let ultimaCategoriaId = null;
+let ultimoItemId = null;
+
+function pintarMenuIds() {
+  document.getElementById('menuIds').textContent =
+    'ultimaCategoriaId: ' + (ultimaCategoriaId ?? '(ninguna)') + '  |  ultimoItemId: ' + (ultimoItemId ?? '(ninguno)');
+  if (ultimoItemId && !document.getElementById('imgItemId').value) {
+    document.getElementById('imgItemId').value = ultimoItemId;
+  }
+}
+
+async function crearCategoriaDePrueba() {
+  const r = await llamar('POST', '/api/admin/menu/categorias', { nombre: 'Entradas', orden: 0 }, true);
+  if (r.ok) {
+    ultimaCategoriaId = JSON.parse(r.texto).id;
+    pintarMenuIds();
+  }
+}
+
+async function crearItemDePrueba() {
+  if (!ultimaCategoriaId) {
+    agregarLog('crearItemDePrueba', '-', 'Primero crea una categoría (paso 1).', true);
+    return;
+  }
+  const r = await llamar('POST', '/api/admin/menu/items', {
+    categoriaId: ultimaCategoriaId,
+    nombre: 'Ceviche',
+    descripcion: 'Ceviche de camarón con leche de tigre',
+    precio: 35000,
+    imagenUrl: null
+  }, true);
+  if (r.ok) {
+    ultimoItemId = JSON.parse(r.texto).id;
+    pintarMenuIds();
+  }
+}
+
+async function listarCategoriasEItems() {
+  const r = await llamar('GET', '/api/admin/menu/categorias', null, true);
+  if (r.ok) {
+    const categorias = JSON.parse(r.texto);
+    for (const cat of categorias) {
+      await llamar('GET', '/api/admin/menu/categorias/' + cat.id + '/items', null, true);
+    }
+  }
+}
+
+async function subirImagen() {
+  const itemId = document.getElementById('imgItemId').value.trim();
+  const archivo = document.getElementById('imgArchivo').files[0];
+  const resultadoDiv = document.getElementById('imgResultado');
+  if (!itemId) { resultadoDiv.textContent = 'Falta el item id.'; return; }
+  if (!archivo) { resultadoDiv.textContent = 'Falta elegir un archivo.'; return; }
+  if (!accessToken) { resultadoDiv.textContent = 'Primero haz login.'; return; }
+
+  const formData = new FormData();
+  formData.append('archivo', archivo);
+
+  const titulo = 'POST /api/admin/menu/items/' + itemId + '/imagen';
+  try {
+    // OJO: no se pone Content-Type a mano -- el navegador arma el boundary
+    // del multipart/form-data solo. Ponerlo manual rompe el request.
+    const resp = await fetch('/api/admin/menu/items/' + itemId + '/imagen', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + accessToken },
+      body: formData
+    });
+    const texto = await resp.text();
+    let textoFormateado = texto;
+    try { textoFormateado = JSON.stringify(JSON.parse(texto), null, 2); } catch (e) {}
+    agregarLog(titulo, resp.status, textoFormateado, !resp.ok);
+
+    if (resp.ok) {
+      const json = JSON.parse(texto);
+      resultadoDiv.innerHTML = 'Subida OK. URL: <a href="' + json.imagenUrl + '" target="_blank">' + json.imagenUrl + '</a>';
+    } else {
+      resultadoDiv.textContent = 'Fallo la subida (ver log abajo).';
+    }
+  } catch (e) {
+    agregarLog(titulo, 'ERROR DE RED', String(e), true);
+    resultadoDiv.textContent = 'Error de red.';
+  }
 }
 
 function copiarLog() {
