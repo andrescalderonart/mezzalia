@@ -1,0 +1,29 @@
+# Configuración SOLO para tests. Deliberadamente NO usa Flyway ni MySQL:
+# las migraciones en db/migration tienen sintaxis específica de MySQL
+# (ENGINE=InnoDB, CHECK, COLLATE) que no vale la pena mantener compatible con
+# H2 solo para tests rápidos. En su lugar, Hibernate genera el esquema
+# directamente desde las entidades (ddl-auto: create-drop) contra H2 en
+# memoria. Esto prueba el mecanismo del filtro de tenant (la lógica de la
+# aplicación), no las migraciones en sí — las migraciones se validan
+# corriendo de verdad contra MySQL en CI/staging, no acá.
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+    open-in-view: true
+  flyway:
+    enabled: false
+
+app:
+  jwt:
+    secret: solo-para-tests-nunca-usar-en-otro-ambiente-32bytes
+    expiracion-acceso-ms: 900000
+    expiracion-refresh-ms: 604800000

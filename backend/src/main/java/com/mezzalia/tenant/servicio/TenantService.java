@@ -17,16 +17,39 @@ public class TenantService {
 
     private final TenantRepository tenantRepository;
 
+    /**
+     * Uso exclusivo de caminos PÚBLICOS/de cliente final (ej. branding vía QR,
+     * carta). Un tenant suspendido (RF-11) no debe seguir siendo servido acá:
+     * lanza TenantSuspendidoException en vez de devolver sus datos.
+     *
+     * NO usar este método para pantallas de administración de tenants (ej. un
+     * futuro "ver/reactivar tenant" del super-admin) — para eso, usar
+     * {@link #obtenerParaAdministracion(Long)}, que sí necesita poder leer un
+     * tenant suspendido para poder reactivarlo.
+     */
     @Transactional(readOnly = true)
     public Tenant obtenerPorId(Long tenantId) {
+        Tenant tenant = obtenerParaAdministracion(tenantId);
+        if (tenant.estaSuspendido()) {
+            throw new DomainExceptions.TenantSuspendidoException(tenantId);
+        }
+        return tenant;
+    }
+
+    /**
+     * Lectura sin chequeo de suspensión, para uso interno/administrativo
+     * (super-admin) donde precisamente hace falta poder ver un tenant
+     * suspendido para gestionarlo (ej. reactivarlo).
+     */
+    @Transactional(readOnly = true)
+    public Tenant obtenerParaAdministracion(Long tenantId) {
         return tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new DomainExceptions.TenantNoEncontradoException(tenantId));
     }
 
     @Transactional
     public void actualizarBranding(Long tenantId, String logoUrl, String colorPrimario, String colorSecundario) {
-        Tenant tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new DomainExceptions.TenantNoEncontradoException(tenantId));
+        Tenant tenant = obtenerParaAdministracion(tenantId);
 
         validarColorHex(colorPrimario);
         validarColorHex(colorSecundario);

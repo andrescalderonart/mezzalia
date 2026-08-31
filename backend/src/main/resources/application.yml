@@ -11,13 +11,28 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
     show-sql: false
+    # Explícito a propósito (aunque hoy coincide con el default de Spring Boot):
+    # JwtAuthenticationFilter activa el filtro de tenant vía
+    # entityManager.unwrap(Session.class) y depende de que el mismo
+    # EntityManager/Session viva durante todo el request. Si esto se pone en
+    # false algún día (para evitar el antipatrón de lazy-loading en la vista),
+    # el enforcement de tenant hay que rehacerlo con un interceptor por
+    # transacción en vez de por request.
+    open-in-view: true
   flyway:
     enabled: true
     locations: classpath:db/migration
 
 app:
   jwt:
-    secret: ${JWT_SECRET:cambia-esto-en-produccion-con-una-clave-de-al-menos-256-bits}
+    # SIN valor por defecto a propósito: si falta la variable de entorno, la
+    # aplicación debe fallar al arrancar, no arrancar igual usando un secreto
+    # que vive en el historial de git. Un JWT_SECRET filtrado permite forjar
+    # tokens de cualquier usuario/tenant/rol — es el riesgo más alto de todo
+    # el sistema de auth, así que acá no hay "valor cómodo para desarrollo":
+    # generen uno real incluso en local (ej. `openssl rand -base64 32`) y
+    # pónganlo en su .env (ver .env.example).
+    secret: ${JWT_SECRET}
     expiracion-acceso-ms: 900000    # 15 minutos
     expiracion-refresh-ms: 604800000 # 7 días
 

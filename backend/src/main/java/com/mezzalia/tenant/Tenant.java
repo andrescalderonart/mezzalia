@@ -12,6 +12,9 @@ import java.time.LocalDateTime;
 @Setter
 public class Tenant {
 
+    public static final String ESTADO_ACTIVO = "ACTIVO";
+    public static final String ESTADO_SUSPENDIDO = "SUSPENDIDO";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -52,5 +55,16 @@ public class Tenant {
         if (creadoEn == null) {
             creadoEn = LocalDateTime.now();
         }
+        if (estado == null) {
+            estado = ESTADO_ACTIVO;
+        }
+    }
+
+    /**
+     * RF-11: un tenant suspendido conserva sus datos pero deja de ser servido
+     * por los endpoints públicos (carta, branding). No confundir con borrado.
+     */
+    public boolean estaSuspendido() {
+        return ESTADO_SUSPENDIDO.equalsIgnoreCase(estado);
     }
 }

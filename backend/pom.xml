@@ -80,6 +80,17 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <!-- Solo para el test de aislamiento de tenant (§6): H2 en vez de
+                 Testcontainers+MySQL real para que corra rápido en cualquier
+                 máquina/CI sin Docker. Si en algún punto se depende de una
+                 función específica de MySQL (CHECK constraints, JSON, etc.)
+                 en la lógica bajo test, este test deja de ser representativo
+                 y hay que migrarlo a Testcontainers con MySQL real. -->
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>

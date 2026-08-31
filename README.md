@@ -4,24 +4,29 @@ Plataforma SaaS multi-tenant de carta digital y comanda desde la mesa, vía QR. 
 
 ## Estado actual
 
-Fase 0 (validación con restaurante piloto) — este repositorio contiene la estructura inicial del monolito modular, sin lógica de negocio implementada todavía.
+Fase 0 (validación con restaurante piloto) — monolito modular Spring Boot con un único módulo Maven (`backend/pom.xml`). Hay lógica real en `tenant` (branding) e `identidad` (login JWT + aislamiento de tenant); `menu` y `pedidos` siguen siendo stubs. Los frontends todavía no tienen código.
 
 ## Estructura
 
 ```
-backend/            Monolito modular Spring Boot (Java 21)
-  common/            Filtros de tenant, manejo de errores, config compartida
-  identidad/         Usuarios, roles, JWT
-  tenant/            Tenants, sucursales, planes y límites
-  menu/              Categorías, ítems, variantes
-  pedidos/           Comanda, estados, websocket de pedidos en vivo
-  notificaciones/    (Fase 2+) email/WhatsApp de confirmación
+backend/
+  pom.xml            Módulo Maven único (NO multi-módulo: todo compila junto)
+  src/main/java/com/mezzalia/
+    common/            Config compartida (seguridad, manejo de errores)
+    tenant/            Tenants, branding, EntidadConTenant (filtro de aislamiento)
+    identidad/         Usuarios internos, JWT, login/refresh/logout
+    menu/              Categorías, ítems, variantes (stub)
+  src/main/resources/
+    application.yml
+    db/migration/      Migraciones Flyway, versionadas desde el commit inicial
 frontend/
-  app-cliente/       SPA pública: carta + carrito, sin login (React + TS + Vite)
-  app-admin/         SPA panel restaurante + super-admin (React + TS + Vite)
+  app-cliente/       SPA pública: carta + carrito, sin login (React + TS + Vite) — aún sin código
+  app-admin/         SPA panel restaurante + super-admin (React + TS + Vite) — aún sin código
 docs/
   documentacion-tecnica.md   Requisitos, arquitectura, modelo de datos, API, roadmap
 ```
+
+Nota: `pedidos` y `notificaciones` (mencionados en la documentación técnica §12) todavía no tienen ni carpeta ni código — se crean cuando alguien empiece a construir esa lógica, no antes (evitar carpetas vacías que sugieran una estructura multi-módulo que este proyecto no usa).
 
 ## Por qué está organizado así
 
