@@ -4,10 +4,23 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 
 import java.time.Instant;
 import java.util.Map;
 
+// @Order explicito y al final a proposito: este es el handler generico de
+// ultimo recurso (catch-all Exception.class). Sin esto, Spring puede elegir
+// este bean antes que el @RestControllerAdvice especifico de otro modulo
+// (p.ej. identidad.excepcion.IdentidadExceptionHandler) simplemente por el
+// orden en que los descubre el classpath scanning -- no por especificidad --
+// y entonces excepciones de negocio bien tipadas terminan devolviendo 500
+// generico en vez de su status real. Ver docs/documentacion-tecnica.md §12:
+// cualquier @RestControllerAdvice nuevo de un modulo debe declarar un
+// @Order explicito MENOR que Ordered.LOWEST_PRECEDENCE (ej. @Order(10)) para
+// garantizar que gane sobre este handler generico.
+@Order(Ordered.LOWEST_PRECEDENCE)
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 

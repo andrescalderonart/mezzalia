@@ -79,7 +79,13 @@ public class AuthService {
         return emitirPar(usuario);
     }
 
-    @Transactional
+    // noRollbackFor a propósito: si se detecta reuso, la revocación masiva
+    // (revocarTodosDelUsuario) DEBE quedar guardada aunque el método termine
+    // lanzando RefreshTokenInvalidoException para reportarle el error al
+    // cliente — sin esto, el rollback automático de Spring en cualquier
+    // RuntimeException deshace la revocación, dejando la "defensa ante robo"
+    // como un no-op silencioso.
+    @Transactional(noRollbackFor = AuthExceptions.RefreshTokenInvalidoException.class)
     public TokensRespuesta refrescar(String refreshTokenPlano) {
         String hash = hashear(refreshTokenPlano);
         RefreshToken token = refreshTokenRepository.findByTokenHash(hash)

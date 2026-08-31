@@ -26,3 +26,13 @@ spring:
     console:
       enabled: true
       path: /h2-console
+
+# Solo para depuracion local (perfil h2, nunca en produccion): que el JSON de
+# error incluya el mensaje y el stacktrace completo. Asi el panel de pruebas
+# (/test.html) muestra la excepcion real en pantalla sin tener que ir a buscar
+# logs en la consola del servidor.
+server:
+  error:
+    include-stacktrace: always
+    include-message: always
+    include-binding-errors: always

@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.core.annotation.Order;
 
 import java.time.Instant;
 import java.util.Map;
@@ -17,7 +18,16 @@ import java.util.Map;
  * dependencias circulares el día que otro módulo necesite lo mismo (§11,
  * nota sobre ArchUnit). El pequeño duplicado del helper `respuesta(...)` es
  * el costo aceptado de mantener esa regla.
+ *
+ * @Order(10) a proposito: debe resolverse ANTES que el catch-all
+ * Exception.class de common.excepcion.GlobalExceptionHandler. Sin un orden
+ * explicito, Spring no compara especificidad entre distintos beans
+ * @RestControllerAdvice -- toma el primero que descubre con algun match --
+ * y eso hacia que CredencialesInvalidasException, RefreshTokenInvalidoException
+ * y DemasiadosIntentosException terminaran devolviendo 500 generico en vez
+ * de 401/429. Ese fue el bug real detras del 500 en refresh y en rate limiting.
  */
+@Order(10)
 @RestControllerAdvice
 public class IdentidadExceptionHandler {
 

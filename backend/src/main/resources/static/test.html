@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Mezzalia - Panel de pruebas (dev)</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, Arial, sans-serif; max-width: 900px; margin: 20px auto; padding: 0 16px; background: #f5f5f5; }
+  h1 { font-size: 20px; }
+  h2 { font-size: 15px; margin-top: 28px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+  .card { background: white; border: 1px solid #ddd; border-radius: 6px; padding: 14px; margin-bottom: 12px; }
+  label { display: inline-block; width: 90px; font-size: 13px; }
+  input, select, textarea { font-size: 13px; padding: 4px 6px; margin: 3px 0; }
+  input[type=text], input[type=password] { width: 220px; }
+  textarea { width: 100%; height: 60px; font-family: monospace; }
+  button { padding: 6px 12px; margin: 3px 6px 3px 0; cursor: pointer; }
+  #tokens { font-size: 12px; font-family: monospace; background: #eef; padding: 8px; border-radius: 4px; word-break: break-all; }
+  #log { background: #111; color: #0f0; font-family: monospace; font-size: 12px; padding: 10px; border-radius: 4px; height: 380px; overflow-y: auto; white-space: pre-wrap; }
+  .entry-ok { color: #7fdc7f; }
+  .entry-err { color: #ff7f7f; }
+  .entry-meta { color: #7fb0ff; }
+</style>
+</head>
+<body>
+
+<h1>Mezzalia - Panel de pruebas (solo dev)</h1>
+<p>Esta pagina llama directamente a la API en el mismo origen (<code id="origin"></code>). Todo lo que pase queda registrado abajo en el log; usa "Copiar log" y pegalo en el chat cuando algo falle.</p>
+
+<div class="card">
+  <h2>1. Login</h2>
+  <div>
+    <label>Usuario</label>
+    <input id="loginUser" type="text" value="admin.demo"><br>
+    <label>Password</label>
+    <input id="loginPass" type="password" value="Demo1234!">
+  </div>
+  <button onclick="login()">Login</button>
+  <button onclick="login('mesero.demo','Demo1234!')">Login mesero.demo</button>
+</div>
+
+<div class="card">
+  <h2>Tokens actuales</h2>
+  <div id="tokens">(todavia no hay login)</div>
+</div>
+
+<div class="card">
+  <h2>2. Refresh</h2>
+  <button onclick="refrescar('actual')">Refrescar (token actual)</button>
+  <button onclick="refrescar('anterior')">Reusar refresh ANTERIOR (debe dar 401, no 500)</button>
+</div>
+
+<div class="card">
+  <h2>3. Logout</h2>
+  <button onclick="logout()">Logout (revoca el refresh actual)</button>
+</div>
+
+<div class="card">
+  <h2>4. Rate limiting (5 intentos fallidos + 1)</h2>
+  <label>Usuario</label>
+  <input id="rlUser" type="text" value="admin.demo"><br>
+  <button onclick="probarRateLimit()">Probar 6 logins fallidos seguidos</button>
+</div>
+
+<div class="card">
+  <h2>5. Peticion libre (para branding, tenants, etc.)</h2>
+  <select id="freeMethod">
+    <option>GET</option>
+    <option>POST</option>
+    <option>PATCH</option>
+    <option>PUT</option>
+    <option>DELETE</option>
+  </select>
+  <input id="freePath" type="text" placeholder="/api/..." style="width:300px">
+  <label><input id="freeAuth" type="checkbox" checked style="width:auto"> usar Authorization Bearer</label><br>
+  <textarea id="freeBody" placeholder='{"clave": "valor"}'></textarea><br>
+  <button onclick="peticionLibre()">Enviar</button>
+</div>
+
+<h2>Log</h2>
+<button onclick="copiarLog()">Copiar log completo</button>
+<button onclick="limpiarLog()">Limpiar log</button>
+<div id="log"></div>
+
+<script>
+document.getElementById('origin').textContent = window.location.origin;
+
+let accessToken = null;
+let refreshToken = null;
+let refreshTokenAnterior = null;
+
+function ahora() {
+  return new Date().toLocaleTimeString('es-CO', { hour12: false }) + '.' + new Date().getMilliseconds();
+}
+
+function pintarTokens() {
+  document.getElementById('tokens').innerHTML =
+    'accessToken: ' + (accessToken ? accessToken.slice(0, 40) + '...' : '(ninguno)') + '<br>' +
+    'refreshToken actual: ' + (refreshToken ? refreshToken.slice(0, 40) + '...' : '(ninguno)') + '<br>' +
+    'refreshToken anterior (para probar reuso): ' + (refreshTokenAnterior ? refreshTokenAnterior.slice(0, 40) + '...' : '(ninguno)');
+}
+
+function agregarLog(titulo, status, cuerpoTexto, esError) {
+  const div = document.getElementById('log');
+  const clase = esError ? 'entry-err' : 'entry-ok';
+  div.innerHTML +=
+    '<span class="entry-meta">[' + ahora() + ']</span> ' +
+    '<span class="' + clase + '">' + titulo + ' -> HTTP ' + status + '</span>\n' +
+    cuerpoTexto + '\n\n';
+  div.scrollTop = div.scrollHeight;
+}
+
+async function llamar(metodo, path, cuerpo, usarAuth) {
+  const opciones = { method: metodo, headers: { 'Content-Type': 'application/json' } };
+  if (usarAuth && accessToken) {
+    opciones.headers['Authorization'] = 'Bearer ' + accessToken;
+  }
+  if (cuerpo !== undefined && cuerpo !== null) {
+    opciones.body = JSON.stringify(cuerpo);
+  }
+  const titulo = metodo + ' ' + path;
+  try {
+    const resp = await fetch(path, opciones);
+    const texto = await resp.text();
+    let textoFormateado = texto;
+    try { textoFormateado = JSON.stringify(JSON.parse(texto), null, 2); } catch (e) { /* no era JSON, se deja tal cual */ }
+    agregarLog(titulo, resp.status, textoFormateado, !resp.ok);
+    return { status: resp.status, texto: texto, ok: resp.ok };
+  } catch (e) {
+    agregarLog(titulo, 'ERROR DE RED', String(e), true);
+    return { status: 0, texto: '', ok: false };
+  }
+}
+
+async function login(user, pass) {
+  const u = user || document.getElementById('loginUser').value;
+  const p = pass || document.getElementById('loginPass').value;
+  const r = await llamar('POST', '/api/auth/login', { username: u, password: p }, false);
+  if (r.ok) {
+    const json = JSON.parse(r.texto);
+    refreshTokenAnterior = refreshToken;
+    accessToken = json.accessToken;
+    refreshToken = json.refreshToken;
+    pintarTokens();
+  }
+}
+
+async function refrescar(cual) {
+  const tokenAUsar = cual === 'anterior' ? refreshTokenAnterior : refreshToken;
+  if (!tokenAUsar) {
+    agregarLog('refrescar(' + cual + ')', '-', 'No hay token guardado para esa opcion todavia.', true);
+    return;
+  }
+  const r = await llamar('POST', '/api/auth/refresh', { refreshToken: tokenAUsar }, false);
+  if (r.ok) {
+    const json = JSON.parse(r.texto);
+    refreshTokenAnterior = cual === 'anterior' ? refreshTokenAnterior : refreshToken;
+    accessToken = json.accessToken;
+    refreshToken = json.refreshToken;
+    pintarTokens();
+  }
+}
+
+async function logout() {
+  if (!refreshToken) {
+    agregarLog('logout', '-', 'No hay refreshToken actual.', true);
+    return;
+  }
+  await llamar('POST', '/api/auth/logout', { refreshToken: refreshToken }, false);
+}
+
+async function probarRateLimit() {
+  const u = document.getElementById('rlUser').value;
+  for (let i = 1; i <= 6; i++) {
+    await llamar('POST', '/api/auth/login', { username: u, password: 'contrasena-incorrecta-' + i }, false);
+  }
+}
+
+async function peticionLibre() {
+  const metodo = document.getElementById('freeMethod').value;
+  const path = document.getElementById('freePath').value;
+  const usarAuth = document.getElementById('freeAuth').checked;
+  const cuerpoTexto = document.getElementById('freeBody').value.trim();
+  let cuerpo = undefined;
+  if (cuerpoTexto) {
+    try { cuerpo = JSON.parse(cuerpoTexto); }
+    catch (e) { agregarLog('peticionLibre', '-', 'El body no es JSON valido: ' + e, true); return; }
+  }
+  await llamar(metodo, path, cuerpo, usarAuth);
+}
+
+function copiarLog() {
+  const texto = document.getElementById('log').innerText;
+  navigator.clipboard.writeText(texto).then(
+    () => alert('Log copiado al portapapeles. Ya lo puedes pegar en el chat.'),
+    () => alert('No se pudo copiar automaticamente. Selecciona el texto del log manualmente y copialo (Ctrl+C).')
+  );
+}
+
+function limpiarLog() {
+  document.getElementById('log').innerHTML = '';
+}
+</script>
+</body>
+</html>

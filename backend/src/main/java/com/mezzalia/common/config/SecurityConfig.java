@@ -47,6 +47,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()
                 // Carta pública, branding y pedidos sin login (QR del comensal)
                 .requestMatchers("/api/publico/**").permitAll()
+                // Panel de pruebas manual en dev (ver docs) - no debe existir en produccion
+                .requestMatchers("/test.html").permitAll()
                 // Gestión de tenants: exclusivo del equipo Mezzalia (SUPER_ADMIN)
                 .requestMatchers("/api/admin/tenants/**").hasRole("SUPER_ADMIN")
                 .requestMatchers("/api/superadmin/**").hasRole("SUPER_ADMIN")
