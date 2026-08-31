@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  @apply bg-carbon-950 text-crema font-sans antialiased;
+  background-image: radial-gradient(circle at 15% 0%, rgba(193,80,46,0.08), transparent 40%),
+                     radial-gradient(circle at 85% 100%, rgba(212,162,76,0.06), transparent 45%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background-color: rgba(212, 162, 76, 0.35);
+}
+
+/* Scrollbar oscuro discreto, en vez del default gris claro del navegador */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #3d3933; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #524c43; }
+
+@layer components {
+  .btn-primario {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-carbon-950
+           bg-gradient-to-r from-terracota to-dorado
+           shadow-glow transition-all duration-200
+           hover:brightness-110 hover:-translate-y-0.5
+           active:translate-y-0 active:brightness-95
+           disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-secundario {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-crema
+           bg-carbon-800 border border-carbon-600
+           transition-all duration-200
+           hover:border-dorado/60 hover:-translate-y-0.5
+           active:translate-y-0
+           disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-peligro {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium text-crema
+           bg-carbon-800 border border-red-900/60
+           transition-all duration-200
+           hover:bg-red-950 hover:border-red-700
+           disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .card {
+    @apply bg-carbon-900/80 border border-carbon-700 rounded-2xl backdrop-blur-sm;
+  }
+
+  .input-carbon {
+    @apply w-full rounded-lg bg-carbon-800 border border-carbon-600 px-3 py-2 text-sm text-crema
+           placeholder:text-crema/30
+           focus:outline-none focus:ring-2 focus:ring-dorado/50 focus:border-dorado/50
+           transition-colors duration-150;
+  }
+
+  .label-carbon {
+    @apply block text-xs uppercase tracking-wide text-crema/50 mb-1.5;
+  }
+}
