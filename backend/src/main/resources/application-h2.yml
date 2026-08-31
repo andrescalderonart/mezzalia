@@ -1,0 +1,28 @@
+# Perfil `h2`: levanta la app COMPLETA sin Docker ni MySQL, para probar en
+# local cuando no se tiene Docker Desktop instalado. NO usa Flyway (las
+# migraciones en db/migration son SQL específico de MySQL) — Hibernate genera
+# el esquema directamente desde las entidades. Igual que en los tests: esto
+# valida el comportamiento de la aplicación, no las migraciones reales — esas
+# se siguen probando de verdad contra MySQL (CI, o `docker compose up`).
+#
+# Uso: SPRING_PROFILES_ACTIVE=dev,h2 (junto con el perfil `dev` para que
+# también corran los seeds de SeedSuperAdminConfig/SeedDatosDemoConfig).
+spring:
+  datasource:
+    url: jdbc:h2:mem:mezzalia;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+    open-in-view: true
+  flyway:
+    enabled: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
