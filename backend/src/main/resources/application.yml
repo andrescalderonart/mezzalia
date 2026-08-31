@@ -4,6 +4,12 @@ spring:
     username: ${DB_USER:carta_digital}
     password: ${DB_PASSWORD:dev_password}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  servlet:
+    multipart:
+      # Limite generoso mas alto que un celular tipico produce en una foto de plato;
+      # evita subidas gigantes que llenen el disco (ver AlmacenamientoImagenService).
+      max-file-size: 5MB
+      max-request-size: 5MB
   jpa:
     hibernate:
       ddl-auto: validate
@@ -24,6 +30,10 @@ spring:
     locations: classpath:db/migration
 
 app:
+  uploads:
+    # DISCO LOCAL a proposito (ver AlmacenamientoImagenService.java para el porque
+    # y la limitacion conocida): un solo VPS/instancia, no S3 todavia.
+    dir: ${UPLOADS_DIR:./uploads}
   jwt:
     # SIN valor por defecto a propósito: si falta la variable de entorno, la
     # aplicación debe fallar al arrancar, no arrancar igual usando un secreto

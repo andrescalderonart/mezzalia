@@ -49,6 +49,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/publico/**").permitAll()
                 // Panel de pruebas manual en dev (ver docs) - no debe existir en produccion
                 .requestMatchers("/test.html").permitAll()
+                // Fotos de platos: publicas porque el comensal las ve en la carta sin login (RF-01)
+                .requestMatchers("/uploads/**").permitAll()
                 // Gestión de tenants: exclusivo del equipo Mezzalia (SUPER_ADMIN)
                 .requestMatchers("/api/admin/tenants/**").hasRole("SUPER_ADMIN")
                 .requestMatchers("/api/superadmin/**").hasRole("SUPER_ADMIN")

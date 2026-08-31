@@ -23,6 +23,8 @@ spring:
     enabled: false
 
 app:
+  uploads:
+    dir: ./uploads-test
   jwt:
     secret: solo-para-tests-nunca-usar-en-otro-ambiente-32bytes
     expiracion-acceso-ms: 900000

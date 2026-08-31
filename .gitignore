@@ -28,3 +28,7 @@ application-local.properties
 
 # Logs
 *.log
+
+# Imagenes subidas en local (AlmacenamientoImagenService, disco local dev)
+backend/uploads/
+backend/uploads-test/
