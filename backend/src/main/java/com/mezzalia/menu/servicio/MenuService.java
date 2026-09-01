@@ -133,6 +133,24 @@ public class MenuService {
      * para no confirmarle a un atacante que el recurso sí existe en otro
      * tenant. Ver MenuServiceTest.
      */
+    /**
+     * Camino usado por pedido.servicio.PedidoService (RF-05): busca el item
+     * exactamente igual que obtenerItem() (misma defensa explicita de
+     * tenant) pero ademas exige que este disponible -- un pedido no puede
+     * incluir un plato agotado, ni siquiera si el comensal alcanzo a
+     * tenerlo en el carrito antes de que se marcara agotado. Publico a
+     * proposito (a diferencia de obtenerItem): es el unico punto de entrada
+     * pensado para que otro modulo reuse esta logica, en vez de duplicarla.
+     */
+    @Transactional(readOnly = true)
+    public ItemMenu obtenerItemDisponibleParaPedido(Long itemId) {
+        ItemMenu item = obtenerItem(itemId);
+        if (!item.isDisponible()) {
+            throw new MenuExceptions.ItemNoDisponibleException(itemId);
+        }
+        return item;
+    }
+
     private CategoriaMenu obtenerCategoria(Long id) {
         CategoriaMenu categoria = categoriaMenuRepository.findById(id)
                 .filter(CategoriaMenu::isActivo)

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { obtenerCarta } from '../api/publico.js'
+import { crearPedido, obtenerCarta } from '../api/publico.js'
 
 const formatoPrecio = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -8,12 +8,40 @@ const formatoPrecio = new Intl.NumberFormat('es-CO', {
   maximumFractionDigits: 0,
 })
 
+function generarClaveIdempotencia() {
+  // crypto.randomUUID existe en todo navegador moderno servido sobre HTTPS
+  // (o localhost) -- el fallback de abajo es solo para no romper en un
+  // contexto raro (http:// plano en LAN local, por ejemplo) donde la API
+  // Crypto puede no estar disponible.
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID()
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
 export default function CartaPage() {
   const { token } = useParams()
   const [estado, setEstado] = useState('cargando') // 'cargando' | 'error' | 'listo'
   const [error, setError] = useState('')
   const [carta, setCarta] = useState(null)
   const [categoriaActiva, setCategoriaActiva] = useState(null)
+
+  // carrito[itemId] = cantidad. Vive solo en memoria del navegador -- si el
+  // comensal recarga la pagina, el carrito se pierde (mismo criterio que
+  // sesiones[] en MesasPage.jsx del panel: no hay backend de "borrador de
+  // pedido", el pedido solo existe una vez que se confirma y se envia).
+  const [carrito, setCarrito] = useState({})
+  const [modalAbierto, setModalAbierto] = useState(false)
+  const [notas, setNotas] = useState('')
+  const [comensalNombre, setComensalNombre] = useState('')
+  const [comensalTelefono, setComensalTelefono] = useState('')
+  const [comensalConsentimiento, setComensalConsentimiento] = useState(false)
+  const [envio, setEnvio] = useState({ estado: 'idle', error: '', pedido: null }) // idle|enviando|exito|error
+
+  // Misma clave de idempotencia (RF-04) mientras el comensal no haya
+  // enviado el pedido con exito -- si el POST falla por red y reintenta
+  // manualmente, el backend lo trata como el MISMO intento, no como un
+  // pedido nuevo. Se regenera solo despues de un envio exitoso (ver
+  // onEnviarPedido), para la proxima ronda de pedido de la misma mesa.
+  const claveIdempotenciaRef = useRef(generarClaveIdempotencia())
 
   const seccionesRef = useRef({})
   const navRef = useRef(null)
@@ -78,6 +106,86 @@ export default function CartaPage() {
     [carta],
   )
 
+  // Mapa id -> item de toda la carta, para poder resolver nombre/precio de
+  // lo que hay en `carrito` (que solo guarda cantidades por id) sin recorrer
+  // categorias cada vez que se pinta el resumen del pedido.
+  const itemsPorId = useMemo(() => {
+    const mapa = {}
+    carta?.categorias?.forEach((categoria) => {
+      categoria.items.forEach((item) => {
+        mapa[item.id] = item
+      })
+    })
+    return mapa
+  }, [carta])
+
+  const itemsCarrito = useMemo(
+    () =>
+      Object.entries(carrito)
+        .map(([itemId, cantidad]) => ({ item: itemsPorId[Number(itemId)], cantidad }))
+        .filter((entrada) => entrada.item), // por si un item cambiara/desapareciera de la carta a mitad de sesion
+    [carrito, itemsPorId],
+  )
+  const totalCarrito = itemsCarrito.reduce((acc, { item, cantidad }) => acc + item.precio * cantidad, 0)
+  const cantidadTotalCarrito = itemsCarrito.reduce((acc, { cantidad }) => acc + cantidad, 0)
+
+  function agregarUnidad(itemId) {
+    setCarrito((prev) => ({ ...prev, [itemId]: (prev[itemId] || 0) + 1 }))
+  }
+
+  function quitarUnidad(itemId) {
+    setCarrito((prev) => {
+      const actual = prev[itemId] || 0
+      if (actual <= 1) {
+        const { [itemId]: _omitido, ...resto } = prev
+        return resto
+      }
+      return { ...prev, [itemId]: actual - 1 }
+    })
+  }
+
+  async function onEnviarPedido() {
+    if (itemsCarrito.length === 0) return
+    setEnvio({ estado: 'enviando', error: '', pedido: null })
+    try {
+      const payload = {
+        claveIdempotencia: claveIdempotenciaRef.current,
+        items: itemsCarrito.map(({ item, cantidad }) => ({ itemMenuId: item.id, cantidad })),
+        notas: notas.trim() || undefined,
+        // Sin consentimiento explicito, no se manda absolutamente ningun
+        // dato del comensal -- ni siquiera un objeto vacio (ver
+        // PedidoService.crearComensalSiAplica en el backend, que hace la
+        // misma verificacion del lado del servidor: esto no depende de que
+        // el frontend "se porte bien").
+        comensal: comensalConsentimiento
+          ? {
+              nombre: comensalNombre.trim() || undefined,
+              telefono: comensalTelefono.trim() || undefined,
+              consentimiento: true,
+            }
+          : null,
+      }
+      const pedido = await crearPedido(token, payload)
+      setEnvio({ estado: 'exito', error: '', pedido })
+      setCarrito({})
+      claveIdempotenciaRef.current = generarClaveIdempotencia()
+    } catch (e) {
+      setEnvio({ estado: 'error', error: e.message, pedido: null })
+    }
+  }
+
+  function onCerrarModal() {
+    if (envio.estado === 'enviando') return
+    setModalAbierto(false)
+    if (envio.estado === 'exito') {
+      // Deja el formulario limpio para la proxima ronda de pedido de esta
+      // misma mesa -- una sesion de mesa dura horas (RF-08) y puede incluir
+      // varios pedidos (entrada, luego postre, etc.).
+      setEnvio({ estado: 'idle', error: '', pedido: null })
+      setNotas('')
+    }
+  }
+
   if (estado === 'cargando') {
     return (
       <div className="min-h-dvh flex items-center justify-center px-6">
@@ -138,7 +246,11 @@ export default function CartaPage() {
         </nav>
       </header>
 
-      <main className="px-4 sm:px-6 py-6 max-w-3xl mx-auto pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+      <main
+        className={`px-4 sm:px-6 py-6 max-w-3xl mx-auto ${
+          cantidadTotalCarrito > 0 ? 'pb-28' : 'pb-[max(1.5rem,env(safe-area-inset-bottom))]'
+        }`}
+      >
         {carta.categorias.length === 0 && (
           <p className="text-center text-sm text-carbon-900/40 py-16">
             Esta carta todavía no tiene platos publicados.
@@ -162,7 +274,13 @@ export default function CartaPage() {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {cat.items.map((item) => (
-                    <ItemCarta key={item.id} item={item} />
+                    <ItemCarta
+                      key={item.id}
+                      item={item}
+                      cantidadEnCarrito={carrito[item.id] || 0}
+                      onAgregar={() => agregarUnidad(item.id)}
+                      onQuitar={() => quitarUnidad(item.id)}
+                    />
                   ))}
                 </div>
               )}
@@ -174,11 +292,48 @@ export default function CartaPage() {
           Carta digital por Mezzalia
         </p>
       </main>
+
+      {/* Barra de carrito: solo aparece con items adentro. Fixed (no
+          sticky) para que quede siempre visible sobre el contenido, con
+          padding de safe-area para no quedar debajo de la barra de gestos
+          de iPhone/Android. */}
+      {cantidadTotalCarrito > 0 && (
+        <button
+          onClick={() => setModalAbierto(true)}
+          className="fixed bottom-0 inset-x-0 z-30 flex items-center justify-between gap-3 px-4 sm:px-6 py-3.5 text-white animate-fadeInUp shadow-[0_-4px_20px_rgba(0,0,0,0.15)]"
+          style={{
+            backgroundColor: 'var(--color-acento)',
+            paddingBottom: 'max(0.875rem, env(safe-area-inset-bottom))',
+          }}
+        >
+          <span className="text-sm font-medium">
+            {cantidadTotalCarrito} {cantidadTotalCarrito === 1 ? 'ítem' : 'ítems'}
+          </span>
+          <span className="text-sm font-semibold">Ver pedido · {formatoPrecio.format(totalCarrito)}</span>
+        </button>
+      )}
+
+      <ModalCheckout
+        abierto={modalAbierto}
+        onCerrar={onCerrarModal}
+        itemsCarrito={itemsCarrito}
+        total={totalCarrito}
+        notas={notas}
+        setNotas={setNotas}
+        comensalNombre={comensalNombre}
+        setComensalNombre={setComensalNombre}
+        comensalTelefono={comensalTelefono}
+        setComensalTelefono={setComensalTelefono}
+        comensalConsentimiento={comensalConsentimiento}
+        setComensalConsentimiento={setComensalConsentimiento}
+        envio={envio}
+        onEnviar={onEnviarPedido}
+      />
     </div>
   )
 }
 
-function ItemCarta({ item }) {
+function ItemCarta({ item, cantidadEnCarrito, onAgregar, onQuitar }) {
   return (
     <div className={`tarjeta-item animate-fadeInUp ${!item.disponible ? 'opacity-70' : ''}`}>
       <div className="relative aspect-[4/3] bg-papel-200">
@@ -195,7 +350,9 @@ function ItemCarta({ item }) {
         )}
         {/* RF-02: agotado se muestra visualmente distinto, NUNCA desaparece
             de la carta -- el comensal debe poder seguir viendo que el plato
-            existe, solo que hoy no está disponible. */}
+            existe, solo que hoy no está disponible. Tampoco se puede
+            agregar al carrito -- ver el stepper mas abajo, que ni siquiera
+            se renderiza si !item.disponible. */}
         {!item.disponible && (
           <div className="absolute inset-0 flex items-center justify-center bg-carbon-950/40">
             <span className="bg-carbon-950/80 text-white text-xs font-medium px-3 py-1 rounded-full tracking-wide">
@@ -217,7 +374,207 @@ function ItemCarta({ item }) {
         {item.descripcion && (
           <p className="text-xs text-carbon-900/50 mt-1 line-clamp-2">{item.descripcion}</p>
         )}
+
+        {item.disponible && (
+          <div className="mt-3 flex justify-end">
+            {cantidadEnCarrito > 0 ? (
+              <div className="flex items-center gap-3 bg-papel-200 rounded-full pl-1 pr-1 py-1">
+                <button
+                  onClick={onQuitar}
+                  aria-label={`Quitar una unidad de ${item.nombre}`}
+                  className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-carbon-950 font-semibold leading-none"
+                >
+                  −
+                </button>
+                <span className="text-sm font-semibold w-4 text-center tabular-nums">{cantidadEnCarrito}</span>
+                <button
+                  onClick={onAgregar}
+                  aria-label={`Agregar una unidad de ${item.nombre}`}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-white font-semibold leading-none"
+                  style={{ backgroundColor: 'var(--color-acento)' }}
+                >
+                  +
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={onAgregar}
+                className="text-xs font-medium px-3.5 py-1.5 rounded-full text-white"
+                style={{ backgroundColor: 'var(--color-acento)' }}
+              >
+                + Agregar
+              </button>
+            )}
+          </div>
+        )}
       </div>
+    </div>
+  )
+}
+
+function ModalCheckout({
+  abierto,
+  onCerrar,
+  itemsCarrito,
+  total,
+  notas,
+  setNotas,
+  comensalNombre,
+  setComensalNombre,
+  comensalTelefono,
+  setComensalTelefono,
+  comensalConsentimiento,
+  setComensalConsentimiento,
+  envio,
+  onEnviar,
+}) {
+  if (!abierto) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div
+        className="absolute inset-0 bg-carbon-950/50"
+        onClick={envio.estado === 'enviando' ? undefined : onCerrar}
+        aria-hidden="true"
+      />
+      <div
+        className="relative w-full sm:max-w-md sm:mx-4 bg-papel-100 rounded-t-3xl sm:rounded-2xl max-h-[90dvh] overflow-y-auto animate-fadeInUp"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        {envio.estado === 'exito' ? (
+          <ConfirmacionPedido pedido={envio.pedido} onCerrar={onCerrar} />
+        ) : (
+          <div className="p-5 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-display text-xl text-carbon-950">Tu pedido</h2>
+              <button
+                onClick={onCerrar}
+                aria-label="Cerrar"
+                className="w-9 h-9 -mr-1.5 flex items-center justify-center rounded-full text-carbon-900/40 hover:bg-carbon-950/5"
+              >
+                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+
+            {itemsCarrito.length === 0 ? (
+              <p className="text-sm text-carbon-900/50 py-6 text-center">Tu pedido está vacío.</p>
+            ) : (
+              <div className="space-y-2.5 mb-4">
+                {itemsCarrito.map(({ item, cantidad }) => (
+                  <div key={item.id} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="text-carbon-900/80">
+                      {cantidad}× {item.nombre}
+                    </span>
+                    <span className="font-medium text-carbon-950 whitespace-nowrap">
+                      {formatoPrecio.format(item.precio * cantidad)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between text-base font-semibold border-t border-carbon-950/10 pt-3 mb-5">
+              <span className="text-carbon-950">Total</span>
+              <span style={{ color: 'var(--color-acento)' }}>{formatoPrecio.format(total)}</span>
+            </div>
+
+            <label className="block text-xs uppercase tracking-wide text-carbon-900/40 mb-1.5">
+              Notas para cocina (opcional)
+            </label>
+            <textarea
+              value={notas}
+              onChange={(e) => setNotas(e.target.value)}
+              placeholder="Ej. sin cebolla, término de la carne, alergias…"
+              rows={2}
+              maxLength={500}
+              className="w-full rounded-xl border border-carbon-950/10 bg-white px-3 py-2 text-sm mb-5 focus:outline-none focus:ring-2 focus:ring-carbon-950/15"
+            />
+
+            <div className="rounded-xl border border-carbon-950/10 bg-white p-4 mb-5">
+              <label className="flex items-start gap-2.5 mb-3">
+                <input
+                  type="checkbox"
+                  checked={comensalConsentimiento}
+                  onChange={(e) => setComensalConsentimiento(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 shrink-0 accent-current"
+                  style={{ color: 'var(--color-acento)' }}
+                />
+                {/* Texto de consentimiento PLACEHOLDER: el aviso de
+                    privacidad real (que datos se guardan, por cuanto
+                    tiempo, con quien se comparten) esta pendiente de
+                    revision legal -- documentacion-tecnica.md §15.2. Esto
+                    cubre solo el mecanismo tecnico de RF-13 (nada se
+                    guarda sin este check marcado), no el texto definitivo. */}
+                <span className="text-xs text-carbon-900/60 leading-relaxed">
+                  Acepto compartir mi nombre y/o teléfono para que el restaurante pueda
+                  contactarme sobre este pedido si es necesario (opcional).
+                </span>
+              </label>
+
+              {comensalConsentimiento && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    value={comensalNombre}
+                    onChange={(e) => setComensalNombre(e.target.value)}
+                    placeholder="Tu nombre (opcional)"
+                    maxLength={150}
+                    className="rounded-lg border border-carbon-950/10 bg-papel-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-carbon-950/15"
+                  />
+                  <input
+                    value={comensalTelefono}
+                    onChange={(e) => setComensalTelefono(e.target.value)}
+                    placeholder="Tu teléfono (opcional)"
+                    inputMode="tel"
+                    maxLength={30}
+                    className="rounded-lg border border-carbon-950/10 bg-papel-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-carbon-950/15"
+                  />
+                </div>
+              )}
+            </div>
+
+            {envio.estado === 'error' && (
+              <div className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {envio.error}
+              </div>
+            )}
+
+            <button
+              onClick={onEnviar}
+              disabled={envio.estado === 'enviando' || itemsCarrito.length === 0}
+              className="w-full rounded-xl py-3 text-sm font-semibold text-white transition-opacity duration-150 disabled:opacity-50"
+              style={{ backgroundColor: 'var(--color-acento)' }}
+            >
+              {envio.estado === 'enviando' ? 'Enviando…' : `Enviar pedido · ${formatoPrecio.format(total)}`}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ConfirmacionPedido({ pedido, onCerrar }) {
+  return (
+    <div className="p-6 sm:p-8 text-center">
+      <div className="w-14 h-14 rounded-full bg-green-100 text-green-700 flex items-center justify-center mx-auto mb-4">
+        <svg viewBox="0 0 24 24" className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 6L9 17l-5-5" />
+        </svg>
+      </div>
+      <h2 className="font-display text-xl text-carbon-950 mb-1">¡Pedido enviado!</h2>
+      <p className="text-sm text-carbon-900/50 mb-6">
+        {pedido?.id ? `Tu pedido #${pedido.id} fue recibido.` : 'Tu pedido fue recibido.'} El mesero lo confirmará
+        en un momento.
+      </p>
+      <button
+        onClick={onCerrar}
+        className="w-full rounded-xl py-3 text-sm font-semibold text-white"
+        style={{ backgroundColor: 'var(--color-acento)' }}
+      >
+        Seguir viendo la carta
+      </button>
     </div>
   )
 }

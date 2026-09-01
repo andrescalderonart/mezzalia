@@ -11,3 +11,25 @@ export async function obtenerCarta(token) {
   }
   return datos
 }
+
+
+/**
+ * RF-03/RF-04: crea un pedido para la mesa detras de este token. El
+ * `payload` no lleva ningun precio -- ver ItemSolicitadoRequest en el
+ * backend: el precio siempre se recalcula del lado del servidor (RF-05).
+ * `claveIdempotencia` debe ser la MISMA en un reintento del mismo intento
+ * de envio (ver CartaPage.jsx) para que un doble-tap o un timeout de red no
+ * cree un pedido duplicado.
+ */
+export async function crearPedido(token, payload) {
+  const resp = await fetch(`/api/publico/mesas/${encodeURIComponent(token)}/pedidos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const datos = await resp.json().catch(() => null)
+  if (!resp.ok) {
+    throw new Error(datos?.mensaje || 'No se pudo enviar el pedido.')
+  }
+  return datos
+}

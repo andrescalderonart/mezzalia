@@ -38,6 +38,22 @@ public final class MenuExceptions {
     }
 
     /**
+     * RF-05: un plato puede pasar a "agotado" (ItemMenu.disponible = false)
+     * en cualquier momento, incluso mientras un comensal ya lo tenia en su
+     * carrito. Distinto de ItemMenuNoEncontradoException (404): el item SI
+     * existe y SI pertenece a este tenant -- por eso 409 CONFLICT, no 404 --
+     * el comensal ya lo vio en la carta que le sirvio este mismo tenant, asi
+     * que no hay riesgo de confirmarle a un desconocido que un recurso
+     * existe en otro tenant (ver MenuService.obtenerItem para ese criterio).
+     */
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public static class ItemNoDisponibleException extends RuntimeException {
+        public ItemNoDisponibleException(Long id) {
+            super("El item con id " + id + " ya no esta disponible");
+        }
+    }
+
+    /**
      * SUPER_ADMIN (equipo Mezzalia) no tiene tenant_id propio -- no gestiona
      * la carta de un restaurante específico. Si de alguna forma llega hasta
      * acá (no debería, ver RolUsuario), es un 403 explícito, no un 500

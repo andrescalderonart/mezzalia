@@ -4,6 +4,12 @@ import com.mezzalia.mesa.SesionMesa;
 import com.mezzalia.mesa.excepcion.MesaExceptions;
 import com.mezzalia.mesa.servicio.MesaService;
 import com.mezzalia.menu.dto.CartaPublicaDto;
+import com.mezzalia.pedido.Pedido;
+import com.mezzalia.pedido.dto.CrearPedidoRequest;
+import com.mezzalia.pedido.dto.PedidoDto;
+import com.mezzalia.pedido.dto.PedidoItemDto;
+import com.mezzalia.pedido.servicio.PedidoService;
+
 import com.mezzalia.menu.dto.CategoriaPublicaDto;
 import com.mezzalia.menu.dto.ItemPublicoDto;
 import com.mezzalia.menu.servicio.MenuService;
@@ -11,6 +17,7 @@ import com.mezzalia.tenant.Tenant;
 import com.mezzalia.tenant.TenantFilterActivator;
 import com.mezzalia.tenant.dto.BrandingDto;
 import com.mezzalia.tenant.servicio.TenantService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +28,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/publico/mesas")
 @RequiredArgsConstructor
@@ -30,6 +39,7 @@ public class MenuPublicoController {
     private final MenuService menuService;
     private final TenantService tenantService;
     private final TenantFilterActivator tenantFilterActivator;
+    private final PedidoService pedidoService;
 
     /**
      * RF-01/RF-02: el comensal ve la carta vigente -- incluidos los ítems
@@ -75,18 +85,37 @@ public class MenuPublicoController {
     }
 
     /**
-     * RF-03..RF-07: el módulo `pedidos` (carrito, idempotencia, recálculo de
-     * precio en servidor, websocket al panel, captura de datos del comensal
-     * bajo Habeas Data para RF-13) todavía no existe -- ver
-     * docs/documentacion-tecnica.md §13, Fase 1, y §15.2 (retención de datos
-     * del comensal y texto de aviso de privacidad siguen sin resolver, y son
-     * trabajo legal, no de arquitectura). 501 explícito en vez de 200 vacío:
-     * la versión anterior de este endpoint devolvía 200 OK sin hacer nada,
-     * lo cual le habría hecho creer a un comensal real que su pedido se
-     * envió correctamente -- eso es peor que no tener el endpoint.
+     * RF-03..RF-08: implementacion real -- reemplaza el 501 explicito que
+     * habia antes. Mismo patron de resolucion publica que obtenerCarta: el
+     * token de la URL es la unica credencial, se resuelve tenant+mesa a
+     * partir de el, y se activa el filtro de tenant a mano
+     * (TenantFilterActivator) para poder reusar PedidoService/MenuService
+     * sin fuga entre tenants -- ver el comentario de obtenerCarta arriba
+     * para el detalle de por que esto no es opcional.
      */
     @PostMapping("/{token}/pedidos")
-    public ResponseEntity<Void> crearPedido(@PathVariable String token, @RequestBody Object body) {
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+    public ResponseEntity<PedidoDto> crearPedido(@PathVariable String token, @Valid @RequestBody CrearPedidoRequest request) {
+        SesionMesa sesion = mesaService.resolverSesionValida(token);
+        Long tenantId = sesion.getTenantId();
+
+        Tenant tenant = tenantService.obtenerPorId(tenantId);
+        if (tenant.estaSuspendido()) {
+            // Mismo criterio que en obtenerCarta: 404 generico, nunca un
+            // estado que le confirme a un desconocido que el restaurante
+            // existe pero esta suspendido.
+            throw new MesaExceptions.RestauranteNoDisponibleException();
+        }
+
+        PedidoDto dto = tenantFilterActivator.ejecutarConTenant(tenantId, () -> {
+            Pedido pedido = pedidoService.crearPedido(
+                    sesion.getMesaId(), request.claveIdempotencia(), request.items(),
+                    request.notas(), request.comensal());
+            List<PedidoItemDto> items = pedidoService.listarItems(pedido.getId()).stream()
+                    .map(PedidoItemDto::desde)
+                    .toList();
+            return PedidoDto.desde(pedido, items);
+        });
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }
 }

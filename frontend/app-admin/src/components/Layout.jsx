@@ -88,6 +88,16 @@ export default function Layout() {
 
         <nav className="flex-1 px-3 space-y-1">
           <NavLink
+            to="/pedidos"
+            className={({ isActive }) =>
+              `flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150 ${
+                isActive ? 'bg-carbon-800 text-dorado' : 'text-crema/70 hover:bg-carbon-800 hover:text-crema'
+              }`
+            }
+          >
+            Pedidos
+          </NavLink>
+          <NavLink
             to="/menu"
             className={({ isActive }) =>
               `flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150 ${

@@ -41,6 +41,11 @@ public class MenuExceptionHandler {
         return respuesta(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
+    @ExceptionHandler(MenuExceptions.ItemNoDisponibleException.class)
+    public ResponseEntity<Map<String, Object>> handleItemNoDisponible(MenuExceptions.ItemNoDisponibleException ex) {
+        return respuesta(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
     @ExceptionHandler(MenuExceptions.ArchivoInvalidoException.class)
     public ResponseEntity<Map<String, Object>> handleArchivoInvalido(MenuExceptions.ArchivoInvalidoException ex) {
         return respuesta(HttpStatus.BAD_REQUEST, ex.getMessage());
