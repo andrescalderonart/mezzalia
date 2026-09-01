@@ -26,7 +26,7 @@ export default {
       },
       fontFamily: {
         display: ['"Playfair Display"', 'serif'],
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Sora', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         glow: '0 0 0 1px rgba(212,162,76,0.25), 0 8px 24px -8px rgba(193,80,46,0.35)',

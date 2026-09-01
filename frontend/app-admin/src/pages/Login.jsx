@@ -29,7 +29,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <div className="min-h-dvh flex items-center justify-center px-4 py-8">
       <div className={`card w-full max-w-sm p-8 animate-fadeInUp ${sacudir ? 'animate-shake' : ''}`}>
         <div className="flex flex-col items-center mb-8">
           <LogoMark className="w-14 h-14 mb-3" />

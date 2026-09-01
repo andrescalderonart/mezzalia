@@ -164,24 +164,28 @@ export default function MenuPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-[220px_1fr] gap-6">
+      {/* En pantallas angostas las categorías van arriba como una fila de
+          chips con scroll horizontal (mismo <ul>, solo cambia flex-direction
+          por breakpoint); desde lg se acomodan como sidebar vertical de
+          220px, como en escritorio. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-4 lg:gap-6">
         {/* ── Categorías ─────────────────────────────────────────── */}
-        <div className="card p-4 h-fit">
+        <div className="card p-4 lg:h-fit">
           <h2 className="text-xs uppercase tracking-wide text-crema/50 mb-3">Categorías</h2>
 
           {cargandoCategorias ? (
-            <div className="space-y-2">
+            <div className="flex flex-row gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0 lg:space-y-2">
               {[1, 2, 3].map((n) => (
-                <div key={n} className="h-8 rounded-lg bg-carbon-800 animate-pulseSoft" />
+                <div key={n} className="h-8 w-24 shrink-0 lg:w-full rounded-lg bg-carbon-800 animate-pulseSoft" />
               ))}
             </div>
           ) : (
-            <ul className="space-y-1">
+            <ul className="flex flex-row gap-2 overflow-x-auto pb-1 -mx-1 px-1 lg:flex-col lg:overflow-visible lg:pb-0 lg:mx-0 lg:px-0 lg:space-y-1">
               {categorias.map((cat) => (
-                <li key={cat.id}>
+                <li key={cat.id} className="shrink-0 lg:shrink">
                   <button
                     onClick={() => setCategoriaId(cat.id)}
-                    className={`w-full text-left rounded-lg px-3 py-2 text-sm transition-colors duration-150 ${
+                    className={`whitespace-nowrap lg:whitespace-normal lg:w-full text-left rounded-lg px-3 py-2 text-sm transition-colors duration-150 ${
                       cat.id === categoriaId
                         ? 'bg-carbon-800 text-dorado'
                         : 'text-crema/70 hover:bg-carbon-800 hover:text-crema'
@@ -205,7 +209,7 @@ export default function MenuPage() {
                 value={nombreNuevaCategoria}
                 onChange={(e) => setNombreNuevaCategoria(e.target.value)}
               />
-              <button type="submit" disabled={creandoCategoria} className="btn-secundario w-full text-xs py-1.5">
+              <button type="submit" disabled={creandoCategoria} className="btn-secundario w-full text-xs py-2">
                 {creandoCategoria ? 'Creando…' : '+ Agregar categoría'}
               </button>
             </form>
@@ -213,29 +217,29 @@ export default function MenuPage() {
         </div>
 
         {/* ── Ítems ──────────────────────────────────────────────── */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
+        <div className="min-w-0">
+          <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
             <h2 className="text-sm text-crema/60">
               {categorias.find((c) => c.id === categoriaId)?.nombre || 'Selecciona una categoría'}
             </h2>
             {puedeEditar && categoriaId && (
-              <button onClick={() => setModal({ modo: 'crear' })} className="btn-primario text-xs py-1.5">
+              <button onClick={() => setModal({ modo: 'crear' })} className="btn-primario text-xs py-2">
                 + Nuevo plato
               </button>
             )}
           </div>
 
           {cargandoItems ? (
-            <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {[1, 2, 3].map((n) => (
                 <div key={n} className="h-40 rounded-2xl bg-carbon-800 animate-pulseSoft" />
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {items.map((item) => (
                 <div key={item.id} className="card overflow-hidden animate-fadeInUp group">
-                  <div className="h-32 bg-carbon-800 overflow-hidden">
+                  <div className="aspect-[4/3] bg-carbon-800 overflow-hidden">
                     {item.imagenUrl ? (
                       <img
                         src={item.imagenUrl}
@@ -259,7 +263,7 @@ export default function MenuPage() {
                       <p className="text-xs text-crema/40 mt-1 line-clamp-2">{item.descripcion}</p>
                     )}
 
-                    <div className="flex items-center justify-between mt-3">
+                    <div className="mt-3 space-y-2">
                       <button
                         onClick={() => puedeEditar && onCambiarDisponibilidad(item)}
                         disabled={!puedeEditar}
@@ -273,14 +277,14 @@ export default function MenuPage() {
                       </button>
 
                       {puedeEditar && (
-                        <div className="flex gap-1.5">
+                        <div className="flex gap-2">
                           <button
                             onClick={() => setModal({ modo: 'editar', item })}
-                            className="btn-secundario text-xs px-2 py-1"
+                            className="btn-secundario flex-1 text-xs py-2"
                           >
                             Editar
                           </button>
-                          <button onClick={() => onEliminarItem(item)} className="btn-peligro">
+                          <button onClick={() => onEliminarItem(item)} className="btn-peligro flex-1 py-2">
                             Eliminar
                           </button>
                         </div>
@@ -333,8 +337,12 @@ function ModalItem({ modo, item, onCancelar, onGuardar }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-carbon-950/80 backdrop-blur-sm flex items-center justify-center px-4 z-50 animate-fadeInUp">
-      <div className="card w-full max-w-md p-6">
+    <div className="fixed inset-0 bg-carbon-950/80 backdrop-blur-sm flex items-center justify-center px-4 py-6 z-50 animate-fadeInUp">
+      {/* max-h-[90dvh] + overflow-y-auto: en un celular con el teclado
+          abierto la altura visible baja muchísimo (iPhone SE ~= 400px
+          libres) y este formulario tiene 4 campos + 2 botones -- sin esto
+          el botón "Guardar" queda fuera de pantalla e inalcanzable. */}
+      <div className="card w-full max-w-md p-6 max-h-[90dvh] overflow-y-auto">
         <h2 className="font-display text-xl text-crema mb-4">
           {modo === 'crear' ? 'Nuevo plato' : 'Editar plato'}
         </h2>
