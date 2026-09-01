@@ -32,3 +32,8 @@ application-local.properties
 # Imagenes subidas en local (AlmacenamientoImagenService, disco local dev)
 backend/uploads/
 backend/uploads-test/
+
+# Base de datos H2 persistente del perfil `h2` (application-h2.yml) --
+# archivo real con datos locales (y password hashes), nunca se commitea,
+# igual criterio que backend/uploads/ de arriba.
+backend/data/

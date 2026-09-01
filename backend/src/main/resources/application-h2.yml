@@ -1,21 +1,49 @@
 # Perfil `h2`: levanta la app COMPLETA sin Docker ni MySQL, para probar en
-# local cuando no se tiene Docker Desktop instalado. NO usa Flyway (las
-# migraciones en db/migration son SQL específico de MySQL) — Hibernate genera
-# el esquema directamente desde las entidades. Igual que en los tests: esto
-# valida el comportamiento de la aplicación, no las migraciones reales — esas
-# se siguen probando de verdad contra MySQL (CI, o `docker compose up`).
+# local cuando no se tiene Docker Desktop instalado.
+#
+# `jdbc:h2:file:...` (antes `jdbc:h2:mem:...`): la base ahora vive en un
+# archivo real bajo backend/data/, no solo en memoria del proceso -- los
+# datos (tenants, usuarios, categorias, items, mesas) sobreviven un reinicio
+# de la app. `AUTO_SERVER=TRUE` permite abrir el archivo desde más de un
+# proceso a la vez (la app corriendo Y la consola /h2-console/un test local
+# al mismo tiempo) sin que el segundo se quede bloqueado por el primero --
+# sin esto, abrir la consola H2 mientras la app está corriendo falla con
+# "Database may be already in use" apenas se intenta.
+#
+# `ddl-auto: update` en vez de `create-drop`: create-drop BORRA el esquema
+# completo al apagar la app -- con almacenamiento en archivo eso habría
+# dejado el archivo persistente pero vacío en cada reinicio, sin resolver
+# nada. `update` crea las tablas que falten y agrega columnas nuevas sin
+# borrar datos existentes. Limitación conocida y aceptada a propósito: no
+# aplica bien un cambio de tipo de columna ni un borrado de columna -- si
+# eso pasa alguna vez, borrar backend/data/ y dejar que arranque de cero es
+# más simple que perseguir ese caso acá. Esto NUNCA debe usarse en
+# producción (ahí sigue `ddl-auto: validate` + Flyway real, ver
+# application.yml) -- este archivo es exclusivamente el perfil `h2` de
+# desarrollo local.
+#
+# Se sigue SIN usar Flyway acá (las migraciones en db/migration son SQL
+# específico de MySQL -- ENGINE=InnoDB, COLLATE=utf8mb4_unicode_ci -- que el
+# parser de H2 no garantiza aceptar igual, y no hay forma de probarlo sin
+# arrancar la app de verdad). Hibernate sigue generando el esquema desde las
+# entidades. Consecuencia ya documentada antes: esto valida el
+# COMPORTAMIENTO de la aplicación, no las migraciones reales -- esas se
+# siguen probando de verdad contra MySQL (CI, o `docker compose up`).
 #
 # Uso: SPRING_PROFILES_ACTIVE=dev,h2 (junto con el perfil `dev` para que
-# también corran los seeds de SeedSuperAdminConfig/SeedDatosDemoConfig).
+# también corran los seeds de SeedSuperAdminConfig/SeedDatosDemoConfig --
+# ambos ya son idempotentes, confirmado leyendo el código: usan
+# existsByUsername/findByNombre-orElseGet antes de insertar, así que
+# reiniciar la app con datos ya persistidos no los duplica ni falla).
 spring:
   datasource:
-    url: jdbc:h2:mem:mezzalia;DB_CLOSE_DELAY=-1
+    url: jdbc:h2:file:./data/mezzalia;AUTO_SERVER=TRUE
     driver-class-name: org.h2.Driver
     username: sa
     password:
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect
