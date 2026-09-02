@@ -31,8 +31,20 @@ public class MesaService {
     private final MesaRepository mesaRepository;
     private final SesionMesaRepository sesionMesaRepository;
 
+    /**
+     * Defensa explicita, mismo criterio que crearMesa()/obtenerMesa():
+     * este metodo depende del filtro de Hibernate (tenantFilter) para el
+     * aislamiento entre tenants, pero ese filtro NUNCA se activa para
+     * SUPER_ADMIN (TenantContext vacio a proposito -- ver
+     * JwtAuthenticationFilter, "tenantId ausente = SUPER_ADMIN"). Sin este
+     * guardia, un token SUPER_ADMIN recibia las mesas de TODOS los
+     * restaurantes en una sola lista con GET /api/admin/mesas --
+     * tenantActual() lanza si no hay contexto, cerrando ese hueco igual que
+     * ya cierra el resto de metodos de escritura de este servicio.
+     */
     @Transactional(readOnly = true)
     public List<Mesa> listarMesas() {
+        tenantActual();
         return mesaRepository.findByActivaTrueOrderByCodigoAsc();
     }
 
