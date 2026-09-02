@@ -36,10 +36,38 @@ public class MesaService {
         return mesaRepository.findByActivaTrueOrderByCodigoAsc();
     }
 
+    /**
+     * Unicidad de `codigo` por tenant, solo entre mesas ACTIVAS (RF-09,
+     * decision tomada en esta sesion tras encontrar que no existia ninguna
+     * restriccion: dos mesas "M1" simultaneas dejarian a un mesero sin
+     * forma de distinguir cual QR es cual).
+     *
+     * Chequeo de aplicacion (leer-antes-de-escribir), NO una restriccion
+     * UNIQUE de base de datos como la de Pedido.claveIdempotencia, a
+     * proposito, por dos motivos:
+     *  1. El alcance real es "unico entre las activas", no "unico para
+     *     siempre": no hay endpoint para renombrar el codigo de una mesa,
+     *     asi que si se desactiva "M1" y despues se quiere dar de alta una
+     *     mesa fisica nueva con esa misma etiqueta, eso deberia poder
+     *     hacerse. Una UNIQUE KEY de MySQL no distingue activa/inactiva sin
+     *     un indice parcial (que MySQL no soporta de forma nativa como si
+     *     lo hace Postgres) -- habria bloqueado esa reutilizacion legitima
+     *     para siempre.
+     *  2. Esta es una accion administrativa de baja frecuencia y ritmo
+     *     humano (un ADMIN_RESTAURANTE dando de alta una mesa desde el
+     *     panel), no el endpoint publico sin auth de pedidos -- el perfil
+     *     de riesgo de una carrera real aca (dos admins creando "M1" en el
+     *     mismo instante) es muchisimo mas bajo que el de RF-04, que si
+     *     justifica la garantia dura de una restriccion de base de datos.
+     */
     @Transactional
     public Mesa crearMesa(String codigo) {
+        Long tenantId = tenantActual();
+        if (mesaRepository.existsByTenantIdAndCodigoAndActivaTrue(tenantId, codigo)) {
+            throw new MesaExceptions.CodigoMesaDuplicadoException(codigo);
+        }
         Mesa mesa = new Mesa();
-        mesa.setTenantId(tenantActual());
+        mesa.setTenantId(tenantId);
         mesa.setCodigo(codigo);
         return mesaRepository.save(mesa);
     }
