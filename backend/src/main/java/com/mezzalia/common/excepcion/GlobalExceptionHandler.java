@@ -34,9 +34,17 @@ public class GlobalExceptionHandler {
         return respuesta(HttpStatus.CONFLICT, ex.getMessage());
     }
 
+    // 409, no 403: los unicos caminos que lanzan esta excepcion
+    // (MenuPublicoController, TenantPublicoController) son publicos y sin
+    // autenticacion -- no hay ninguna identidad a la que "autorizar" aca.
+    // Lo que bloquea la request es el ESTADO del tenant (SUSPENDIDO), un
+    // estado reversible por diseno (ver TenantService.reactivarTenant), no
+    // un problema de permisos del llamador. 403 sugeria "vos no tenes
+    // permiso"; 409 dice lo que realmente pasa: "este recurso esta en un
+    // estado que bloquea esto ahora mismo, y puede cambiar".
     @ExceptionHandler(DomainExceptions.TenantSuspendidoException.class)
     public ResponseEntity<Map<String, Object>> handleTenantSuspendido(DomainExceptions.TenantSuspendidoException ex) {
-        return respuesta(HttpStatus.FORBIDDEN, ex.getMessage());
+        return respuesta(HttpStatus.CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(DomainExceptions.ColorHexInvalidoException.class)
