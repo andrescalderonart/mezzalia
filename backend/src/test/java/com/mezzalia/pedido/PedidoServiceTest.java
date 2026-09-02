@@ -176,6 +176,59 @@ class PedidoServiceTest {
     }
 
     @Test
+    void masDeVeinteNuevosPedidosEnCincoMinutosParaLaMismaMesaLanzaExcepcionDeLimite() {
+        // 20 es el limite documentado en PedidoService.LIMITE_PEDIDOS_POR_VENTANA
+        // (privado, hardcodeado aca a proposito -- ver el comentario en
+        // tablaCompletaDeTransicionesValidasEInvalidas sobre por que un test
+        // no deberia leer la constante privada de la implementacion).
+        PedidoService pedidoService = nuevoPedidoService();
+        Escenario e = prepararEscenario("Restaurante Limite Volumen");
+        ItemMenu item = crearItem(e.categoria, "Agua", "3000");
+        testEntityManager.flush();
+
+        for (int i = 0; i < 20; i++) {
+            pedidoService.crearPedido(e.mesa.getId(), UUID.randomUUID().toString(),
+                    List.of(new ItemSolicitadoRequest(item.getId(), 1)), null, null);
+        }
+        testEntityManager.flush();
+
+        assertThatThrownBy(() -> pedidoService.crearPedido(e.mesa.getId(), UUID.randomUUID().toString(),
+                List.of(new ItemSolicitadoRequest(item.getId(), 1)), null, null))
+                .isInstanceOf(PedidoExceptions.DemasiadosPedidosException.class);
+    }
+
+    @Test
+    void elLimiteDeVolumenEsPorMesaNoGlobal() {
+        PedidoService pedidoService = nuevoPedidoService();
+        Escenario mesaAgotada = prepararEscenario("Restaurante Limite A");
+        ItemMenu itemA = crearItem(mesaAgotada.categoria, "Agua", "3000");
+        Escenario otraMesa = prepararEscenario("Restaurante Limite B");
+        ItemMenu itemB = crearItem(otraMesa.categoria, "Agua", "3000");
+        testEntityManager.flush();
+
+        // prepararEscenario establece TenantContext (ThreadLocal) con el
+        // tenant que acaba de crear -- la segunda llamada (otraMesa) pisa el
+        // valor dejado por la primera. Sin re-establecerlo aca antes del
+        // loop, MenuService.obtenerItem busca itemA bajo el tenant de
+        // otraMesa y falla con ItemMenuNoEncontradoException.
+        TenantContext.establecerTenantId(mesaAgotada.tenant.getId());
+        for (int i = 0; i < 20; i++) {
+            pedidoService.crearPedido(mesaAgotada.mesa.getId(), UUID.randomUUID().toString(),
+                    List.of(new ItemSolicitadoRequest(itemA.getId(), 1)), null, null);
+        }
+        testEntityManager.flush();
+
+        // La mesa A ya esta en el limite; la mesa B (otro tenant en este
+        // fixture, pero el punto es que es otro mesaId) no deberia verse
+        // afectada.
+        TenantContext.establecerTenantId(otraMesa.tenant.getId());
+        Pedido pedidoDeOtraMesa = pedidoService.crearPedido(otraMesa.mesa.getId(), UUID.randomUUID().toString(),
+                List.of(new ItemSolicitadoRequest(itemB.getId(), 1)), null, null);
+
+        assertThat(pedidoDeOtraMesa.getId()).isNotNull();
+    }
+
+    @Test
     void cambiarAUnaTransicionInvalidaLanzaExcepcionYNoModificaElEstadoPersistido() {
         PedidoService pedidoService = nuevoPedidoService();
         Escenario e = prepararEscenario("Restaurante Transicion Invalida");

@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.EnumSet;
@@ -41,6 +42,22 @@ public class PedidoService {
      * una decision de producto nueva sobre esta tabla, no un bug de ella.
      */
     private static final Map<EstadoPedido, Set<EstadoPedido>> TRANSICIONES_VALIDAS = crearTransicionesValidas();
+
+    /**
+     * Backstop de abuso (RF-04/RF-05 no cubren esto: son sobre precio e
+     * idempotencia, no sobre volumen) del endpoint publico sin auth
+     * (MenuPublicoController.crearPedido) -- el token de la URL no es
+     * secreto (viaja en un QR fisico), asi que nada impide a alguien
+     * mandar cientos de POSTs distintos (cada uno con su propia
+     * claveIdempotencia valida) contra la misma mesa. 20 pedidos NUEVOS
+     * (no reintentos con la misma clave -- esos ni llegan aca, ver el
+     * chequeo de arriba en crearPedido) en 5 minutos es generoso para el
+     * uso real (una mesa pidiendo por rondas: entrada, plato fuerte,
+     * postre, bebidas extra) y muy por debajo de lo que un script de abuso
+     * intentaria.
+     */
+    private static final int LIMITE_PEDIDOS_POR_VENTANA = 20;
+    private static final int MINUTOS_VENTANA_LIMITE = 5;
 
     private static Map<EstadoPedido, Set<EstadoPedido>> crearTransicionesValidas() {
         Map<EstadoPedido, Set<EstadoPedido>> mapa = new EnumMap<>(EstadoPedido.class);
@@ -99,6 +116,15 @@ public class PedidoService {
                 .orElse(null);
         if (existente != null) {
             return existente;
+        }
+
+        // A partir de aca es un pedido genuinamente NUEVO (no un reintento
+        // con la misma clave) -- el chequeo de volumen va aqui, antes de
+        // tocar Comensal/MenuService, para no gastar ese trabajo en un
+        // request que de todos modos se va a rechazar.
+        LocalDateTime desde = LocalDateTime.now().minusMinutes(MINUTOS_VENTANA_LIMITE);
+        if (pedidoRepository.countByMesaIdAndCreadoEnAfter(mesaId, desde) >= LIMITE_PEDIDOS_POR_VENTANA) {
+            throw new PedidoExceptions.DemasiadosPedidosException();
         }
 
         if (itemsSolicitados == null || itemsSolicitados.isEmpty()) {

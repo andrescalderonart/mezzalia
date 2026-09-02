@@ -47,6 +47,11 @@ public class PedidoExceptionHandler {
         return respuesta(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 
+    @ExceptionHandler(PedidoExceptions.DemasiadosPedidosException.class)
+    public ResponseEntity<Map<String, Object>> handleDemasiadosPedidos(PedidoExceptions.DemasiadosPedidosException ex) {
+        return respuesta(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+    }
+
     private ResponseEntity<Map<String, Object>> respuesta(HttpStatus status, String mensaje) {
         return ResponseEntity.status(status).body(Map.of(
                 "timestamp", Instant.now().toString(),
