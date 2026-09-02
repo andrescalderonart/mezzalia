@@ -35,4 +35,14 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
      * de verdad ya es la tabla pedidos, no estado nuevo en memoria.
      */
     long countByMesaIdAndCreadoEnAfter(Long mesaId, LocalDateTime desde);
+
+    /**
+     * Uso exclusivo de ComensalService.eliminarDatosComensal (Habeas Data,
+     * documentacion-tecnica.md §10): antes de borrar un Comensal hace falta
+     * desvincular cada pedido que lo referencia (comensal_id es NULLABLE a
+     * proposito, ver Pedido.java) -- la FK fk_pedidos_comensal
+     * (V11__pedidos.sql) no tiene ON DELETE SET NULL, asi que un DELETE
+     * directo sobre comensales fallaria si queda algun pedido apuntandole.
+     */
+    List<Pedido> findByComensalId(Long comensalId);
 }

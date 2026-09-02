@@ -52,6 +52,11 @@ public class PedidoExceptionHandler {
         return respuesta(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
     }
 
+    @ExceptionHandler(PedidoExceptions.ComensalNoEncontradoException.class)
+    public ResponseEntity<Map<String, Object>> handleComensalNoEncontrado(PedidoExceptions.ComensalNoEncontradoException ex) {
+        return respuesta(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
     private ResponseEntity<Map<String, Object>> respuesta(HttpStatus status, String mensaje) {
         return ResponseEntity.status(status).body(Map.of(
                 "timestamp", Instant.now().toString(),

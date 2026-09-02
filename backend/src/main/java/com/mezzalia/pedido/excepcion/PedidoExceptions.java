@@ -64,4 +64,17 @@ public final class PedidoExceptions {
             super("Esta operacion requiere un usuario de restaurante autenticado (no SUPER_ADMIN)");
         }
     }
+
+    /**
+     * Habeas Data (documentacion-tecnica.md §10/RF-13): mismo criterio de
+     * "no encontrado" generico que el resto del modulo (nunca 403/404
+     * distinguible que le confirme a un tenant que el id existe en otro
+     * tenant) -- ver ComensalService.obtenerComensalDelTenant.
+     */
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public static class ComensalNoEncontradoException extends RuntimeException {
+        public ComensalNoEncontradoException(Long id) {
+            super("Comensal no encontrado con id: " + id);
+        }
+    }
 }
