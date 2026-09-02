@@ -3,8 +3,16 @@ import Login from './pages/Login.jsx'
 import MenuPage from './pages/MenuPage.jsx'
 import MesasPage from './pages/MesasPage.jsx'
 import PedidosPage from './pages/PedidosPage.jsx'
+import TenantsPage from './pages/TenantsPage.jsx'
 import Layout from './components/Layout.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
+import RutaConRol from './components/RutaConRol.jsx'
+import InicioRedirect from './components/InicioRedirect.jsx'
+
+// SUPER_ADMIN no pertenece a ningun tenant (a proposito, ver
+// UsuarioInterno/JwtAuthenticationFilter en el backend) -- menu/mesas/
+// pedidos son exclusivos de los roles que si operan un restaurante.
+const ROLES_RESTAURANTE = ['ADMIN_RESTAURANTE', 'MESERO']
 
 export default function App() {
   return (
@@ -13,15 +21,21 @@ export default function App() {
 
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
-          <Route path="/menu" element={<MenuPage />} />
-          <Route path="/mesas" element={<MesasPage />} />
-          <Route path="/pedidos" element={<PedidosPage />} />
-          {/* Pedidos (no /menu) es la pantalla por defecto: es el uso
-              operativo del dia a dia durante un turno (para ambos roles,
-              ver RF-09) -- editar la carta es una tarea ocasional de
-              configuracion, no lo primero que alguien necesita ver al
-              entrar. */}
-          <Route path="/" element={<Navigate to="/pedidos" replace />} />
+          <Route element={<RutaConRol permitidos={ROLES_RESTAURANTE} />}>
+            <Route path="/menu" element={<MenuPage />} />
+            <Route path="/mesas" element={<MesasPage />} />
+            <Route path="/pedidos" element={<PedidosPage />} />
+          </Route>
+
+          <Route element={<RutaConRol permitidos={['SUPER_ADMIN']} />}>
+            <Route path="/tenants" element={<TenantsPage />} />
+          </Route>
+
+          {/* El destino de "/" depende del rol -- ver InicioRedirect.jsx.
+              Para ADMIN_RESTAURANTE/MESERO sigue siendo /pedidos (uso
+              operativo del dia a dia durante un turno, ver RF-09); un
+              SUPER_ADMIN no tiene tenant y aterriza en /tenants. */}
+          <Route path="/" element={<InicioRedirect />} />
         </Route>
       </Route>
 
