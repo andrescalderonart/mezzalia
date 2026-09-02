@@ -116,6 +116,32 @@
                     </excludes>
                 </configuration>
             </plugin>
+            <plugin>
+                <!-- COMENSAL_ENCRYPTION_KEY es una variable de entorno del
+                     sistema operativo (AesGcmComensalCipher la lee via
+                     System.getenv, no via Spring @Value: ver el
+                     comentario en esa clase sobre por que). Cualquier test
+                     que persista un Comensal con telefono (ver
+                     PedidoServiceTest.conConsentimientoExplicitoSiPersisteElComensal)
+                     dispara ese converter, incluso en un @DataJpaTest que
+                     no carga el ApplicationRunner de arranque: Hibernate
+                     invoca el AttributeConverter por su cuenta, sin pasar
+                     por Spring. En vez de exigir que cada desarrollador
+                     recuerde setear esta variable a mano en su propia
+                     sesion de shell antes de correr mvn test (la misma
+                     fragilidad operativa ya documentada como riesgo real
+                     de este proyecto), Surefire se la inyecta el mismo al
+                     proceso de tests. Valor fijo SOLO PARA TESTS, nunca
+                     usar en dev/staging/produccion: mismo criterio que
+                     el JWT_SECRET de src/test/resources/application.yml. -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <environmentVariables>
+                        <COMENSAL_ENCRYPTION_KEY>OQIKasA27c4Px5Z3pA2upceGEhPZtuY9BZtgrZaNqPg=</COMENSAL_ENCRYPTION_KEY>
+                    </environmentVariables>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>

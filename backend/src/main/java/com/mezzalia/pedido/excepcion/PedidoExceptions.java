@@ -42,6 +42,21 @@ public final class PedidoExceptions {
         }
     }
 
+    /**
+     * Backstop de abuso del endpoint publico (sin auth) -- ver
+     * PedidoService.crearPedido/LIMITE_PEDIDOS_POR_VENTANA. No es un error
+     * del comensal en el sentido de RF-04/RF-05 (no confunde con
+     * PedidoDuplicadoException, que es sobre la MISMA clave de
+     * idempotencia); esto es sobre demasiados pedidos DISTINTOS en poco
+     * tiempo desde la misma mesa.
+     */
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public static class DemasiadosPedidosException extends RuntimeException {
+        public DemasiadosPedidosException() {
+            super("Se alcanzo el limite de pedidos para esta mesa en poco tiempo. Espera un momento e intenta de nuevo.");
+        }
+    }
+
     /** Mismo patron que menu/mesa: SUPER_ADMIN no tiene tenant_id propio. */
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public static class SinTenantEnContextoException extends RuntimeException {
