@@ -3,6 +3,8 @@ package com.mezzalia.common.excepcion;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpInputMessage;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 
 import java.util.Map;
 
@@ -51,6 +53,20 @@ class GlobalExceptionHandlerTest {
     @Test
     void colorHexInvalidoDevuelve400() {
         assertStatus(handler.handleColorHexInvalido(new DomainExceptions.ColorHexInvalidoException("azul")), HttpStatus.BAD_REQUEST);
+    }
+
+    /**
+     * JSON malformado o un enum invalido en un @RequestBody (ej. "estado":
+     * "COCINANDO" en el PATCH de pedidos) no es un fallo del servidor -- es
+     * un dato invalido del cliente. Sin este handler caia en el catch-all de
+     * abajo y devolvia 500.
+     */
+    @Test
+    void mensajeNoLegibleDevuelve400() {
+        HttpMessageNotReadableException ex =
+                new HttpMessageNotReadableException("JSON invalido", (HttpInputMessage) null);
+
+        assertStatus(handler.handleMensajeNoLegible(ex), HttpStatus.BAD_REQUEST);
     }
 
     @Test

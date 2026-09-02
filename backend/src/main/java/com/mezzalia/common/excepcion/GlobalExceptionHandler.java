@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 
@@ -50,6 +51,20 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DomainExceptions.ColorHexInvalidoException.class)
     public ResponseEntity<Map<String, Object>> handleColorHexInvalido(DomainExceptions.ColorHexInvalidoException ex) {
         return respuesta(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    // JSON malformado o un valor invalido en un @RequestBody (ej. mandar
+    // "estado": "COCINANDO" -- un valor que no existe en EstadoPedido -- al
+    // PATCH de pedidos/estado) disparaba esta excepcion. Sin un handler
+    // especifico caia en el catch-all Exception.class de abajo y devolvia 500
+    // generico -- gap pre-existente para CUALQUIER endpoint con @RequestBody
+    // (menu/mesa/pedido/tenant/auth), documentado como pendiente desde la
+    // Fase 4 de pedidos. El mensaje de la excepcion original no se expone al
+    // cliente (puede incluir detalle interno de Jackson/nombres de campos) --
+    // mismo criterio que handleGenerico de abajo.
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleMensajeNoLegible(HttpMessageNotReadableException ex) {
+        return respuesta(HttpStatus.BAD_REQUEST, "El cuerpo de la solicitud es invalido o esta mal formado");
     }
 
     @ExceptionHandler(Exception.class)
