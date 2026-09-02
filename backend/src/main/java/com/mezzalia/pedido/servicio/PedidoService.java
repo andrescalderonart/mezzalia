@@ -193,8 +193,20 @@ public class PedidoService {
         return pedido;
     }
 
+    /**
+     * Defensa explicita, mismo criterio que crearPedido()/obtenerPedido():
+     * este metodo depende del filtro de Hibernate (tenantFilter) para el
+     * aislamiento entre tenants, pero ese filtro NUNCA se activa para
+     * SUPER_ADMIN (TenantContext vacio a proposito -- ver
+     * JwtAuthenticationFilter, "tenantId ausente = SUPER_ADMIN"). Sin este
+     * guardia, un token SUPER_ADMIN recibia los pedidos de TODOS los
+     * restaurantes en una sola lista con GET /api/admin/pedidos --
+     * tenantActual() lanza si no hay contexto, cerrando ese hueco igual que
+     * ya cierra el resto de metodos de escritura de este servicio.
+     */
     @Transactional(readOnly = true)
     public List<Pedido> listarPedidos(EstadoPedido estado) {
+        tenantActual();
         if (estado != null) {
             return pedidoRepository.findByEstadoOrderByCreadoEnAsc(estado);
         }

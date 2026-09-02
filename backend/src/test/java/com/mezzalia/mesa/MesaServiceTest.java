@@ -63,6 +63,18 @@ class MesaServiceTest {
     }
 
     @Test
+    void listarMesasSinTenantEnContextoLanzaExcepcion() {
+        MesaService mesaService = nuevoMesaService();
+        // A proposito NO se llama TenantContext.establecerTenantId(...): asi
+        // llega un SUPER_ADMIN real (JwtAuthenticationFilter nunca activa
+        // TenantContext para ese rol). Sin este guardia, listarMesas() dependia
+        // solo del filtro de Hibernate -- que tampoco se activa para
+        // SUPER_ADMIN -- y devolvia las mesas de TODOS los tenants.
+        assertThatThrownBy(mesaService::listarMesas)
+                .isInstanceOf(MesaExceptions.SinTenantEnContextoException.class);
+    }
+
+    @Test
     void crearMesaQuedaAsociadaAlTenantDelContexto() {
         MesaService mesaService = nuevoMesaService();
         Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Mesa A"));

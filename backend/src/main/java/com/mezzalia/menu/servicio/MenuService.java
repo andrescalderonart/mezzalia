@@ -26,8 +26,20 @@ public class MenuService {
     private final HistorialPrecioItemRepository historialPrecioItemRepository;
     private final AlmacenamientoImagenService almacenamientoImagenService;
 
+    /**
+     * Defensa explicita, mismo criterio que crearCategoria()/obtenerItem():
+     * este metodo depende del filtro de Hibernate (tenantFilter) para el
+     * aislamiento entre tenants, pero ese filtro NUNCA se activa para
+     * SUPER_ADMIN (TenantContext vacio a proposito -- ver
+     * JwtAuthenticationFilter, "tenantId ausente = SUPER_ADMIN"). Sin este
+     * guardia, un token SUPER_ADMIN recibia la carta de TODOS los
+     * restaurantes en una sola lista con GET /api/admin/menu/categorias --
+     * tenantActual() lanza si no hay contexto, cerrando ese hueco igual que
+     * ya cierra el resto de metodos de escritura de este servicio.
+     */
     @Transactional(readOnly = true)
     public List<CategoriaMenu> listarCategorias() {
+        tenantActual();
         return categoriaMenuRepository.findByActivoTrueOrderByOrdenAsc();
     }
 
@@ -40,8 +52,17 @@ public class MenuService {
         return categoriaMenuRepository.save(categoria);
     }
 
+    /**
+     * Ya estaba protegido indirectamente: obtenerCategoria() exige que la
+     * categoria pertenezca al tenant del contexto actual, y para SUPER_ADMIN
+     * (sin tenant) eso siempre resuelve "no encontrada". Se agrega
+     * tenantActual() explicito aca tambien -- mismo criterio del resto de
+     * esta clase: no depender solo de que otro metodo interno mantenga la
+     * proteccion.
+     */
     @Transactional(readOnly = true)
     public List<ItemMenu> listarItemsDeCategoria(Long categoriaId) {
+        tenantActual();
         obtenerCategoria(categoriaId);
         return itemMenuRepository.findByCategoriaIdAndActivoTrue(categoriaId);
     }

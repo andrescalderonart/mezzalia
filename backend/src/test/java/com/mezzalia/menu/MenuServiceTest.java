@@ -168,6 +168,28 @@ class MenuServiceTest {
                 .isInstanceOf(MenuExceptions.SinTenantEnContextoException.class);
     }
 
+    @Test
+    void unSuperAdminSinTenantEnContextoNoPuedeListarCategorias() {
+        MenuService menuService = nuevoMenuService();
+        autenticarComo("superadmin");
+        // Mismo caso que unSuperAdminSinTenantEnContextoNoPuedeCrearCategorias,
+        // pero del lado de lectura: listarCategorias() dependia solo del
+        // filtro de Hibernate para el aislamiento -- que tampoco se activa
+        // para SUPER_ADMIN -- y devolvia la carta de TODOS los restaurantes.
+
+        assertThatThrownBy(menuService::listarCategorias)
+                .isInstanceOf(MenuExceptions.SinTenantEnContextoException.class);
+    }
+
+    @Test
+    void unSuperAdminSinTenantEnContextoNoPuedeListarItemsDeCategoria() {
+        MenuService menuService = nuevoMenuService();
+        autenticarComo("superadmin");
+
+        assertThatThrownBy(() -> menuService.listarItemsDeCategoria(999L))
+                .isInstanceOf(MenuExceptions.SinTenantEnContextoException.class);
+    }
+
     private MenuService nuevoMenuService() {
         // AlmacenamientoImagenService en null a propósito: ningún test de
         // esta clase ejerce subida de imágenes.

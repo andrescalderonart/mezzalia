@@ -315,6 +315,22 @@ class PedidoServiceTest {
         };
     }
 
+    /**
+     * Mismo caso que las pruebas equivalentes de MenuService/MesaService:
+     * listarPedidos() dependia solo del filtro de Hibernate para el
+     * aislamiento entre tenants -- que nunca se activa para SUPER_ADMIN
+     * (TenantContext vacio a proposito) -- y devolvia los pedidos de TODOS
+     * los restaurantes en una sola lista. A proposito NO se llama
+     * TenantContext.establecerTenantId(...): asi llega un SUPER_ADMIN real.
+     */
+    @Test
+    void unSuperAdminSinTenantEnContextoNoPuedeListarPedidos() {
+        PedidoService pedidoService = nuevoPedidoService();
+
+        assertThatThrownBy(() -> pedidoService.listarPedidos(null))
+                .isInstanceOf(PedidoExceptions.SinTenantEnContextoException.class);
+    }
+
     private PedidoService nuevoPedidoService() {
         return new PedidoService(pedidoRepository, pedidoItemRepository, historialRepository, comensalRepository,
                 nuevoMenuService());
