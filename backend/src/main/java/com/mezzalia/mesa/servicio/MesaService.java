@@ -7,6 +7,7 @@ import com.mezzalia.mesa.SesionMesaRepository;
 import com.mezzalia.mesa.excepcion.MesaExceptions;
 import com.mezzalia.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,28 +38,27 @@ public class MesaService {
     }
 
     /**
-     * Unicidad de `codigo` por tenant, solo entre mesas ACTIVAS (RF-09,
-     * decision tomada en esta sesion tras encontrar que no existia ninguna
-     * restriccion: dos mesas "M1" simultaneas dejarian a un mesero sin
-     * forma de distinguir cual QR es cual).
+     * Unicidad de `codigo` por tenant, solo entre mesas ACTIVAS (RF-09).
      *
-     * Chequeo de aplicacion (leer-antes-de-escribir), NO una restriccion
-     * UNIQUE de base de datos como la de Pedido.claveIdempotencia, a
-     * proposito, por dos motivos:
-     *  1. El alcance real es "unico entre las activas", no "unico para
-     *     siempre": no hay endpoint para renombrar el codigo de una mesa,
-     *     asi que si se desactiva "M1" y despues se quiere dar de alta una
-     *     mesa fisica nueva con esa misma etiqueta, eso deberia poder
-     *     hacerse. Una UNIQUE KEY de MySQL no distingue activa/inactiva sin
-     *     un indice parcial (que MySQL no soporta de forma nativa como si
-     *     lo hace Postgres) -- habria bloqueado esa reutilizacion legitima
-     *     para siempre.
-     *  2. Esta es una accion administrativa de baja frecuencia y ritmo
-     *     humano (un ADMIN_RESTAURANTE dando de alta una mesa desde el
-     *     panel), no el endpoint publico sin auth de pedidos -- el perfil
-     *     de riesgo de una carrera real aca (dos admins creando "M1" en el
-     *     mismo instante) es muchisimo mas bajo que el de RF-04, que si
-     *     justifica la garantia dura de una restriccion de base de datos.
+     * El chequeo de aplicacion (leer-antes-de-escribir) de abajo sigue
+     * existiendo por UX -- falla rapido con un mensaje claro sin esperar a
+     * un catch -- pero YA NO es la unica defensa. El backstop real es la
+     * restriccion UNIQUE(tenant_id, codigo_unico) agregada en
+     * V14__mesas_unicidad_codigo_activo.sql: ver el comentario largo en
+     * Mesa.java sobre por que vive sobre una columna espejo
+     * (`codigoUnico`, mantenida a mano, null cuando la mesa esta
+     * desactivada) y no sobre `codigo` directamente ni sobre un indice
+     * funcional de MySQL 8 -- se prioriza que el mismo UNIQUE KEY se
+     * pueda generar tambien desde la entidad JPA para el perfil h2 de
+     * desarrollo/tests, igual que Pedido.claveIdempotencia.
+     *
+     * Esto cierra una condicion de carrera real (dos altas simultaneas del
+     * mismo codigo para el mismo tenant) que antes solo dependia del
+     * chequeo de aplicacion de abajo -- documentada en su momento como
+     * bajo riesgo por ser una accion administrativa de ritmo humano, pero
+     * bajo riesgo no es cero riesgo, y el costo de cerrarla de verdad era
+     * bajo. Se cierra al auditar el codigo, no porque el riesgo percibido
+     * haya cambiado.
      */
     @Transactional
     public Mesa crearMesa(String codigo) {
@@ -69,13 +69,34 @@ public class MesaService {
         Mesa mesa = new Mesa();
         mesa.setTenantId(tenantId);
         mesa.setCodigo(codigo);
-        return mesaRepository.save(mesa);
+        mesa.setCodigoUnico(codigo);
+        try {
+            return mesaRepository.save(mesa);
+        } catch (DataIntegrityViolationException ex) {
+            // Backstop de BD ante la carrera -- mismo patron que
+            // PedidoService.crearPedido/TenantService.crearTenant: no se
+            // ejecuta ningun otro statement despues de este catch en esta
+            // transaccion, solo se traduce la excepcion de bajo nivel de
+            // Spring Data a la misma excepcion de negocio que el chequeo
+            // de arriba, y se deja que @Transactional haga rollback
+            // completo. El perdedor de la carrera real recibe el mismo
+            // 409 que el caso comun, no un 500.
+            throw new MesaExceptions.CodigoMesaDuplicadoException(codigo);
+        }
     }
 
     @Transactional
     public void desactivarMesa(Long mesaId) {
         Mesa mesa = obtenerMesa(mesaId);
         mesa.setActiva(false);
+        // Libera el codigo para reuso -- ver el comentario largo en
+        // Mesa.java y en crearMesa de arriba sobre por que la restriccion
+        // UNIQUE real vive sobre codigo_unico (que admite multiples NULL)
+        // y no sobre codigo directamente. Sin esta linea, el UNIQUE KEY
+        // nuevo bloquearia para siempre la reutilizacion legitima de un
+        // codigo de mesa desactivada -- exactamente lo que este diseno
+        // esta pensado para seguir permitiendo.
+        mesa.setCodigoUnico(null);
         mesaRepository.save(mesa);
     }
 
