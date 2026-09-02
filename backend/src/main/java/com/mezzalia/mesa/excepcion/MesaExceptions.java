@@ -41,4 +41,12 @@ public final class MesaExceptions {
             super("Esta operación requiere un usuario de restaurante autenticado (no SUPER_ADMIN)");
         }
     }
+
+    /** Ver el comentario de MesaService.crearMesa sobre el alcance de esta unicidad. */
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public static class CodigoMesaDuplicadoException extends RuntimeException {
+        public CodigoMesaDuplicadoException(String codigo) {
+            super("Ya existe una mesa activa con el código '" + codigo + "'.");
+        }
+    }
 }

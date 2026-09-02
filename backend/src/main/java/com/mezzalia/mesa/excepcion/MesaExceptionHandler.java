@@ -43,6 +43,11 @@ public class MesaExceptionHandler {
         return respuesta(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 
+    @ExceptionHandler(MesaExceptions.CodigoMesaDuplicadoException.class)
+    public ResponseEntity<Map<String, Object>> handleCodigoDuplicado(MesaExceptions.CodigoMesaDuplicadoException ex) {
+        return respuesta(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
     private ResponseEntity<Map<String, Object>> respuesta(HttpStatus status, String mensaje) {
         return ResponseEntity.status(status).body(Map.of(
                 "timestamp", Instant.now().toString(),
