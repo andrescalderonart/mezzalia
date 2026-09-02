@@ -8,6 +8,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.regex.Pattern;
 
 @Service
@@ -17,6 +18,22 @@ public class TenantService {
     private static final Pattern PATRON_COLOR_HEX = Pattern.compile("^#[0-9A-Fa-f]{6}$");
 
     private final TenantRepository tenantRepository;
+
+    /**
+     * Listado completo para SUPER_ADMIN (gestion de tenants) -- a
+     * diferencia de las listas tenant-scoped del resto del sistema
+     * (MesaService.listarMesas, PedidoService.listarPedidos...), esta no
+     * necesita ni puede filtrar por tenantActual(): Tenant es la propia
+     * tabla que define cada tenant, no una entidad DENTRO de un tenant.
+     * El aislamiento de esta ruta es via SecurityConfig/@PreAuthorize
+     * (hasRole SUPER_ADMIN) en TenantAdminController, no via TenantContext.
+     * Incluye tenants suspendidos a proposito -- el super-admin necesita
+     * verlos para poder reactivarlos.
+     */
+    @Transactional(readOnly = true)
+    public List<Tenant> listarTenants() {
+        return tenantRepository.findAllByOrderByNombreAsc();
+    }
 
     /**
      * Uso exclusivo de caminos PÚBLICOS/de cliente final (ej. branding vía QR,

@@ -258,6 +258,25 @@ class TenantServiceTest {
                 .isInstanceOf(DomainExceptions.TenantNoEncontradoException.class);
     }
 
+    @Test
+    void listarTenantsDevuelveTodosOrdenadosPorNombreIncluidosLosSuspendidos() {
+        TenantService tenantService = nuevoTenantService();
+        tenantRepository.save(nuevoTenant("Zeta Restaurante", Tenant.ESTADO_ACTIVO));
+        tenantRepository.save(nuevoTenant("Alfa Restaurante", Tenant.ESTADO_SUSPENDIDO));
+
+        java.util.List<Tenant> tenants = tenantService.listarTenants();
+
+        assertThat(tenants).extracting(Tenant::getNombre).containsExactly("Alfa Restaurante", "Zeta Restaurante");
+        assertThat(tenants).anyMatch(Tenant::estaSuspendido);
+    }
+
+    @Test
+    void listarTenantsSinTenantsCreadosDevuelveListaVacia() {
+        TenantService tenantService = nuevoTenantService();
+
+        assertThat(tenantService.listarTenants()).isEmpty();
+    }
+
     private TenantService nuevoTenantService() {
         return new TenantService(tenantRepository);
     }

@@ -12,6 +12,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/admin/tenants")
 @RequiredArgsConstructor
@@ -19,6 +21,19 @@ import org.springframework.web.bind.annotation.*;
 public class TenantAdminController {
 
     private final TenantService tenantService;
+
+    /**
+     * Listado completo de tenants (SUPER_ADMIN), incluidos los
+     * suspendidos -- ver TenantService.listarTenants() para el porque no
+     * filtra por tenant.
+     */
+    @GetMapping
+    public ResponseEntity<List<TenantDto>> listarTenants() {
+        List<TenantDto> tenants = tenantService.listarTenants().stream()
+                .map(TenantDto::desde)
+                .toList();
+        return ResponseEntity.ok(tenants);
+    }
 
     /**
      * Alta de un tenant nuevo. 201 + el tenant creado (TenantDto), a

@@ -87,36 +87,56 @@ export default function Layout() {
         </div>
 
         <nav className="flex-1 px-3 space-y-1">
-          <NavLink
-            to="/pedidos"
-            className={({ isActive }) =>
-              `flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150 ${
-                isActive ? 'bg-carbon-800 text-dorado' : 'text-crema/70 hover:bg-carbon-800 hover:text-crema'
-              }`
-            }
-          >
-            Pedidos
-          </NavLink>
-          <NavLink
-            to="/menu"
-            className={({ isActive }) =>
-              `flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150 ${
-                isActive ? 'bg-carbon-800 text-dorado' : 'text-crema/70 hover:bg-carbon-800 hover:text-crema'
-              }`
-            }
-          >
-            Carta
-          </NavLink>
-          <NavLink
-            to="/mesas"
-            className={({ isActive }) =>
-              `flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150 ${
-                isActive ? 'bg-carbon-800 text-dorado' : 'text-crema/70 hover:bg-carbon-800 hover:text-crema'
-              }`
-            }
-          >
-            Mesas
-          </NavLink>
+          {/* SUPER_ADMIN no tiene tenant -- estos 3 links le devolverian un
+              error de backend (SinTenantEnContextoException), asi que ni
+              se muestran para ese rol. Ver RutaConRol.jsx para el gating
+              real (esto es solo ocultar el link, no la unica defensa). */}
+          {usuario?.rol !== 'SUPER_ADMIN' && (
+            <>
+              <NavLink
+                to="/pedidos"
+                className={({ isActive }) =>
+                  `flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150 ${
+                    isActive ? 'bg-carbon-800 text-dorado' : 'text-crema/70 hover:bg-carbon-800 hover:text-crema'
+                  }`
+                }
+              >
+                Pedidos
+              </NavLink>
+              <NavLink
+                to="/menu"
+                className={({ isActive }) =>
+                  `flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150 ${
+                    isActive ? 'bg-carbon-800 text-dorado' : 'text-crema/70 hover:bg-carbon-800 hover:text-crema'
+                  }`
+                }
+              >
+                Carta
+              </NavLink>
+              <NavLink
+                to="/mesas"
+                className={({ isActive }) =>
+                  `flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150 ${
+                    isActive ? 'bg-carbon-800 text-dorado' : 'text-crema/70 hover:bg-carbon-800 hover:text-crema'
+                  }`
+                }
+              >
+                Mesas
+              </NavLink>
+            </>
+          )}
+          {usuario?.rol === 'SUPER_ADMIN' && (
+            <NavLink
+              to="/tenants"
+              className={({ isActive }) =>
+                `flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150 ${
+                  isActive ? 'bg-carbon-800 text-dorado' : 'text-crema/70 hover:bg-carbon-800 hover:text-crema'
+                }`
+              }
+            >
+              Restaurantes
+            </NavLink>
+          )}
         </nav>
 
         <div className="px-4 py-4 border-t border-carbon-700">
