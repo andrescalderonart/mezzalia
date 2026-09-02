@@ -23,7 +23,12 @@ public final class DomainExceptions {
         }
     }
 
-    @ResponseStatus(HttpStatus.CONFLICT)
+    // Sin @ResponseStatus a proposito: GlobalExceptionHandler tiene un
+    // @ExceptionHandler explicito para esta excepcion, y ese SIEMPRE gana
+    // sobre la anotacion de la clase -- tenerla aca (aunque coincidiera)
+    // seria un status "documentado" que Spring nunca mira, la misma trampa
+    // que hizo que esto estuviera en 403 real vs 409 anotado hasta ahora.
+    // La fuente de verdad del status es el handler, no esta clase.
     public static class TenantSuspendidoException extends RuntimeException {
         public TenantSuspendidoException(Long id) {
             super("El tenant con id " + id + " está suspendido");
