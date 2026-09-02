@@ -44,10 +44,24 @@ class GlobalExceptionHandlerTest {
      * test lo notara. Se corrigio a 409: no hay ninguna identidad que
      * "autorizar" en esos endpoints publicos, lo que bloquea la request es
      * el ESTADO del tenant (suspendido), un estado reversible por diseno.
+     *
+     * El mensaje tambien se verifica aca a proposito (a diferencia de los
+     * demas handlers de este archivo): getMessage() de esta excepcion llega
+     * TAL CUAL a un comensal anonimo sin autenticacion (ver el comentario
+     * largo en DomainExceptions.TenantSuspendidoException) -- "el tenant con
+     * id N esta suspendido" ya se filtro una vez al frontend publico antes
+     * de que alguien lo notara, este test es para que no vuelva a pasar
+     * desapercibido si alguien revierte el mensaje sin querer.
      */
     @Test
     void tenantSuspendidoDevuelve409NoForbidden() {
-        assertStatus(handler.handleTenantSuspendido(new DomainExceptions.TenantSuspendidoException(1L)), HttpStatus.CONFLICT);
+        ResponseEntity<Map<String, Object>> respuesta =
+                handler.handleTenantSuspendido(new DomainExceptions.TenantSuspendidoException(1L));
+
+        assertStatus(respuesta, HttpStatus.CONFLICT);
+        assertThat(respuesta.getBody().get("mensaje"))
+                .as("el mensaje llega sin autenticacion a un comensal anonimo -- no puede exponer el id interno del tenant")
+                .isEqualTo("Este restaurante no está disponible en este momento.");
     }
 
     @Test
