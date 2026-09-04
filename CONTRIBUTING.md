@@ -22,7 +22,9 @@ git checkout -b <tipo>/<nombre-de-la-tarea>
 |---|---|---|
 | `feature/` | Una funcionalidad nueva | `feature/menu-crud`, `feature/auth-jwt` |
 | `fix/` | Corrección de un error | `fix/bug-precio` |
-| `chore/` | Tareas de mantenimiento (dependencias, config, docs) | `chore/actualizar-dependencias` |
+| `test/` | Agregar o mejorar cobertura de tests sin cambiar comportamiento | `test/mesa-service-cobertura` |
+| `docs/` | Documentación o propuestas técnicas para discutir en equipo | `docs/propuesta-multisucursal-rf10` |
+| `chore/` | Tareas de mantenimiento (dependencias, config) | `chore/actualizar-dependencias` |
 
 ## Reglas al trabajar los dos en backend en paralelo
 
