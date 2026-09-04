@@ -10,6 +10,9 @@ import com.mezzalia.pedido.servicio.PedidoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,11 +30,21 @@ import java.util.List;
  * este controlador lleva @PreAuthorize("hasRole('ADMIN_RESTAURANTE')"): la
  * autenticacion que ya exige SecurityConfig para /api/admin/** alcanza para
  * ambos roles del tenant.
+ *
+ * Eso NO significa que ambos roles reciban el mismo payload: §10 de
+ * documentacion-tecnica.md exige que el telefono del comensal solo se vea
+ * completo para ADMIN_RESTAURANTE. Por eso los dos endpoints que arman un
+ * PedidoAdminDto calculan {@link #telefonoCompleto()} a partir del rol
+ * autenticado y se lo pasan explicito a PedidoAdminDto.desde() -- el
+ * gating no es por endpoint (@PreAuthorize), es por campo dentro de la
+ * misma respuesta.
  */
 @RestController
 @RequestMapping("/api/admin/pedidos")
 @RequiredArgsConstructor
 public class PedidoAdminController {
+
+    private static final String AUTORIDAD_ADMIN_RESTAURANTE = "ROLE_ADMIN_RESTAURANTE";
 
     private final PedidoService pedidoService;
 
@@ -52,12 +65,13 @@ public class PedidoAdminController {
     @GetMapping
     public ResponseEntity<List<PedidoAdminDto>> listarPedidos(
             @RequestParam(required = false) EstadoPedido estado) {
+        boolean telefonoCompleto = telefonoCompleto();
         List<Pedido> pedidos = pedidoService.listarPedidos(estado);
         List<PedidoAdminDto> dtos = pedidos.stream()
                 .map(pedido -> {
                     List<PedidoItem> items = pedidoService.listarItems(pedido.getId());
                     Comensal comensal = pedidoService.obtenerComensal(pedido.getComensalId());
-                    return PedidoAdminDto.desde(pedido, items, comensal);
+                    return PedidoAdminDto.desde(pedido, items, comensal, telefonoCompleto);
                 })
                 .toList();
         return ResponseEntity.ok(dtos);
@@ -68,6 +82,34 @@ public class PedidoAdminController {
         Pedido pedido = pedidoService.cambiarEstado(id, request.estado());
         List<PedidoItem> items = pedidoService.listarItems(pedido.getId());
         Comensal comensal = pedidoService.obtenerComensal(pedido.getComensalId());
-        return ResponseEntity.ok(PedidoAdminDto.desde(pedido, items, comensal));
+        return ResponseEntity.ok(PedidoAdminDto.desde(pedido, items, comensal, telefonoCompleto()));
+    }
+
+    /**
+     * true solo para ADMIN_RESTAURANTE. Default seguro es false: un rol
+     * nuevo que en el futuro tambien pueda autenticarse contra
+     * /api/admin/** (hoy solo existen ADMIN_RESTAURANTE y MESERO llegando
+     * hasta aca -- SUPER_ADMIN no tiene tenant y PedidoService.tenantActual()
+     * lo bloquea antes de llegar a este punto) empieza viendo el telefono
+     * enmascarado hasta que alguien decida explicitamente lo contrario,
+     * nunca al reves.
+     *
+     * Visibilidad de paquete (no private) a proposito: PedidoAdminControllerTest
+     * la llama directo, mismo patron que el resto del proyecto prefiere
+     * (instanciar la clase real y probar el metodo, en vez de mockear
+     * SecurityContextHolder a traves de una capa HTTP completa que este
+     * proyecto todavia no monta en tests).
+     */
+    boolean telefonoCompleto() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) {
+            return false;
+        }
+        for (GrantedAuthority autoridad : auth.getAuthorities()) {
+            if (AUTORIDAD_ADMIN_RESTAURANTE.equals(autoridad.getAuthority())) {
+                return true;
+            }
+        }
+        return false;
     }
 }
