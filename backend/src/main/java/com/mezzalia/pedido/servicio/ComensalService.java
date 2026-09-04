@@ -69,11 +69,21 @@ public class ComensalService {
      * variable del DELETE), asi que es exactamente el caso que ese patron
      * cubre: nunca "no autorizado", siempre "no encontrado", para no
      * confirmarle a un tenant que el id existe en otro tenant.
+     *
+     * tenantActual() se llama ANTES del findById, no despues -- mismo
+     * orden que MesaService.listarMesas()/crearMesa(). Si se llama despues,
+     * un SUPER_ADMIN (sin tenant_id, ver JwtAuthenticationFilter) pidiendo
+     * un id que no existe recibe ComensalNoEncontradoException en vez de
+     * SinTenantEnContextoException, porque el orElseThrow del findById
+     * gana la carrera antes de que se note que ni siquiera hay tenant en
+     * contexto -- exactamente el bug que este orden evita (encontrado por
+     * ComensalServiceTest.unSuperAdminSinTenantEnContextoNoPuedeEliminarDatosDeComensal
+     * fallando en CI contra un id inexistente).
      */
     private Comensal obtenerComensalDelTenant(Long id) {
+        Long tenantActual = tenantActual();
         Comensal comensal = comensalRepository.findById(id)
                 .orElseThrow(() -> new PedidoExceptions.ComensalNoEncontradoException(id));
-        Long tenantActual = tenantActual();
         if (!tenantActual.equals(comensal.getTenantId())) {
             throw new PedidoExceptions.ComensalNoEncontradoException(id);
         }
