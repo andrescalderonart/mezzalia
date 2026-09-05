@@ -125,6 +125,18 @@ export default function Layout() {
               </NavLink>
             </>
           )}
+          {usuario?.rol === 'ADMIN_RESTAURANTE' && (
+            <NavLink
+              to="/usuarios"
+              className={({ isActive }) =>
+                `flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150 ${
+                  isActive ? 'bg-carbon-800 text-dorado' : 'text-crema/70 hover:bg-carbon-800 hover:text-crema'
+                }`
+              }
+            >
+              Usuarios
+            </NavLink>
+          )}
           {usuario?.rol === 'SUPER_ADMIN' && (
             <NavLink
               to="/tenants"
