@@ -10,6 +10,7 @@ import com.mezzalia.pedido.servicio.PedidoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +28,11 @@ import java.util.List;
  * este controlador lleva @PreAuthorize("hasRole('ADMIN_RESTAURANTE')"): la
  * autenticacion que ya exige SecurityConfig para /api/admin/** alcanza para
  * ambos roles del tenant.
+ *
+ * Eso SI, RF-09/documentacion-tecnica.md §10 distingue explicitamente el
+ * NIVEL de acceso dentro de ese mismo endpoint para el telefono del
+ * comensal ("un mesero no necesita ver el telefono completo, un
+ * admin_restaurante si") -- ver esAdminRestaurante() y ComensalDto.
  */
 @RestController
 @RequestMapping("/api/admin/pedidos")
@@ -52,12 +58,13 @@ public class PedidoAdminController {
     @GetMapping
     public ResponseEntity<List<PedidoAdminDto>> listarPedidos(
             @RequestParam(required = false) EstadoPedido estado) {
+        boolean puedeVerTelefonoCompleto = esAdminRestaurante();
         List<Pedido> pedidos = pedidoService.listarPedidos(estado);
         List<PedidoAdminDto> dtos = pedidos.stream()
                 .map(pedido -> {
                     List<PedidoItem> items = pedidoService.listarItems(pedido.getId());
                     Comensal comensal = pedidoService.obtenerComensal(pedido.getComensalId());
-                    return PedidoAdminDto.desde(pedido, items, comensal);
+                    return PedidoAdminDto.desde(pedido, items, comensal, puedeVerTelefonoCompleto);
                 })
                 .toList();
         return ResponseEntity.ok(dtos);
@@ -68,6 +75,20 @@ public class PedidoAdminController {
         Pedido pedido = pedidoService.cambiarEstado(id, request.estado());
         List<PedidoItem> items = pedidoService.listarItems(pedido.getId());
         Comensal comensal = pedidoService.obtenerComensal(pedido.getComensalId());
-        return ResponseEntity.ok(PedidoAdminDto.desde(pedido, items, comensal));
+        return ResponseEntity.ok(PedidoAdminDto.desde(pedido, items, comensal, esAdminRestaurante()));
+    }
+
+    /**
+     * RF-09/§10: unica fuente de verdad de "quien puede ver el telefono
+     * completo del comensal" en este controlador -- ROLE_ADMIN_RESTAURANTE
+     * viene de JwtAuthenticationFilter (claim `rol` del JWT), mismo mecanismo
+     * que @PreAuthorize("hasRole(...)") usa en el resto de la aplicacion,
+     * solo que aca la decision no es "permitir/rechazar el endpoint entero"
+     * sino "que tan completo es el DTO que devuelve" -- por eso se resuelve
+     * a mano en vez de con una anotacion.
+     */
+    private boolean esAdminRestaurante() {
+        return SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(autoridad -> autoridad.getAuthority().equals("ROLE_ADMIN_RESTAURANTE"));
     }
 }

@@ -20,9 +20,24 @@ public record PedidoAdminDto(
         LocalDateTime creadoEn,
         LocalDateTime actualizadoEn
 ) {
-    public static PedidoAdminDto desde(Pedido pedido, List<PedidoItem> items, Comensal comensal) {
+    /**
+     * @param puedeVerTelefonoComensalCompleto RF-09/§10: true solo para
+     *                                          ADMIN_RESTAURANTE -- ver
+     *                                          PedidoAdminController. Se
+     *                                          pasa explicito desde el
+     *                                          controlador (no se resuelve
+     *                                          aca) para que este DTO siga
+     *                                          siendo una funcion pura de
+     *                                          sus argumentos, sin leer
+     *                                          SecurityContextHolder por su
+     *                                          cuenta.
+     */
+    public static PedidoAdminDto desde(
+            Pedido pedido, List<PedidoItem> items, Comensal comensal, boolean puedeVerTelefonoComensalCompleto) {
         List<PedidoItemDto> itemsDto = items.stream().map(PedidoItemDto::desde).toList();
-        ComensalDto comensalDto = comensal != null ? ComensalDto.desde(comensal) : null;
+        ComensalDto comensalDto = comensal != null
+                ? ComensalDto.desde(comensal, puedeVerTelefonoComensalCompleto)
+                : null;
         return new PedidoAdminDto(
                 pedido.getId(), pedido.getMesaId(), pedido.getEstado(), pedido.getTotal(), pedido.getNotas(),
                 itemsDto, comensalDto, pedido.getCreadoEn(), pedido.getActualizadoEn());
