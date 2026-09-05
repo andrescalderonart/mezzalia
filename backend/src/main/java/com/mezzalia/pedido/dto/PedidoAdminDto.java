@@ -21,10 +21,10 @@ public record PedidoAdminDto(
         LocalDateTime actualizadoEn
 ) {
     /**
-     * `telefonoCompleto` viaja explicito desde el controlador (que es
+     * `telefonoCompleto` viaja explícito desde el controlador (que es
      * quien conoce el rol autenticado) hasta ComensalDto.desde() -- ver el
-     * comentario en ComensalDto sobre por que no existe una version de
-     * este metodo sin ese parametro.
+     * comentario en ComensalDto sobre por qué no existe una versión de
+     * este método sin ese parámetro.
      */
     public static PedidoAdminDto desde(Pedido pedido, List<PedidoItem> items, Comensal comensal, boolean telefonoCompleto) {
         List<PedidoItemDto> itemsDto = items.stream().map(PedidoItemDto::desde).toList();

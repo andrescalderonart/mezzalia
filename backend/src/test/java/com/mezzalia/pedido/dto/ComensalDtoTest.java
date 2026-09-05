@@ -7,8 +7,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * documentacion-tecnica.md §10: "un mesero no necesita ver el telefono
- * completo, un admin_restaurante si". Estos tests cubren solo la logica de
- * enmascarado -- el "quien es ADMIN_RESTAURANTE" vive en
+ * completo, un admin_restaurante si". Estos tests cubren solo la lógica de
+ * enmascarado -- el "quién es ADMIN_RESTAURANTE" vive en
  * PedidoAdminController y se prueba aparte en PedidoAdminControllerTest.
  */
 class ComensalDtoTest {
