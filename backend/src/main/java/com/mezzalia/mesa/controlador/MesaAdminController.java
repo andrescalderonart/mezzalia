@@ -45,7 +45,7 @@ public class MesaAdminController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN_RESTAURANTE')")
     public ResponseEntity<MesaDto> crearMesa(@Valid @RequestBody CrearMesaRequest request) {
-        Mesa mesa = mesaService.crearMesa(request.codigo());
+        Mesa mesa = mesaService.crearMesa(request.codigo(), request.sucursalId());
         return ResponseEntity.status(HttpStatus.CREATED).body(MesaDto.desde(mesa));
     }
 

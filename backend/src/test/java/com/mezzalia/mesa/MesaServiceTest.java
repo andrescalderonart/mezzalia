@@ -2,6 +2,9 @@ package com.mezzalia.mesa;
 
 import com.mezzalia.mesa.excepcion.MesaExceptions;
 import com.mezzalia.mesa.servicio.MesaService;
+import com.mezzalia.sucursal.Sucursal;
+import com.mezzalia.sucursal.SucursalRepository;
+import com.mezzalia.sucursal.servicio.SucursalService;
 import com.mezzalia.tenant.Tenant;
 import com.mezzalia.tenant.TenantContext;
 import com.mezzalia.tenant.TenantRepository;
@@ -36,6 +39,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *  3. resolverSesionValida (camino publico, sin TenantContext todavia) no
  *     debe distinguir "token nunca existio" de "token expirado" -- ambos
  *     casos tiran la misma excepcion con el mismo mensaje generico.
+ *
+ * RF-10 (ver Mesa.sucursalId/sucursal.Sucursal): crearMesa ahora exige un
+ * sucursalId valido del tenant actual -- cada test que crea una mesa
+ * primero crea (o reusa) una Sucursal para ese mismo tenant via
+ * nuevaSucursal(tenantId).
  */
 @DataJpaTest
 class MesaServiceTest {
@@ -48,6 +56,8 @@ class MesaServiceTest {
     private MesaRepository mesaRepository;
     @Autowired
     private SesionMesaRepository sesionMesaRepository;
+    @Autowired
+    private SucursalRepository sucursalRepository;
 
     @AfterEach
     void limpiarContexto() {
@@ -58,7 +68,10 @@ class MesaServiceTest {
     void crearMesaSinTenantEnContextoLanzaExcepcion() {
         MesaService mesaService = nuevoMesaService();
 
-        assertThatThrownBy(() -> mesaService.crearMesa("M1"))
+        // El sucursalId (999L) no importa: tenantActual() se evalúa ANTES
+        // que la validación de sucursal en MesaService.crearMesa -- ver el
+        // comentario de ese método.
+        assertThatThrownBy(() -> mesaService.crearMesa("M1", 999L))
                 .isInstanceOf(MesaExceptions.SinTenantEnContextoException.class);
     }
 
@@ -75,27 +88,43 @@ class MesaServiceTest {
     }
 
     @Test
-    void crearMesaQuedaAsociadaAlTenantDelContexto() {
+    void crearMesaQuedaAsociadaAlTenantYALaSucursalDelContexto() {
         MesaService mesaService = nuevoMesaService();
         Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Mesa A"));
+        Sucursal sucursal = nuevaSucursal(tenant.getId());
         TenantContext.establecerTenantId(tenant.getId());
 
-        Mesa mesa = mesaService.crearMesa("M1");
+        Mesa mesa = mesaService.crearMesa("M1", sucursal.getId());
 
         assertThat(mesa.getId()).isNotNull();
         assertThat(mesa.getTenantId()).isEqualTo(tenant.getId());
+        assertThat(mesa.getSucursalId()).isEqualTo(sucursal.getId());
         assertThat(mesa.isActiva()).isTrue();
+    }
+
+    @Test
+    void crearMesaConUnaSucursalDeOtroTenantLanzaSucursalNoEncontrada() {
+        MesaService mesaService = nuevoMesaService();
+        Tenant tenantA = tenantRepository.save(nuevoTenant("Restaurante Sucursal A"));
+        Tenant tenantB = tenantRepository.save(nuevoTenant("Restaurante Sucursal B"));
+        Sucursal sucursalDeB = nuevaSucursal(tenantB.getId());
+
+        TenantContext.establecerTenantId(tenantA.getId());
+
+        assertThatThrownBy(() -> mesaService.crearMesa("M1", sucursalDeB.getId()))
+                .isInstanceOf(com.mezzalia.sucursal.excepcion.SucursalExceptions.SucursalNoEncontradaException.class);
     }
 
     @Test
     void listarMesasSoloDevuelveActivasOrdenadasPorCodigo() {
         MesaService mesaService = nuevoMesaService();
         Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Listado"));
+        Sucursal sucursal = nuevaSucursal(tenant.getId());
         TenantContext.establecerTenantId(tenant.getId());
 
-        Mesa m3 = mesaService.crearMesa("M3");
-        mesaService.crearMesa("M1");
-        Mesa m2Desactivada = mesaService.crearMesa("M2-desactivada");
+        Mesa m3 = mesaService.crearMesa("M3", sucursal.getId());
+        mesaService.crearMesa("M1", sucursal.getId());
+        Mesa m2Desactivada = mesaService.crearMesa("M2-desactivada", sucursal.getId());
         mesaService.desactivarMesa(m2Desactivada.getId());
         testEntityManager.flush();
 
@@ -109,8 +138,9 @@ class MesaServiceTest {
     void desactivarMesaLaExcluyeDeOperacionesFuturasIncluidoRegenerarSesion() {
         MesaService mesaService = nuevoMesaService();
         Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Desactivada"));
+        Sucursal sucursal = nuevaSucursal(tenant.getId());
         TenantContext.establecerTenantId(tenant.getId());
-        Mesa mesa = mesaService.crearMesa("M1");
+        Mesa mesa = mesaService.crearMesa("M1", sucursal.getId());
         mesaService.desactivarMesa(mesa.getId());
         testEntityManager.flush();
 
@@ -129,9 +159,10 @@ class MesaServiceTest {
         MesaService mesaService = nuevoMesaService();
         Tenant tenantA = tenantRepository.save(nuevoTenant("Restaurante A"));
         Tenant tenantB = tenantRepository.save(nuevoTenant("Restaurante B"));
+        Sucursal sucursalA = nuevaSucursal(tenantA.getId());
 
         TenantContext.establecerTenantId(tenantA.getId());
-        Mesa mesaDeA = mesaService.crearMesa("M1");
+        Mesa mesaDeA = mesaService.crearMesa("M1", sucursalA.getId());
         testEntityManager.flush();
 
         // Este test NO activa el filtro tenantFilter de Hibernate (ver
@@ -151,8 +182,9 @@ class MesaServiceTest {
     void generarSesionInvalidaCualquierSesionVigentePrevia() {
         MesaService mesaService = nuevoMesaService();
         Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante QR"));
+        Sucursal sucursal = nuevaSucursal(tenant.getId());
         TenantContext.establecerTenantId(tenant.getId());
-        Mesa mesa = mesaService.crearMesa("M1");
+        Mesa mesa = mesaService.crearMesa("M1", sucursal.getId());
         testEntityManager.flush();
 
         SesionMesa sesionVieja = mesaService.generarSesion(mesa.getId());
@@ -174,8 +206,9 @@ class MesaServiceTest {
     void generarSesionEstableceExpiracionACuatroHoras() {
         MesaService mesaService = nuevoMesaService();
         Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Vigencia"));
+        Sucursal sucursal = nuevaSucursal(tenant.getId());
         TenantContext.establecerTenantId(tenant.getId());
-        Mesa mesa = mesaService.crearMesa("M1");
+        Mesa mesa = mesaService.crearMesa("M1", sucursal.getId());
 
         LocalDateTime antes = LocalDateTime.now();
         SesionMesa sesion = mesaService.generarSesion(mesa.getId());
@@ -239,11 +272,12 @@ class MesaServiceTest {
     void crearMesaConCodigoYaActivoParaElMismoTenantLanzaExcepcion() {
         MesaService mesaService = nuevoMesaService();
         Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Duplicado"));
+        Sucursal sucursal = nuevaSucursal(tenant.getId());
         TenantContext.establecerTenantId(tenant.getId());
-        mesaService.crearMesa("M1");
+        mesaService.crearMesa("M1", sucursal.getId());
         testEntityManager.flush();
 
-        assertThatThrownBy(() -> mesaService.crearMesa("M1"))
+        assertThatThrownBy(() -> mesaService.crearMesa("M1", sucursal.getId()))
                 .isInstanceOf(MesaExceptions.CodigoMesaDuplicadoException.class);
     }
 
@@ -252,13 +286,15 @@ class MesaServiceTest {
         MesaService mesaService = nuevoMesaService();
         Tenant tenantA = tenantRepository.save(nuevoTenant("Restaurante Codigo A"));
         Tenant tenantB = tenantRepository.save(nuevoTenant("Restaurante Codigo B"));
+        Sucursal sucursalA = nuevaSucursal(tenantA.getId());
+        Sucursal sucursalB = nuevaSucursal(tenantB.getId());
 
         TenantContext.establecerTenantId(tenantA.getId());
-        mesaService.crearMesa("M1");
+        mesaService.crearMesa("M1", sucursalA.getId());
         testEntityManager.flush();
 
         TenantContext.establecerTenantId(tenantB.getId());
-        Mesa mesaDeB = mesaService.crearMesa("M1");
+        Mesa mesaDeB = mesaService.crearMesa("M1", sucursalB.getId());
 
         assertThat(mesaDeB.getId()).isNotNull();
     }
@@ -267,19 +303,28 @@ class MesaServiceTest {
     void unCodigoQuedaDisponibleDeNuevoUnaVezQueLaMesaOriginalSeDesactiva() {
         MesaService mesaService = nuevoMesaService();
         Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Reutiliza Codigo"));
+        Sucursal sucursal = nuevaSucursal(tenant.getId());
         TenantContext.establecerTenantId(tenant.getId());
-        Mesa original = mesaService.crearMesa("M1");
+        Mesa original = mesaService.crearMesa("M1", sucursal.getId());
         mesaService.desactivarMesa(original.getId());
         testEntityManager.flush();
 
-        Mesa nueva = mesaService.crearMesa("M1");
+        Mesa nueva = mesaService.crearMesa("M1", sucursal.getId());
 
         assertThat(nueva.getId()).isNotEqualTo(original.getId());
         assertThat(nueva.isActiva()).isTrue();
     }
 
     private MesaService nuevoMesaService() {
-        return new MesaService(mesaRepository, sesionMesaRepository);
+        return new MesaService(mesaRepository, sesionMesaRepository, new SucursalService(sucursalRepository));
+    }
+
+    private Sucursal nuevaSucursal(Long tenantId) {
+        Sucursal sucursal = new Sucursal();
+        sucursal.setTenantId(tenantId);
+        sucursal.setNombre("Sucursal Principal");
+        sucursal.setActiva(true);
+        return sucursalRepository.save(sucursal);
     }
 
     private Tenant nuevoTenant(String nombre) {

@@ -15,15 +15,13 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 /**
- * Una mesa física del restaurante. Hoy sin `sucursal_id` propio: el resto
- * del dominio ya implementado (menu.CategoriaMenu/ItemMenu) todavía no
- * modela sucursales -- solo tenant_id -- así que Mesa sigue el mismo nivel
- * de granularidad real en vez de adelantar un concepto (Sucursal) que no
- * existe todavía en ninguna otra parte del código. documentacion-tecnica.md
- * §7 sí modela SUCURSAL explícitamente; si se implementa más adelante, esta
- * clase necesita `sucursal_id` igual que categorias_menu/items_menu -- no
- * es un olvido, es una simplificación deliberada consistente con lo ya
- * construido.
+ * Una mesa física del restaurante, de UNA sucursal (RF-10,
+ * documentacion-tecnica.md §7) -- ver sucursal.Sucursal para el alcance
+ * real de esa entidad en este proyecto: existe y Mesa ya la referencia,
+ * pero CategoriaMenu/ItemMenu/Pedido todavía no, así que la carta y los
+ * pedidos siguen siendo tenant-scoped únicamente por ahora, no
+ * sucursal-scoped -- ese es el siguiente paso, no algo que esta clase
+ * resuelva por sí sola.
  */
 @Entity
 @Table(
@@ -43,6 +41,17 @@ public class Mesa extends EntidadConTenant {
 
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
+
+    /**
+     * RF-10: a qué sucursal del tenant pertenece esta mesa -- validado en
+     * MesaService.crearMesa contra SucursalService (pertenece al tenant
+     * actual y está activa) antes de guardar, nunca solo confiado al FK de
+     * V16__mesas_sucursal_id.sql como única defensa (mismo criterio de
+     * "defensa explícita ademas del filtro/FK de base de datos" que el
+     * resto de este proyecto).
+     */
+    @Column(name = "sucursal_id", nullable = false)
+    private Long sucursalId;
 
     @Column(nullable = false, length = 50)
     private String codigo;
@@ -67,12 +76,20 @@ public class Mesa extends EntidadConTenant {
      * Hibernate por el mismo motivo por el que se necesita escribirla (no
      * solo leerla): ponerla en null al desactivar es la mitad del
      * mecanismo.
+     *
+     * NOTA RF-10: esta unicidad sigue siendo (tenant_id, codigo_unico), NO
+     * (sucursal_id, codigo_unico) -- una decisión deliberada de esta rama,
+     * no un olvido: cambiarla a nivel de sucursal es una migración de datos
+     * con su propio riesgo (¿qué pasa si dos mesas de sucursales distintas
+     * del mismo tenant ya comparten código hoy?) que merece su propio
+     * análisis, no un cambio de paso en la migración que introduce
+     * sucursal_id.
      */
     @Column(name = "codigo_unico", length = 50)
     private String codigoUnico;
 
     /** Soft delete -- una SesionMesa/Pedido histórico podría seguir
-     * referenciando esta mesa el día que exista el módulo pedidos. */
+     * referenciando esta mesa. */
     @Column(nullable = false)
     private boolean activa = true;
 
