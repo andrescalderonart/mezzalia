@@ -4,6 +4,7 @@ import MenuPage from './pages/MenuPage.jsx'
 import MesasPage from './pages/MesasPage.jsx'
 import PedidosPage from './pages/PedidosPage.jsx'
 import TenantsPage from './pages/TenantsPage.jsx'
+import UsuariosPage from './pages/UsuariosPage.jsx'
 import Layout from './components/Layout.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import RutaConRol from './components/RutaConRol.jsx'
@@ -25,6 +26,13 @@ export default function App() {
             <Route path="/menu" element={<MenuPage />} />
             <Route path="/mesas" element={<MesasPage />} />
             <Route path="/pedidos" element={<PedidosPage />} />
+          </Route>
+
+          {/* Gestión de usuarios internos (RF-09/§2): exclusivo de
+              ADMIN_RESTAURANTE, ni siquiera MESERO puede dar de alta o
+              desactivar otras cuentas del restaurante. */}
+          <Route element={<RutaConRol permitidos={['ADMIN_RESTAURANTE']} />}>
+            <Route path="/usuarios" element={<UsuariosPage />} />
           </Route>
 
           <Route element={<RutaConRol permitidos={['SUPER_ADMIN']} />}>
