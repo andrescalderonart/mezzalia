@@ -73,9 +73,23 @@ public class SucursalService {
         sucursalRepository.save(sucursal);
     }
 
+    /**
+     * BUG REAL encontrado por CI (SucursalServiceTest.
+     * reactivarSucursalLaVuelveAMostrarEnElListado, error -- no solo
+     * assertion failure) y no por revision manual: esto llamaba a
+     * obtenerSucursal(id), que filtra por Sucursal::isActiva -- correcto
+     * para desactivarSucursal/obtenerSucursalActivaDelTenantActual (solo
+     * tiene sentido desactivar o validar algo que esta activo), pero
+     * exactamente al reves de lo que reactivar necesita: una sucursal
+     * INACTIVA es precisamente lo que hay que encontrar aca, asi que ese
+     * filtro hacia que reactivarSucursal() lanzara
+     * SucursalNoEncontradaException el 100% de las veces, sobre
+     * cualquier id valido -- la funcionalidad estaba completamente rota
+     * desde que se escribio, sin importar el estado de la sucursal.
+     */
     @Transactional
     public void reactivarSucursal(Long sucursalId) {
-        Sucursal sucursal = obtenerSucursal(sucursalId);
+        Sucursal sucursal = obtenerSucursalSinImportarEstado(sucursalId);
         sucursal.setActiva(true);
         sucursalRepository.save(sucursal);
     }
@@ -97,6 +111,21 @@ public class SucursalService {
         Sucursal sucursal = sucursalRepository.findById(id)
                 .filter(Sucursal::isActiva)
                 .orElseThrow(() -> new SucursalExceptions.SucursalNoEncontradaException(id));
+        return validarTenantOLanzar(sucursal, id);
+    }
+
+    /**
+     * Igual que obtenerSucursal(id) pero SIN el filtro de estado activo --
+     * uso exclusivo de reactivarSucursal(), que por definicion necesita
+     * poder encontrar una sucursal ya inactiva.
+     */
+    private Sucursal obtenerSucursalSinImportarEstado(Long id) {
+        Sucursal sucursal = sucursalRepository.findById(id)
+                .orElseThrow(() -> new SucursalExceptions.SucursalNoEncontradaException(id));
+        return validarTenantOLanzar(sucursal, id);
+    }
+
+    private Sucursal validarTenantOLanzar(Sucursal sucursal, Long id) {
         Long tenantActual = TenantContext.obtenerTenantId();
         if (tenantActual == null || !tenantActual.equals(sucursal.getTenantId())) {
             throw new SucursalExceptions.SucursalNoEncontradaException(id);
