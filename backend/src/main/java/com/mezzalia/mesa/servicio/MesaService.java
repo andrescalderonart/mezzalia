@@ -5,6 +5,8 @@ import com.mezzalia.mesa.MesaRepository;
 import com.mezzalia.mesa.SesionMesa;
 import com.mezzalia.mesa.SesionMesaRepository;
 import com.mezzalia.mesa.excepcion.MesaExceptions;
+import com.mezzalia.sucursal.SucursalContext;
+import com.mezzalia.sucursal.excepcion.SucursalExceptions;
 import com.mezzalia.sucursal.servicio.SucursalService;
 import com.mezzalia.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -44,11 +46,22 @@ public class MesaService {
      * restaurantes en una sola lista con GET /api/admin/mesas --
      * tenantActual() lanza si no hay contexto, cerrando ese hueco igual que
      * ya cierra el resto de metodos de escritura de este servicio.
+     *
+     * RF-10 PR4: ahora ADEMAS acota por sucursalActual() -- ver el javadoc
+     * de ese metodo. MesaRepository.findByTenantIdAndActivaTrueOrderByCodigoAsc
+     * reemplaza a la vieja findByActivaTrueOrderByCodigoAsc() (sin
+     * tenantId): esta query ya no depende UNICAMENTE del filtro de
+     * Hibernate para el aislamiento de tenant tampoco, cerrando el mismo
+     * tipo de gap que SucursalRepository ya habia cerrado antes.
      */
     @Transactional(readOnly = true)
     public List<Mesa> listarMesas() {
-        tenantActual();
-        return mesaRepository.findByActivaTrueOrderByCodigoAsc();
+        Long tenantId = tenantActual();
+        Long sucursalId = sucursalActual();
+        if (sucursalId != null) {
+            return mesaRepository.findByTenantIdAndSucursalIdAndActivaTrueOrderByCodigoAsc(tenantId, sucursalId);
+        }
+        return mesaRepository.findByTenantIdAndActivaTrueOrderByCodigoAsc(tenantId);
     }
 
     /**
@@ -162,10 +175,43 @@ public class MesaService {
     }
 
     /**
+     * RF-10 PR4: uso exclusivo de PedidoService (sucursalActual()/
+     * obtenerPedido) -- Pedido no tiene su propio sucursal_id (decisión
+     * explícita de esta rama, ver el javadoc de Pedido.java: la carta y
+     * los pedidos siguen siendo tenant-scoped únicamente a nivel de
+     * columna), pero para poder acotar qué MESERO ve/opera qué pedidos por
+     * sucursal sin agregar esa columna todavía, hace falta poder resolver
+     * a qué sucursal pertenece la MESA de un pedido. Devuelve null si la
+     * mesa no existe o no pertenece al tenant actual -- el llamador decide
+     * qué hacer con eso (ver PedidoService.obtenerPedido: una mesa no
+     * resoluble se trata igual que "no pertenece a la sucursal actual",
+     * nunca como "sin restricción").
+     */
+    @Transactional(readOnly = true)
+    public Long obtenerSucursalIdDeMesa(Long mesaId) {
+        Long tenantId = TenantContext.obtenerTenantId();
+        return mesaRepository.findById(mesaId)
+                .filter(m -> tenantId != null && tenantId.equals(m.getTenantId()))
+                .map(Mesa::getSucursalId)
+                .orElse(null);
+    }
+
+    /**
      * Misma defensa explícita que MenuService.obtenerCategoria/obtenerItem:
      * no confiar solo en el filtro de Hibernate para una carga por id, y
      * devolver siempre "no encontrado" (nunca 403) para no confirmarle a un
      * atacante que el recurso existe en otro tenant.
+     *
+     * RF-10 PR4: ADEMAS valida sucursalActual() cuando corresponde (MESERO
+     * con sucursal seleccionada, o ADMIN_RESTAURANTE enfocado en una) --
+     * sin esto, un MESERO de la sucursal A podía, conociendo o adivinando
+     * el id, desactivar una mesa o regenerar el QR de una mesa de la
+     * sucursal B del MISMO tenant: exactamente el caso de prueba que
+     * docs/propuesta-multisucursal-rf10.md §7 pide cerrar ("un MESERO de
+     * la sucursal A no puede leer ni escribir mesas/pedidos de la sucursal
+     * B"). Cuando sucursalActual() es null (ADMIN_RESTAURANTE sin
+     * enfocar), este chequeo es un no-op: comportamiento idéntico al que
+     * existía antes de esta rama.
      */
     private Mesa obtenerMesa(Long id) {
         Mesa mesa = mesaRepository.findById(id)
@@ -173,6 +219,10 @@ public class MesaService {
                 .orElseThrow(() -> new MesaExceptions.MesaNoEncontradaException(id));
         Long tenantActual = TenantContext.obtenerTenantId();
         if (tenantActual == null || !tenantActual.equals(mesa.getTenantId())) {
+            throw new MesaExceptions.MesaNoEncontradaException(id);
+        }
+        Long sucursalId = sucursalActual();
+        if (sucursalId != null && !sucursalId.equals(mesa.getSucursalId())) {
             throw new MesaExceptions.MesaNoEncontradaException(id);
         }
         return mesa;
@@ -184,5 +234,29 @@ public class MesaService {
             throw new MesaExceptions.SinTenantEnContextoException();
         }
         return tenantId;
+    }
+
+    /**
+     * RF-10 PR4 (docs/propuesta-multisucursal-rf10.md §4): "sucursalActual()"
+     * propio de este servicio, no un @Filter global de sucursal -- ver
+     * sucursal.SucursalContext para el porqué (un filtro global que hay
+     * que desactivar según el rol ya generó un bug real en este proyecto
+     * para tenant/SUPER_ADMIN, ver el javadoc de listarMesas). Devuelve
+     * null cuando el rol autenticado puede ver TODAS las sucursales del
+     * tenant (ADMIN_RESTAURANTE sin sucursal seleccionada, igual que
+     * siempre); devuelve un id concreto para acotar la query cuando
+     * corresponde. MESERO SIEMPRE debe tener una sucursal seleccionada
+     * para llegar hasta acá -- si su JWT no trae el claim, es que nunca
+     * seleccionó una tras el login (o perdió la selección en el último
+     * /api/auth/refresh, ver AuthService.emitirPar), y se lo bloquea con
+     * un 409 explícito en vez de mostrarle silenciosamente las mesas de
+     * TODAS las sucursales del tenant (la fuga exacta que este diseño
+     * existe para evitar) o una lista vacía sin explicación.
+     */
+    private Long sucursalActual() {
+        if (SucursalContext.requiereSeleccion() && SucursalContext.obtenerSucursalId() == null) {
+            throw new SucursalExceptions.SucursalNoSeleccionadaException();
+        }
+        return SucursalContext.obtenerSucursalId();
     }
 }

@@ -47,4 +47,21 @@ public final class AuthExceptions {
             super("Demasiados intentos fallidos. Reintente en " + segundosParaReintentar + " segundos");
         }
     }
+
+    /**
+     * RF-10 PR4: defensa-en-profundidad de AuthService.usuarioAutenticadoActual
+     * -- no debería poder pasar nunca en la práctica (SecurityConfig ya
+     * exige autenticado a nivel de filtro para /api/admin/**, ver
+     * SesionController), pero un JWT válido para un username que ya no
+     * resuelve a ningún UsuarioInterno (nunca debería ocurrir, este
+     * proyecto no hace hard-delete de usuarios) es un caso distinto de
+     * "credenciales incorrectas" y merece su propio mensaje, no uno que
+     * sugiera que el usuario escribió mal su contraseña.
+     */
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public static class UsuarioAutenticadoNoEncontradoException extends RuntimeException {
+        public UsuarioAutenticadoNoEncontradoException() {
+            super("El usuario autenticado ya no existe");
+        }
+    }
 }

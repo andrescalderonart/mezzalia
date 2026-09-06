@@ -3,6 +3,7 @@ package com.mezzalia.identidad.seguridad;
 import com.mezzalia.identidad.RolUsuario;
 import com.mezzalia.identidad.excepcion.AuthExceptions;
 import com.mezzalia.identidad.servicio.JwtService;
+import com.mezzalia.sucursal.SucursalContext;
 import com.mezzalia.tenant.TenantContext;
 import io.jsonwebtoken.Claims;
 import jakarta.persistence.EntityManager;
@@ -85,6 +86,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 .enableFilter(NOMBRE_FILTRO_TENANT)
                                 .setParameter("tenantId", tenantId);
                         filtroTenantActivado = true;
+
+                        // RF-10 PR4 (docs/propuesta-multisucursal-rf10.md §4):
+                        // ver sucursal.SucursalContext para el porque de una
+                        // clase aparte de TenantContext. requiereSeleccion()
+                        // marca true SOLO para MESERO -- es el rol para el
+                        // que MesaService/PedidoService EXIGEN una sucursal ya
+                        // elegida antes de listar/operar (ver
+                        // "sucursalActual()" en esos servicios); un
+                        // ADMIN_RESTAURANTE sin este claim sigue viendo todas
+                        // las sucursales de su tenant, comportamiento
+                        // idéntico al que existía antes de esta rama.
+                        SucursalContext.marcarRequiereSeleccion(rol == RolUsuario.MESERO);
+                        Long sucursalId = jwtService.obtenerSucursalId(claims);
+                        if (sucursalId != null) {
+                            SucursalContext.establecerSucursalId(sucursalId);
+                        }
                     }
                 } catch (AuthExceptions.TokenInvalidoException ex) {
                     // Token presente pero inválido/expirado: NO se lanza la excepción
@@ -113,6 +130,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 entityManager.unwrap(Session.class).disableFilter(NOMBRE_FILTRO_TENANT);
             }
             TenantContext.limpiar();
+            // Mismo motivo que TenantContext.limpiar() de arriba: el pool de
+            // hilos de Tomcat reusa hilos entre requests, así que esto se
+            // limpia SIEMPRE, no solo cuando se estableció explícitamente
+            // (ver SucursalContext.limpiar() -- no-op barato si nunca se usó).
+            SucursalContext.limpiar();
         }
     }
 }

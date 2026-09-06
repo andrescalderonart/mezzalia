@@ -8,10 +8,17 @@ import com.mezzalia.menu.ItemMenuRepository;
 import com.mezzalia.menu.servicio.MenuService;
 import com.mezzalia.mesa.Mesa;
 import com.mezzalia.mesa.MesaRepository;
+import com.mezzalia.mesa.SesionMesaRepository;
+import com.mezzalia.mesa.servicio.MesaService;
 import com.mezzalia.pedido.dto.ComensalRequest;
 import com.mezzalia.pedido.dto.ItemSolicitadoRequest;
 import com.mezzalia.pedido.excepcion.PedidoExceptions;
 import com.mezzalia.pedido.servicio.PedidoService;
+import com.mezzalia.sucursal.Sucursal;
+import com.mezzalia.sucursal.SucursalContext;
+import com.mezzalia.sucursal.SucursalRepository;
+import com.mezzalia.sucursal.excepcion.SucursalExceptions;
+import com.mezzalia.sucursal.servicio.SucursalService;
 import com.mezzalia.tenant.Tenant;
 import com.mezzalia.tenant.TenantContext;
 import com.mezzalia.tenant.TenantRepository;
@@ -70,6 +77,10 @@ class PedidoServiceTest {
     @Autowired
     private MesaRepository mesaRepository;
     @Autowired
+    private SesionMesaRepository sesionMesaRepository;
+    @Autowired
+    private SucursalRepository sucursalRepository;
+    @Autowired
     private PedidoRepository pedidoRepository;
     @Autowired
     private PedidoItemRepository pedidoItemRepository;
@@ -81,6 +92,7 @@ class PedidoServiceTest {
     @AfterEach
     void limpiarContexto() {
         TenantContext.limpiar();
+        SucursalContext.limpiar();
         SecurityContextHolder.clearContext();
     }
 
@@ -331,9 +343,88 @@ class PedidoServiceTest {
                 .isInstanceOf(PedidoExceptions.SinTenantEnContextoException.class);
     }
 
+    /**
+     * RF-10 PR4 (docs/propuesta-multisucursal-rf10.md §7 -- el test que esa
+     * propuesta pedia explicitamente): sin el chequeo de sucursal agregado
+     * a PedidoService.obtenerPedido, un MESERO de la sucursal A podia
+     * cambiar el estado de un pedido de una mesa de la sucursal B del
+     * MISMO tenant con solo conocer/adivinar su id -- PATCH
+     * /api/admin/pedidos/{id}/estado no tiene @PreAuthorize de rol (ver
+     * PedidoAdminController), asi que ese endpoint SI es alcanzable por
+     * cualquier MESERO autenticado del tenant.
+     */
+    @Test
+    void unMeseroConSucursalSeleccionadaNoPuedeCambiarEstadoDePedidosDeOtraSucursalDelMismoTenant() {
+        PedidoService pedidoService = nuevoPedidoService();
+        Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Pedidos Multisucursal"));
+        autenticarComo("mesero.test");
+        TenantContext.establecerTenantId(tenant.getId());
+        Sucursal sucursalA = nuevaSucursal(tenant.getId());
+        Sucursal sucursalB = nuevaSucursal(tenant.getId());
+        CategoriaMenu categoria = nuevoMenuService().crearCategoria("Categoria", 0);
+        ItemMenu item = crearItem(categoria, "Limonada", "8000");
+        Mesa mesaDeB = mesaRepository.save(nuevaMesaEnSucursal(tenant.getId(), "B1", sucursalB.getId()));
+
+        Pedido pedidoDeB = pedidoService.crearPedido(mesaDeB.getId(), UUID.randomUUID().toString(),
+                List.of(new ItemSolicitadoRequest(item.getId(), 1)), null, null);
+
+        SucursalContext.marcarRequiereSeleccion(true);
+        SucursalContext.establecerSucursalId(sucursalA.getId());
+
+        assertThatThrownBy(() -> pedidoService.cambiarEstado(pedidoDeB.getId(), EstadoPedido.EN_PREPARACION))
+                .as("un pedido de otra sucursal del mismo tenant debe ser 'no encontrado', nunca un 403 que confirme que existe")
+                .isInstanceOf(PedidoExceptions.PedidoNoEncontradoException.class);
+    }
+
+    @Test
+    void listarPedidosAcotaPorSucursalCuandoUnMeseroYaSeleccionoUna() {
+        PedidoService pedidoService = nuevoPedidoService();
+        Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Pedidos Listado Multisucursal"));
+        autenticarComo("mesero.test");
+        TenantContext.establecerTenantId(tenant.getId());
+        Sucursal sucursalA = nuevaSucursal(tenant.getId());
+        Sucursal sucursalB = nuevaSucursal(tenant.getId());
+        CategoriaMenu categoria = nuevoMenuService().crearCategoria("Categoria", 0);
+        ItemMenu item = crearItem(categoria, "Limonada", "8000");
+        Mesa mesaDeA = mesaRepository.save(nuevaMesaEnSucursal(tenant.getId(), "A1", sucursalA.getId()));
+        Mesa mesaDeB = mesaRepository.save(nuevaMesaEnSucursal(tenant.getId(), "B1", sucursalB.getId()));
+
+        Pedido pedidoDeA = pedidoService.crearPedido(mesaDeA.getId(), UUID.randomUUID().toString(),
+                List.of(new ItemSolicitadoRequest(item.getId(), 1)), null, null);
+        pedidoService.crearPedido(mesaDeB.getId(), UUID.randomUUID().toString(),
+                List.of(new ItemSolicitadoRequest(item.getId(), 1)), null, null);
+
+        SucursalContext.marcarRequiereSeleccion(true);
+        SucursalContext.establecerSucursalId(sucursalA.getId());
+
+        assertThat(pedidoService.listarPedidos(null)).extracting(Pedido::getId)
+                .containsExactly(pedidoDeA.getId());
+    }
+
+    @Test
+    void unMeseroSinSucursalSeleccionadaNoPuedeListarPedidos() {
+        PedidoService pedidoService = nuevoPedidoService();
+        Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Pedidos Sin Seleccion"));
+        TenantContext.establecerTenantId(tenant.getId());
+
+        SucursalContext.marcarRequiereSeleccion(true);
+
+        assertThatThrownBy(() -> pedidoService.listarPedidos(null))
+                .isInstanceOf(SucursalExceptions.SucursalNoSeleccionadaException.class);
+    }
+
     private PedidoService nuevoPedidoService() {
         return new PedidoService(pedidoRepository, pedidoItemRepository, historialRepository, comensalRepository,
-                nuevoMenuService());
+                nuevoMenuService(), nuevoMesaService());
+    }
+
+    // RF-10 PR4: PedidoService ahora depende de MesaService (ver el
+    // javadoc de PedidoService.obtenerPedido/sucursalActual) -- mismo
+    // criterio que nuevoMenuService() de abajo, instanciado a mano en vez
+    // de @Autowired porque este test no wirea @Service beans (ver el
+    // comentario de clase).
+    private MesaService nuevoMesaService() {
+        return new MesaService(mesaRepository, sesionMesaRepository, new SucursalService(sucursalRepository));
     }
 
     private MenuService nuevoMenuService() {
@@ -380,6 +471,26 @@ class PedidoServiceTest {
         mesa.setSucursalId(1L);
         mesa.setCodigo(codigo);
         return mesa;
+    }
+
+    /** Variante de nuevaMesa() para los tests de aislamiento por sucursal
+     * de arriba, que SI necesitan una Sucursal real (no el placeholder
+     * 1L) para poder crear dos mesas en sucursales distintas del mismo
+     * tenant. */
+    private Mesa nuevaMesaEnSucursal(Long tenantId, String codigo, Long sucursalId) {
+        Mesa mesa = new Mesa();
+        mesa.setTenantId(tenantId);
+        mesa.setSucursalId(sucursalId);
+        mesa.setCodigo(codigo);
+        return mesa;
+    }
+
+    private Sucursal nuevaSucursal(Long tenantId) {
+        Sucursal sucursal = new Sucursal();
+        sucursal.setTenantId(tenantId);
+        sucursal.setNombre("Sucursal " + UUID.randomUUID());
+        sucursal.setActiva(true);
+        return sucursalRepository.save(sucursal);
     }
 
     private record Escenario(Tenant tenant, CategoriaMenu categoria, Mesa mesa) {}

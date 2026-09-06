@@ -47,6 +47,25 @@ public class SucursalService {
         return sucursalRepository.findByTenantIdAndActivaTrueOrderByNombreAsc(tenantId);
     }
 
+    /**
+     * Uso exclusivo de AsignacionSucursalService.listarSucursalesDe (RF-10
+     * PR4): dado un conjunto de ids de sucursal (las que un MESERO tiene
+     * asignadas), devuelve las que pertenecen al tenant actual -- SIN
+     * filtrar por activa a proposito, ver el javadoc de
+     * SucursalRepository.findByTenantIdAndIdInOrderByNombreAsc. Una lista
+     * vacia de ids devuelve una lista vacia sin tocar la base de datos: un
+     * `IN ()` vacio es invalido en SQL estandar, y ademas no tendria
+     * sentido de negocio ejecutar la consulta para un mesero sin ninguna
+     * asignacion todavia.
+     */
+    @Transactional(readOnly = true)
+    public List<Sucursal> listarPorIds(List<Long> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return sucursalRepository.findByTenantIdAndIdInOrderByNombreAsc(tenantActual(), ids);
+    }
+
     @Transactional
     public Sucursal crearSucursal(String nombre, String direccion) {
         Sucursal sucursal = new Sucursal();

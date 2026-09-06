@@ -9,9 +9,11 @@ import com.mezzalia.menu.servicio.AlmacenamientoImagenService;
 import com.mezzalia.menu.servicio.MenuService;
 import com.mezzalia.mesa.Mesa;
 import com.mezzalia.mesa.MesaRepository;
+import com.mezzalia.mesa.servicio.MesaService;
 import com.mezzalia.pedido.dto.ItemSolicitadoRequest;
 import com.mezzalia.pedido.excepcion.PedidoExceptions;
 import com.mezzalia.pedido.servicio.PedidoService;
+import com.mezzalia.sucursal.servicio.SucursalService;
 import com.mezzalia.tenant.Tenant;
 import com.mezzalia.tenant.TenantContext;
 import com.mezzalia.tenant.TenantRepository;
@@ -79,7 +81,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *    puesto en el hilo principal antes de lanzarlos.
  */
 @DataJpaTest
-@Import({MenuService.class, PedidoService.class})
+@Import({MenuService.class, PedidoService.class, MesaService.class, SucursalService.class})
 class PedidoServiceConcurrenciaTest {
 
     @Autowired

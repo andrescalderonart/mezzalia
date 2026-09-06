@@ -37,3 +37,6 @@ backend/uploads-test/
 # archivo real con datos locales (y password hashes), nunca se commitea,
 # igual criterio que backend/uploads/ de arriba.
 backend/data/
+
+# Notas/reportes de sesion de Claude (scratch, no es parte del repo)
+/Claude outputs/

@@ -3,7 +3,9 @@ package com.mezzalia.mesa;
 import com.mezzalia.mesa.excepcion.MesaExceptions;
 import com.mezzalia.mesa.servicio.MesaService;
 import com.mezzalia.sucursal.Sucursal;
+import com.mezzalia.sucursal.SucursalContext;
 import com.mezzalia.sucursal.SucursalRepository;
+import com.mezzalia.sucursal.excepcion.SucursalExceptions;
 import com.mezzalia.sucursal.servicio.SucursalService;
 import com.mezzalia.tenant.Tenant;
 import com.mezzalia.tenant.TenantContext;
@@ -62,6 +64,7 @@ class MesaServiceTest {
     @AfterEach
     void limpiarContexto() {
         TenantContext.limpiar();
+        SucursalContext.limpiar();
     }
 
     @Test
@@ -313,6 +316,89 @@ class MesaServiceTest {
 
         assertThat(nueva.getId()).isNotEqualTo(original.getId());
         assertThat(nueva.isActiva()).isTrue();
+    }
+
+    /**
+     * RF-10 PR4 (docs/propuesta-multisucursal-rf10.md §7 -- el test que esa
+     * propuesta pedia explicitamente y todavia no existia): el caso real
+     * que motivo agregar sucursalActual() a este servicio. Sin el chequeo
+     * de sucursal en obtenerMesa(), un MESERO de la sucursal A podia
+     * desactivar o regenerar el QR de una mesa de la sucursal B del MISMO
+     * tenant con solo adivinar/conocer su id.
+     */
+    @Test
+    void unMeseroConSucursalSeleccionadaNoPuedeOperarMesasDeOtraSucursalDelMismoTenant() {
+        MesaService mesaService = nuevoMesaService();
+        Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Multisucursal"));
+        Sucursal sucursalA = nuevaSucursal(tenant.getId());
+        Sucursal sucursalB = nuevaSucursal(tenant.getId());
+        TenantContext.establecerTenantId(tenant.getId());
+        Mesa mesaDeB = mesaService.crearMesa("M1", sucursalB.getId());
+        testEntityManager.flush();
+
+        // Simula un MESERO que ya selecciono la sucursal A (ver
+        // JwtAuthenticationFilter -- esto es exactamente lo que ese filtro
+        // establece a partir del JWT, reproducido a mano aca porque este
+        // test no monta la capa HTTP).
+        SucursalContext.marcarRequiereSeleccion(true);
+        SucursalContext.establecerSucursalId(sucursalA.getId());
+
+        assertThatThrownBy(() -> mesaService.desactivarMesa(mesaDeB.getId()))
+                .as("una mesa de otra sucursal del mismo tenant debe ser 'no encontrada', nunca un 403 que confirme que existe")
+                .isInstanceOf(MesaExceptions.MesaNoEncontradaException.class);
+        assertThatThrownBy(() -> mesaService.generarSesion(mesaDeB.getId()))
+                .isInstanceOf(MesaExceptions.MesaNoEncontradaException.class);
+    }
+
+    @Test
+    void listarMesasAcotaPorSucursalCuandoUnMeseroYaSeleccionoUna() {
+        MesaService mesaService = nuevoMesaService();
+        Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Listado Multisucursal"));
+        Sucursal sucursalA = nuevaSucursal(tenant.getId());
+        Sucursal sucursalB = nuevaSucursal(tenant.getId());
+        TenantContext.establecerTenantId(tenant.getId());
+        mesaService.crearMesa("A1", sucursalA.getId());
+        mesaService.crearMesa("B1", sucursalB.getId());
+        testEntityManager.flush();
+
+        SucursalContext.marcarRequiereSeleccion(true);
+        SucursalContext.establecerSucursalId(sucursalA.getId());
+
+        assertThat(mesaService.listarMesas()).extracting(Mesa::getCodigo).containsExactly("A1");
+    }
+
+    @Test
+    void unMeseroSinSucursalSeleccionadaNoPuedeListarMesas() {
+        MesaService mesaService = nuevoMesaService();
+        Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Sin Seleccion"));
+        TenantContext.establecerTenantId(tenant.getId());
+
+        // requiereSeleccion=true sin sucursalId establecido -- reproduce un
+        // MESERO recien logueado (o recien refrescado, ver el javadoc de
+        // AuthService.emitirPar) que todavia no llamo a
+        // POST /api/admin/sesion/sucursal.
+        SucursalContext.marcarRequiereSeleccion(true);
+
+        assertThatThrownBy(mesaService::listarMesas)
+                .isInstanceOf(SucursalExceptions.SucursalNoSeleccionadaException.class);
+    }
+
+    @Test
+    void unAdminRestauranteSinSucursalSeleccionadaSigueViendoTodasLasSucursales() {
+        MesaService mesaService = nuevoMesaService();
+        Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Admin Sin Enfocar"));
+        Sucursal sucursalA = nuevaSucursal(tenant.getId());
+        Sucursal sucursalB = nuevaSucursal(tenant.getId());
+        TenantContext.establecerTenantId(tenant.getId());
+        mesaService.crearMesa("A1", sucursalA.getId());
+        mesaService.crearMesa("B1", sucursalB.getId());
+        testEntityManager.flush();
+
+        // requiereSeleccion queda en su default (false): ADMIN_RESTAURANTE
+        // sin enfocar ninguna sucursal -- comportamiento identico al que
+        // existia antes de esta rama.
+        assertThat(mesaService.listarMesas()).extracting(Mesa::getCodigo)
+                .containsExactlyInAnyOrder("A1", "B1");
     }
 
     private MesaService nuevoMesaService() {
