@@ -145,6 +145,13 @@ class ComensalServiceTest {
         mesa.setCodigo(codigo);
         mesa.setCodigoUnico(codigo);
         mesa.setActiva(true);
+        // RF-10 (feature/sucursales-multi-tenant, PR #16): Mesa.sucursalId
+        // ahora es NOT NULL a nivel de columna, pero sin FK a nivel de JPA
+        // (ver Mesa.java) -- este test no ejerce nada de Sucursal, un valor
+        // fijo alcanza para satisfacer la restriccion NOT NULL sin crear
+        // una Sucursal real de mas. Mismo criterio que
+        // PedidoServiceTest/PedidoServiceConcurrenciaTest.nuevaMesa().
+        mesa.setSucursalId(1L);
         return mesa;
     }
 
