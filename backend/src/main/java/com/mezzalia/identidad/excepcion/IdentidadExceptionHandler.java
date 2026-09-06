@@ -56,6 +56,33 @@ public class IdentidadExceptionHandler {
         return respuesta(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
     }
 
+    // ── CRUD de usuarios internos (RF-09/§2, ver UsuarioInternoAdminService) ──
+
+    @ExceptionHandler(UsuarioInternoExceptions.UsuarioYaExisteException.class)
+    public ResponseEntity<Map<String, Object>> handleUsuarioYaExiste(UsuarioInternoExceptions.UsuarioYaExisteException ex) {
+        return respuesta(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(UsuarioInternoExceptions.UsuarioNoEncontradoException.class)
+    public ResponseEntity<Map<String, Object>> handleUsuarioNoEncontrado(UsuarioInternoExceptions.UsuarioNoEncontradoException ex) {
+        return respuesta(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(UsuarioInternoExceptions.RolNoPermitidoException.class)
+    public ResponseEntity<Map<String, Object>> handleRolNoPermitido(UsuarioInternoExceptions.RolNoPermitidoException ex) {
+        return respuesta(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(UsuarioInternoExceptions.SinTenantEnContextoException.class)
+    public ResponseEntity<Map<String, Object>> handleSinTenantUsuarios(UsuarioInternoExceptions.SinTenantEnContextoException ex) {
+        return respuesta(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
+    @ExceptionHandler(UsuarioInternoExceptions.NoPuedeDesactivarseASiMismoException.class)
+    public ResponseEntity<Map<String, Object>> handleNoPuedeDesactivarseASiMismo(UsuarioInternoExceptions.NoPuedeDesactivarseASiMismoException ex) {
+        return respuesta(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
     private ResponseEntity<Map<String, Object>> respuesta(HttpStatus status, String mensaje) {
         return ResponseEntity.status(status).body(Map.of(
                 "timestamp", Instant.now().toString(),
