@@ -20,9 +20,15 @@ public record PedidoAdminDto(
         LocalDateTime creadoEn,
         LocalDateTime actualizadoEn
 ) {
-    public static PedidoAdminDto desde(Pedido pedido, List<PedidoItem> items, Comensal comensal) {
+    /**
+     * `telefonoCompleto` viaja explicito desde el controlador (que es
+     * quien conoce el rol autenticado) hasta ComensalDto.desde() -- ver el
+     * comentario en ComensalDto sobre por que no existe una version de
+     * este metodo sin ese parametro.
+     */
+    public static PedidoAdminDto desde(Pedido pedido, List<PedidoItem> items, Comensal comensal, boolean telefonoCompleto) {
         List<PedidoItemDto> itemsDto = items.stream().map(PedidoItemDto::desde).toList();
-        ComensalDto comensalDto = comensal != null ? ComensalDto.desde(comensal) : null;
+        ComensalDto comensalDto = comensal != null ? ComensalDto.desde(comensal, telefonoCompleto) : null;
         return new PedidoAdminDto(
                 pedido.getId(), pedido.getMesaId(), pedido.getEstado(), pedido.getTotal(), pedido.getNotas(),
                 itemsDto, comensalDto, pedido.getCreadoEn(), pedido.getActualizadoEn());

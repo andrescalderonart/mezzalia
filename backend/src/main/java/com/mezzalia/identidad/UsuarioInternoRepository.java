@@ -3,6 +3,7 @@ package com.mezzalia.identidad;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -18,4 +19,19 @@ public interface UsuarioInternoRepository extends JpaRepository<UsuarioInterno, 
     Optional<UsuarioInterno> findByUsername(String username);
 
     boolean existsByUsername(String username);
+
+    /**
+     * Uso exclusivo de UsuarioInternoAdminService (RF-09: gestión de
+     * usuarios internos con roles, §2 del MVP -- "gestión de usuarios
+     * internos con roles" estaba listada como incluida en el panel del
+     * restaurante pero nunca se había construido, solo seeds fijos vía
+     * SeedDatosDemoConfig). Filtra por tenant_id explícito además del
+     * filtro de Hibernate -- mismo motivo documentado en el resto del
+     * proyecto (MenuService, MesaService...): SUPER_ADMIN no tiene
+     * tenant_id propio y el filtro nunca se activa para él, así que
+     * cualquier query de listado necesita su propio guardia explícito
+     * (ver UsuarioInternoAdminService.tenantActual()) además de esta
+     * condición de repositorio.
+     */
+    List<UsuarioInterno> findByTenantIdOrderByUsernameAsc(Long tenantId);
 }

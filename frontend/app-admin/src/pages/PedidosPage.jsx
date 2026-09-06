@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useApiJson } from '../context/AuthContext.jsx'
+import { useApiJson, useAuth } from '../context/AuthContext.jsx'
 
 const formatoPrecio = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -56,6 +56,11 @@ const INTERVALO_POLLING_MS = 6000
 
 export default function PedidosPage() {
   const apiJson = useApiJson()
+  const { usuario } = useAuth()
+  // Habeas Data (documentacion-tecnica.md §10): borrar datos personales de
+  // un comensal es al menos tan sensible como leerlos -- mismo criterio de
+  // rol que ComensalAdminController en el backend (no MESERO).
+  const puedeEliminarDatosComensal = usuario?.rol === 'ADMIN_RESTAURANTE'
 
   const [vista, setVista] = useState('activos') // 'activos' | 'historial'
   const [pedidos, setPedidos] = useState([])
@@ -63,6 +68,7 @@ export default function PedidosPage() {
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [actualizandoId, setActualizandoId] = useState(null)
+  const [eliminandoComensalId, setEliminandoComensalId] = useState(null)
 
   // Evita que dos llamadas a cargarPedidos() (una del polling, otra
   // disparada por una accion del usuario) se pisen mostrando datos viejos
@@ -123,6 +129,26 @@ export default function PedidosPage() {
       setError(e.message)
     } finally {
       setActualizandoId(null)
+    }
+  }
+
+  async function onEliminarDatosComensal(pedido) {
+    if (
+      !window.confirm(
+        'Esto elimina el nombre y teléfono de este comensal de forma permanente (Habeas Data). El pedido se conserva, solo deja de estar asociado a esa persona. No se puede deshacer.',
+      )
+    ) {
+      return
+    }
+    setEliminandoComensalId(pedido.comensal.id)
+    setError('')
+    try {
+      await apiJson(`/api/admin/comensales/${pedido.comensal.id}`, { method: 'DELETE' })
+      setPedidos((prev) => prev.map((p) => (p.id === pedido.id ? { ...p, comensal: null } : p)))
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setEliminandoComensalId(null)
     }
   }
 
@@ -196,6 +222,9 @@ export default function PedidosPage() {
               nombreMesa={nombreMesa(pedido.mesaId)}
               actualizando={actualizandoId === pedido.id}
               onCambiarEstado={(nuevoEstado) => onCambiarEstado(pedido, nuevoEstado)}
+              puedeEliminarDatosComensal={puedeEliminarDatosComensal}
+              eliminandoDatosComensal={eliminandoComensalId === pedido.comensal?.id}
+              onEliminarDatosComensal={() => onEliminarDatosComensal(pedido)}
             />
           ))}
         </div>
@@ -204,7 +233,15 @@ export default function PedidosPage() {
   )
 }
 
-function TarjetaPedido({ pedido, nombreMesa, actualizando, onCambiarEstado }) {
+function TarjetaPedido({
+  pedido,
+  nombreMesa,
+  actualizando,
+  onCambiarEstado,
+  puedeEliminarDatosComensal,
+  eliminandoDatosComensal,
+  onEliminarDatosComensal,
+}) {
   const transicionesDisponibles = TRANSICIONES[pedido.estado] || []
 
   return (
@@ -239,9 +276,20 @@ function TarjetaPedido({ pedido, nombreMesa, actualizando, onCambiarEstado }) {
       )}
 
       {pedido.comensal && (pedido.comensal.nombre || pedido.comensal.telefono) && (
-        <p className="text-[11px] text-crema/40 mb-3">
-          {[pedido.comensal.nombre, pedido.comensal.telefono].filter(Boolean).join(' · ')}
-        </p>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <p className="text-[11px] text-crema/40">
+            {[pedido.comensal.nombre, pedido.comensal.telefono].filter(Boolean).join(' · ')}
+          </p>
+          {puedeEliminarDatosComensal && (
+            <button
+              onClick={onEliminarDatosComensal}
+              disabled={eliminandoDatosComensal}
+              className="text-[10px] text-crema/30 hover:text-red-300 transition-colors duration-150 whitespace-nowrap"
+            >
+              {eliminandoDatosComensal ? '…' : 'Eliminar datos'}
+            </button>
+          )}
+        </div>
       )}
 
       <div className="flex items-center justify-between text-sm font-semibold border-t border-carbon-700 pt-3 mb-3">
