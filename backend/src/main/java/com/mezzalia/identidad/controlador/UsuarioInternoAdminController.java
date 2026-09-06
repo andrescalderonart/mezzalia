@@ -4,7 +4,9 @@ import com.mezzalia.identidad.UsuarioInterno;
 import com.mezzalia.identidad.dto.CrearUsuarioInternoRequest;
 import com.mezzalia.identidad.dto.ResetearPasswordRequest;
 import com.mezzalia.identidad.dto.UsuarioInternoDto;
+import com.mezzalia.identidad.servicio.AsignacionSucursalService;
 import com.mezzalia.identidad.servicio.UsuarioInternoAdminService;
+import com.mezzalia.sucursal.dto.SucursalDto;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -28,6 +30,7 @@ import java.util.List;
 public class UsuarioInternoAdminController {
 
     private final UsuarioInternoAdminService usuarioInternoAdminService;
+    private final AsignacionSucursalService asignacionSucursalService;
 
     @GetMapping
     public ResponseEntity<List<UsuarioInternoDto>> listarUsuarios() {
@@ -59,6 +62,35 @@ public class UsuarioInternoAdminController {
     @PatchMapping("/{id}/password")
     public ResponseEntity<Void> resetearPassword(@PathVariable Long id, @Valid @RequestBody ResetearPasswordRequest request) {
         usuarioInternoAdminService.resetearPassword(id, request.passwordNueva());
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * RF-10 PR4: sucursales asignadas a un MESERO -- ver
+     * AsignacionSucursalService. Estos 3 endpoints heredan el mismo
+     * @PreAuthorize de clase que el resto de este controlador (exclusivo
+     * de ADMIN_RESTAURANTE): un MESERO no gestiona sus propias
+     * asignaciones, las gestiona el encargado del restaurante (ver
+     * SesionController para el endpoint que SI usa el propio MESERO para
+     * ver/elegir entre las sucursales que ya tiene asignadas).
+     */
+    @GetMapping("/{id}/sucursales")
+    public ResponseEntity<List<SucursalDto>> listarSucursalesAsignadas(@PathVariable Long id) {
+        List<SucursalDto> sucursales = asignacionSucursalService.listarSucursalesDe(id).stream()
+                .map(SucursalDto::desde)
+                .toList();
+        return ResponseEntity.ok(sucursales);
+    }
+
+    @PutMapping("/{id}/sucursales/{sucursalId}")
+    public ResponseEntity<Void> asignarSucursal(@PathVariable Long id, @PathVariable Long sucursalId) {
+        asignacionSucursalService.asignar(id, sucursalId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}/sucursales/{sucursalId}")
+    public ResponseEntity<Void> desasignarSucursal(@PathVariable Long id, @PathVariable Long sucursalId) {
+        asignacionSucursalService.desasignar(id, sucursalId);
         return ResponseEntity.noContent().build();
     }
 }

@@ -39,6 +39,29 @@ public class JwtService {
     }
 
     public String generarAccessToken(UsuarioInterno usuario) {
+        return generarAccessToken(usuario, null);
+    }
+
+    /**
+     * RF-10 PR4 (docs/propuesta-multisucursal-rf10.md §3): sucursalId es un
+     * segundo claim OPCIONAL, independiente de tenantId -- ausente del
+     * claim (no solo null), mismo motivo ya documentado para tenantId:
+     * evita que un consumidor descuidado confunda "claim ausente" con
+     * "sucursal 0".
+     *
+     * Distinto de tenantId en un punto importante: tenantId se resuelve
+     * UNA sola vez, al emitir el PRIMER access token en el login (siempre
+     * a partir del propio UsuarioInterno). sucursalId, en cambio, se
+     * agrega recien en un SEGUNDO paso explicito y posterior al login (ver
+     * AuthService.seleccionarSucursal/SesionController) -- el mesero elige
+     * despues de autenticarse, nunca antes. Ese diseño tiene una
+     * limitación conocida, documentada en AuthService.emitirPar, no acá:
+     * este método no tiene forma de reconstruir, a partir de un
+     * UsuarioInterno solo, cuál era la sucursal elegida en un token
+     * anterior -- por eso cada llamada a /api/auth/refresh emite un access
+     * token SIN sucursalId, sea cual sea el que tenía el token expirado.
+     */
+    public String generarAccessToken(UsuarioInterno usuario, Long sucursalId) {
         Date ahora = new Date();
         Date expira = new Date(ahora.getTime() + expiracionAccesoMs);
 
@@ -53,6 +76,9 @@ public class JwtService {
         // valor null" con "tenant 0" o falle deserializando un tipo inesperado.
         if (usuario.getTenantId() != null) {
             builder.claim("tenantId", usuario.getTenantId());
+        }
+        if (sucursalId != null) {
+            builder.claim("sucursalId", sucursalId);
         }
 
         return builder.signWith(clave, Jwts.SIG.HS256).compact();
@@ -78,6 +104,14 @@ public class JwtService {
 
     public Long obtenerTenantId(Claims claims) {
         Object valor = claims.get("tenantId");
+        if (valor == null) {
+            return null;
+        }
+        return ((Number) valor).longValue();
+    }
+
+    public Long obtenerSucursalId(Claims claims) {
+        Object valor = claims.get("sucursalId");
         if (valor == null) {
             return null;
         }

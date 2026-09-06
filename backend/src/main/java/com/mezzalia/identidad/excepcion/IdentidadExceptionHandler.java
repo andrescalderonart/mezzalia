@@ -56,6 +56,11 @@ public class IdentidadExceptionHandler {
         return respuesta(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
     }
 
+    @ExceptionHandler(AuthExceptions.UsuarioAutenticadoNoEncontradoException.class)
+    public ResponseEntity<Map<String, Object>> handleUsuarioAutenticadoNoEncontrado(AuthExceptions.UsuarioAutenticadoNoEncontradoException ex) {
+        return respuesta(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    }
+
     // ── CRUD de usuarios internos (RF-09/§2, ver UsuarioInternoAdminService) ──
 
     @ExceptionHandler(UsuarioInternoExceptions.UsuarioYaExisteException.class)

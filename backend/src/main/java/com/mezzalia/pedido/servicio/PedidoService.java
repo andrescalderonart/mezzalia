@@ -2,6 +2,7 @@ package com.mezzalia.pedido.servicio;
 
 import com.mezzalia.menu.ItemMenu;
 import com.mezzalia.menu.servicio.MenuService;
+import com.mezzalia.mesa.servicio.MesaService;
 import com.mezzalia.pedido.Comensal;
 import com.mezzalia.pedido.ComensalRepository;
 import com.mezzalia.pedido.EstadoPedido;
@@ -14,6 +15,8 @@ import com.mezzalia.pedido.PedidoRepository;
 import com.mezzalia.pedido.dto.ComensalRequest;
 import com.mezzalia.pedido.dto.ItemSolicitadoRequest;
 import com.mezzalia.pedido.excepcion.PedidoExceptions;
+import com.mezzalia.sucursal.SucursalContext;
+import com.mezzalia.sucursal.excepcion.SucursalExceptions;
 import com.mezzalia.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -74,6 +77,7 @@ public class PedidoService {
     private final PedidoEstadoHistorialRepository historialRepository;
     private final ComensalRepository comensalRepository;
     private final MenuService menuService;
+    private final MesaService mesaService;
 
     /**
      * RF-04 (idempotencia) + RF-05 (recalculo de precio en servidor).
@@ -206,11 +210,17 @@ public class PedidoService {
      */
     @Transactional(readOnly = true)
     public List<Pedido> listarPedidos(EstadoPedido estado) {
-        tenantActual();
-        if (estado != null) {
-            return pedidoRepository.findByEstadoOrderByCreadoEnAsc(estado);
+        Long tenantId = tenantActual();
+        Long sucursalId = sucursalActual();
+        if (sucursalId != null) {
+            return estado != null
+                    ? pedidoRepository.findByTenantIdAndEstadoAndSucursalIdOrderByCreadoEnAsc(tenantId, estado, sucursalId)
+                    : pedidoRepository.findByTenantIdAndSucursalIdOrderByCreadoEnAsc(tenantId, sucursalId);
         }
-        return pedidoRepository.findAllByOrderByCreadoEnAsc();
+        if (estado != null) {
+            return pedidoRepository.findByTenantIdAndEstadoOrderByCreadoEnAsc(tenantId, estado);
+        }
+        return pedidoRepository.findByTenantIdOrderByCreadoEnAsc(tenantId);
     }
 
     @Transactional(readOnly = true)
@@ -301,6 +311,23 @@ public class PedidoService {
         if (tenantActual == null || !tenantActual.equals(pedido.getTenantId())) {
             throw new PedidoExceptions.PedidoNoEncontradoException(id);
         }
+        // RF-10 PR4 (docs/propuesta-multisucursal-rf10.md §7): sin esto, un
+        // MESERO de la sucursal A podia, conociendo o adivinando el id,
+        // cambiar el estado de un pedido de la sucursal B del MISMO
+        // tenant via PATCH /api/admin/pedidos/{id}/estado (ese endpoint no
+        // tiene @PreAuthorize de rol, ver PedidoAdminController) -- Pedido
+        // no tiene su propia sucursal_id, se resuelve via la sucursal de
+        // su Mesa (ver MesaService.obtenerSucursalIdDeMesa). Una mesa que
+        // ya no resuelve (borrada/de otro tenant, no deberia pasar nunca)
+        // se trata igual que "sucursal distinta", nunca como "sin
+        // restriccion".
+        Long sucursalId = sucursalActual();
+        if (sucursalId != null) {
+            Long sucursalDeLaMesa = mesaService.obtenerSucursalIdDeMesa(pedido.getMesaId());
+            if (!sucursalId.equals(sucursalDeLaMesa)) {
+                throw new PedidoExceptions.PedidoNoEncontradoException(id);
+            }
+        }
         return pedido;
     }
 
@@ -310,6 +337,21 @@ public class PedidoService {
             throw new PedidoExceptions.SinTenantEnContextoException();
         }
         return tenantId;
+    }
+
+    /**
+     * RF-10 PR4: mismo patron "sucursalActual()" que MesaService (ver el
+     * javadoc largo ahi) -- duplicado a proposito en vez de extraido a un
+     * helper compartido, coherente con como este proyecto ya duplica
+     * tenantActual() en cada servicio de dominio (MesaService,
+     * SucursalService, PedidoService, UsuarioInternoAdminService) en vez
+     * de una superclase comun.
+     */
+    private Long sucursalActual() {
+        if (SucursalContext.requiereSeleccion() && SucursalContext.obtenerSucursalId() == null) {
+            throw new SucursalExceptions.SucursalNoSeleccionadaException();
+        }
+        return SucursalContext.obtenerSucursalId();
     }
 
     private String usuarioActual() {

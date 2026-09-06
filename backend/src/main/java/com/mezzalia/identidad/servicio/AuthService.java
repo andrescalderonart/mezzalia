@@ -1,12 +1,21 @@
 package com.mezzalia.identidad.servicio;
 
+import com.mezzalia.identidad.AsignacionSucursal;
+import com.mezzalia.identidad.AsignacionSucursalRepository;
 import com.mezzalia.identidad.RefreshToken;
 import com.mezzalia.identidad.RefreshTokenRepository;
+import com.mezzalia.identidad.RolUsuario;
 import com.mezzalia.identidad.UsuarioInterno;
 import com.mezzalia.identidad.UsuarioInternoRepository;
+import com.mezzalia.identidad.dto.AccessTokenRespuesta;
 import com.mezzalia.identidad.dto.TokensRespuesta;
 import com.mezzalia.identidad.excepcion.AuthExceptions;
+import com.mezzalia.sucursal.Sucursal;
+import com.mezzalia.sucursal.SucursalRepository;
+import com.mezzalia.sucursal.excepcion.SucursalExceptions;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +27,7 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.List;
 
 @Service
 public class AuthService {
@@ -26,6 +36,8 @@ public class AuthService {
 
     private final UsuarioInternoRepository usuarioInternoRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final AsignacionSucursalRepository asignacionSucursalRepository;
+    private final SucursalRepository sucursalRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final LoginAttemptService loginAttemptService;
@@ -35,6 +47,8 @@ public class AuthService {
     public AuthService(
             UsuarioInternoRepository usuarioInternoRepository,
             RefreshTokenRepository refreshTokenRepository,
+            AsignacionSucursalRepository asignacionSucursalRepository,
+            SucursalRepository sucursalRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
             LoginAttemptService loginAttemptService,
@@ -42,6 +56,8 @@ public class AuthService {
             @Value("${app.jwt.expiracion-refresh-ms}") long expiracionRefreshMs) {
         this.usuarioInternoRepository = usuarioInternoRepository;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.asignacionSucursalRepository = asignacionSucursalRepository;
+        this.sucursalRepository = sucursalRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.loginAttemptService = loginAttemptService;
@@ -122,6 +138,110 @@ public class AuthService {
                 });
     }
 
+    /**
+     * RF-10 PR4: sucursales entre las que el usuario autenticado puede
+     * elegir para trabajar (ver SesionController). Para MESERO son
+     * EXACTAMENTE las que un ADMIN_RESTAURANTE le asignó (ver
+     * AsignacionSucursalService) -- "solo ve las que estén agregadas a su
+     * nombre", tal cual la decisión de negocio. Para ADMIN_RESTAURANTE son
+     * TODAS las sucursales activas de su tenant: seleccionar acá es una
+     * conveniencia opcional para enfocar su propia vista de
+     * Mesas/Pedidos en una sola sucursal, nunca una restricción -- si no
+     * selecciona ninguna, sigue viendo todas, comportamiento idéntico al
+     * que existía antes de esta rama. SUPER_ADMIN no tiene tenant ni
+     * sucursales que elegir (reutiliza SinTenantEnContextoException, mismo
+     * significado que en el resto del sistema: esta operación requiere un
+     * usuario de restaurante).
+     */
+    @Transactional(readOnly = true)
+    public List<Sucursal> misSucursalesDisponibles() {
+        UsuarioInterno usuario = usuarioAutenticadoActual();
+        if (usuario.getRol() == RolUsuario.SUPER_ADMIN) {
+            throw new SucursalExceptions.SinTenantEnContextoException();
+        }
+        if (usuario.getRol() == RolUsuario.MESERO) {
+            List<Long> idsAsignados = asignacionSucursalRepository
+                    .findByUsuarioInternoIdOrderBySucursalId(usuario.getId()).stream()
+                    .map(AsignacionSucursal::getSucursalId)
+                    .toList();
+            if (idsAsignados.isEmpty()) {
+                return List.of();
+            }
+            return sucursalRepository.findByTenantIdAndActivaTrueAndIdInOrderByNombreAsc(
+                    usuario.getTenantId(), idsAsignados);
+        }
+        return sucursalRepository.findByTenantIdAndActivaTrueOrderByNombreAsc(usuario.getTenantId());
+    }
+
+    /**
+     * RF-10 PR4: emite un access token NUEVO con el claim sucursalId ya
+     * puesto -- el mecanismo real detrás de "el mesero elige en qué
+     * sucursal va a trabajar" (ver JwtService.generarAccessToken,
+     * sucursal.SucursalContext, y "sucursalActual()" en
+     * MesaService/PedidoService, que exigen este claim para MESERO).
+     *
+     * Valida explícitamente que sucursalId esté dentro de lo que
+     * misSucursalesDisponibles() devolvería para este mismo usuario --
+     * NUNCA confía en que el frontend solo vaya a mandar ids de esa lista.
+     * "No disponible" (id inexistente, de otro tenant, inactiva, o -- para
+     * MESERO -- no asignada a este usuario) se modela como una sola
+     * excepción genérica, mismo criterio de "no encontrado" en vez de 403
+     * que el resto del sistema usa para no confirmarle a un atacante cuál
+     * de esos casos es el real.
+     *
+     * A propósito NO toca el refresh token (ver AccessTokenRespuesta): re-
+     * mintear solo el access token es suficiente, y reusar la rotación de
+     * refresh acá invalidaría sin necesidad un token que el cliente sigue
+     * necesitando.
+     *
+     * LIMITACIÓN CONOCIDA, no resuelta en este PR: esta selección vive
+     * solo en el access token (stateless). Cuando ese token expira y el
+     * frontend llama a /api/auth/refresh, emitirPar() de abajo SIEMPRE
+     * devuelve un access token sin sucursalId (no hay forma de reconstruir
+     * cuál era a partir del refresh token, que no la registra) -- el
+     * frontend debe guardar el último sucursalId elegido y volver a llamar
+     * a este método inmediatamente después de cada refresh exitoso para un
+     * MESERO, o GET /api/admin/mesas y /pedidos le van a devolver 409
+     * (SucursalNoSeleccionadaException) hasta que lo haga. Persistir la
+     * selección del lado del servidor (ej. una columna en RefreshToken)
+     * queda como el siguiente paso explícito si esta fricción resulta
+     * real en el uso diario -- no se implementó ahora porque acoplar
+     * "sucursal elegida" a UN refresh token específico, cuando un mismo
+     * usuario puede tener varios vigentes a la vez (varios dispositivos),
+     * es una decisión de diseño de sesión nueva que este entorno no tiene
+     * forma de verificar compilando ni corriendo la suite real.
+     */
+    @Transactional
+    public AccessTokenRespuesta seleccionarSucursal(Long sucursalId) {
+        UsuarioInterno usuario = usuarioAutenticadoActual();
+        if (usuario.getRol() == RolUsuario.SUPER_ADMIN) {
+            throw new SucursalExceptions.SinTenantEnContextoException();
+        }
+
+        boolean activaDelTenant = sucursalRepository.existsByIdAndTenantIdAndActivaTrue(
+                sucursalId, usuario.getTenantId());
+        boolean disponible = activaDelTenant && (usuario.getRol() != RolUsuario.MESERO
+                || asignacionSucursalRepository.existsByUsuarioInternoIdAndSucursalId(usuario.getId(), sucursalId));
+        if (!disponible) {
+            throw new SucursalExceptions.SucursalNoEncontradaException(sucursalId);
+        }
+
+        String accessToken = jwtService.generarAccessToken(usuario, sucursalId);
+        return new AccessTokenRespuesta(accessToken, expiracionAccesoMs / 1000);
+    }
+
+    private UsuarioInterno usuarioAutenticadoActual() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        // No debería pasar nunca en la práctica: SesionController vive bajo
+        // /api/admin/**, que SecurityConfig ya exige autenticado a nivel de
+        // filtro (ver el javadoc de esa clase) -- este chequeo es la misma
+        // defensa-en-profundidad que el resto del proyecto aplica en vez de
+        // confiar en una sola capa.
+        String username = auth != null ? auth.getName() : null;
+        return usuarioInternoRepository.findByUsername(username)
+                .orElseThrow(AuthExceptions.UsuarioAutenticadoNoEncontradoException::new);
+    }
+
     private TokensRespuesta emitirPar(UsuarioInterno usuario) {
         String accessToken = jwtService.generarAccessToken(usuario);
         String refreshTokenPlano = generarRefreshTokenOpaco();
@@ -132,7 +252,11 @@ public class AuthService {
                 LocalDateTime.now().plus(Duration.ofMillis(expiracionRefreshMs)));
         refreshTokenRepository.save(entidad);
 
-        return new TokensRespuesta(accessToken, refreshTokenPlano, expiracionAccesoMs / 1000);
+        // RF-10 PR4: ver el javadoc largo de seleccionarSucursal() para la
+        // limitación conocida de por qué esto SIEMPRE ignora cualquier
+        // sucursalId que el token anterior pudiera haber tenido.
+        boolean requiereSeleccionSucursal = usuario.getRol() == RolUsuario.MESERO;
+        return new TokensRespuesta(accessToken, refreshTokenPlano, expiracionAccesoMs / 1000, requiereSeleccionSucursal);
     }
 
     private String generarRefreshTokenOpaco() {
