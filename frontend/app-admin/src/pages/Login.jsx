@@ -17,8 +17,14 @@ export default function Login() {
     setError('')
     setCargando(true)
     try {
-      await login(username, password)
-      navigate('/menu', { replace: true })
+      const { requiereSeleccionManual } = await login(username, password)
+      // RF-10 PR4: si es un MESERO que todavía no eligió sucursal (y no se
+      // pudo reseleccionar solo con una guardada de antes, ver
+      // AuthContext.login/intentarSeleccionAutomatica), lo manda a elegir
+      // en vez de "/" -- para cualquier otro caso, "/" deja que
+      // InicioRedirect decida el destino según el rol (ya no un /menu fijo
+      // a propósito: un SUPER_ADMIN nunca debería aterrizar ahí).
+      navigate(requiereSeleccionManual ? '/seleccionar-sucursal' : '/', { replace: true })
     } catch (err) {
       setError(err.message || 'No se pudo iniciar sesión')
       setSacudir(true)

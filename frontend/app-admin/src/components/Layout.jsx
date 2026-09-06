@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import LogoMark from './LogoMark.jsx'
 
 export default function Layout() {
   const { usuario, logout } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
   const [menuAbierto, setMenuAbierto] = useState(false)
 
   // Cierra el drawer al navegar -- si no, queda tapando la pantalla
@@ -166,6 +167,19 @@ export default function Layout() {
         <div className="px-4 py-4 border-t border-carbon-700">
           <div className="text-sm text-crema/80 truncate">{usuario?.username}</div>
           <div className="text-[11px] text-crema/40 mb-3">{usuario?.rol}</div>
+          {/* RF-10 PR4: un MESERO puede haber elegido la sucursal
+              equivocada al entrar, o cambiar de local a mitad de turno --
+              esto lo manda de vuelta a SeleccionarSucursal.jsx sin tener
+              que cerrar sesión. Solo tiene sentido para MESERO: el resto
+              de roles no elige sucursal (ver AuthService.emitirPar). */}
+          {usuario?.rol === 'MESERO' && (
+            <button
+              onClick={() => navigate('/seleccionar-sucursal')}
+              className="btn-secundario w-full text-xs py-2 mb-2"
+            >
+              Cambiar sucursal
+            </button>
+          )}
           <button onClick={logout} className="btn-secundario w-full text-xs py-2">
             Cerrar sesión
           </button>

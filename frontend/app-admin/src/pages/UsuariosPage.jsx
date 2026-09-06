@@ -23,6 +23,15 @@ export default function UsuariosPage() {
   const [passwordNueva, setPasswordNueva] = useState('')
   const [reseteando, setReseteando] = useState(false)
 
+  // RF-10 PR4: sucursales ACTIVAS del tenant, para el modal de asignación
+  // de abajo -- mismo endpoint que SucursalesPage/MesasPage.
+  const [sucursales, setSucursales] = useState([])
+  const [asignacionUsuario, setAsignacionUsuario] = useState(null)
+  const [sucursalesAsignadas, setSucursalesAsignadas] = useState([])
+  const [cargandoAsignaciones, setCargandoAsignaciones] = useState(false)
+  const [errorAsignaciones, setErrorAsignaciones] = useState('')
+  const [guardandoSucursalId, setGuardandoSucursalId] = useState(null)
+
   async function cargarUsuarios() {
     setCargando(true)
     setError('')
@@ -35,10 +44,64 @@ export default function UsuariosPage() {
     }
   }
 
+  async function cargarSucursales() {
+    try {
+      setSucursales(await apiJson('/api/admin/sucursales'))
+    } catch {
+      // No bloquea la pantalla de usuarios si esto falla -- el modal de
+      // asignación de sucursales simplemente queda vacío hasta refrescar
+      // (ver la lista de opciones abajo, que igual sigue mostrando las
+      // sucursales ya asignadas que llegan directo de cada usuario).
+    }
+  }
+
   useEffect(() => {
     cargarUsuarios()
+    cargarSucursales()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /**
+   * RF-10 PR4: abre el modal de sucursales asignadas para un MESERO
+   * puntual -- ver UsuarioInternoAdminController.listarSucursalesAsignadas.
+   * A propósito NO filtra por activa (a diferencia de `sucursales` de
+   * arriba): un MESERO puede seguir teniendo asignada una sucursal que
+   * mientras tanto se desactivó (ver SucursalService.desactivarSucursal,
+   * que no toca asignaciones existentes) y hay que poder verla/quitarla
+   * igual, aunque ya no se pueda re-asignar (ver `opciones` más abajo).
+   */
+  async function abrirAsignacionSucursales(usuario) {
+    setAsignacionUsuario(usuario)
+    setErrorAsignaciones('')
+    setCargandoAsignaciones(true)
+    try {
+      setSucursalesAsignadas(await apiJson(`/api/admin/usuarios/${usuario.id}/sucursales`))
+    } catch (e) {
+      setErrorAsignaciones(e.message)
+    } finally {
+      setCargandoAsignaciones(false)
+    }
+  }
+
+  async function onToggleSucursal(sucursal, estaAsignada) {
+    if (!asignacionUsuario) return
+    setGuardandoSucursalId(sucursal.id)
+    setErrorAsignaciones('')
+    try {
+      await apiJson(`/api/admin/usuarios/${asignacionUsuario.id}/sucursales/${sucursal.id}`, {
+        method: estaAsignada ? 'DELETE' : 'PUT',
+      })
+      setSucursalesAsignadas((prev) =>
+        estaAsignada
+          ? prev.filter((s) => s.id !== sucursal.id)
+          : [...prev, sucursal].sort((a, b) => a.nombre.localeCompare(b.nombre)),
+      )
+    } catch (e) {
+      setErrorAsignaciones(e.message)
+    } finally {
+      setGuardandoSucursalId(null)
+    }
+  }
 
   async function onCrearUsuario(e) {
     e.preventDefault()
@@ -93,6 +156,17 @@ export default function UsuariosPage() {
       setReseteando(false)
     }
   }
+
+  // RF-10 PR4: opciones del modal = sucursales activas del tenant + las ya
+  // asignadas que quedaron inactivas mientras tanto (ver el javadoc de
+  // abrirAsignacionSucursales) -- sin este merge, una asignación a una
+  // sucursal desactivada desaparecería de la vista sin poder quitarla
+  // nunca desde acá.
+  const idsAsignados = new Set(sucursalesAsignadas.map((s) => s.id))
+  const opcionesAsignacion = [
+    ...sucursales,
+    ...sucursalesAsignadas.filter((s) => !sucursales.some((activa) => activa.id === s.id)),
+  ].sort((a, b) => a.nombre.localeCompare(b.nombre))
 
   return (
     <div>
@@ -153,6 +227,14 @@ export default function UsuariosPage() {
                 </div>
               </div>
               <div className="flex gap-2">
+                {usuario.rol === 'MESERO' && (
+                  <button
+                    onClick={() => abrirAsignacionSucursales(usuario)}
+                    className="btn-secundario text-xs py-2"
+                  >
+                    Sucursales
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setResetId(usuario.id)
@@ -207,6 +289,76 @@ export default function UsuariosPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {asignacionUsuario && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setAsignacionUsuario(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="card p-5 w-full max-w-sm flex flex-col gap-3 max-h-[80vh] overflow-y-auto"
+          >
+            <div>
+              <h3 className="font-medium text-crema">Sucursales de {asignacionUsuario.username}</h3>
+              <p className="text-[11px] text-crema/40 mt-1">
+                Solo puede trabajar en las que tenga marcadas acá. Al iniciar sesión va a elegir una de
+                estas.
+              </p>
+            </div>
+
+            {errorAsignaciones && (
+              <div className="text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2">
+                {errorAsignaciones}
+              </div>
+            )}
+
+            {cargandoAsignaciones ? (
+              <div className="space-y-2">
+                {[1, 2].map((n) => (
+                  <div key={n} className="h-10 rounded-lg bg-carbon-800 animate-pulseSoft" />
+                ))}
+              </div>
+            ) : opcionesAsignacion.length === 0 ? (
+              <p className="text-sm text-crema/40 text-center py-4">
+                Todavía no hay sucursales creadas -- creá una primero en Sucursales.
+              </p>
+            ) : (
+              <div className="space-y-1">
+                {opcionesAsignacion.map((sucursal) => {
+                  const estaAsignada = idsAsignados.has(sucursal.id)
+                  const esInactivaNoReasignable = !sucursal.activa
+                  return (
+                    <label
+                      key={sucursal.id}
+                      className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg cursor-pointer ${
+                        esInactivaNoReasignable ? 'opacity-50' : 'hover:bg-carbon-800'
+                      }`}
+                    >
+                      <span className="text-sm text-crema">
+                        {sucursal.nombre}
+                        {esInactivaNoReasignable && (
+                          <span className="text-[10px] text-crema/40"> (inactiva)</span>
+                        )}
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={estaAsignada}
+                        disabled={guardandoSucursalId === sucursal.id || (esInactivaNoReasignable && !estaAsignada)}
+                        onChange={() => onToggleSucursal(sucursal, estaAsignada)}
+                      />
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+
+            <button onClick={() => setAsignacionUsuario(null)} className="btn-secundario text-xs py-2 mt-2">
+              Cerrar
+            </button>
+          </div>
         </div>
       )}
     </div>
