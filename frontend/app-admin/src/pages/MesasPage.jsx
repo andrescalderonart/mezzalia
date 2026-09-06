@@ -20,6 +20,14 @@ export default function MesasPage() {
   const [codigoNuevo, setCodigoNuevo] = useState('')
   const [creando, setCreando] = useState(false)
 
+  // RF-10: toda mesa nueva necesita una sucursal activa del tenant. La
+  // inmensa mayoria de restaurantes tiene una sola sucursal (ver
+  // SucursalesPage.jsx) -- en ese caso se preselecciona sola y no hay
+  // combo que mostrar; con 2+ sucursales activas el combo es obligatorio
+  // porque no hay forma correcta de adivinar cual quiso el usuario.
+  const [sucursales, setSucursales] = useState([])
+  const [sucursalId, setSucursalId] = useState('')
+
   // sesiones[mesaId] = { token, expiraEn } -- solo lo que se generó en ESTA
   // sesión del navegador. No hay endpoint para "recuperar" un token viejo a
   // propósito (ver MesaService.generarSesion en el backend): una vez
@@ -42,20 +50,37 @@ export default function MesasPage() {
     }
   }
 
+  async function cargarSucursales() {
+    try {
+      const datos = await apiJson('/api/admin/sucursales')
+      setSucursales(datos)
+      // Preselecciona la unica sucursal activa; con varias, deja el combo
+      // vacio a proposito para forzar una eleccion explicita.
+      if (datos.length === 1) {
+        setSucursalId(String(datos[0].id))
+      }
+    } catch (e) {
+      // No bloquea la carga de mesas si esto falla -- el formulario de
+      // creacion simplemente queda deshabilitado (ver puedeCrear abajo).
+      setError(e.message)
+    }
+  }
+
   useEffect(() => {
     cargarMesas()
+    cargarSucursales()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function onCrearMesa(e) {
     e.preventDefault()
-    if (!codigoNuevo.trim()) return
+    if (!codigoNuevo.trim() || !sucursalId) return
     setCreando(true)
     setError('')
     try {
       const mesa = await apiJson('/api/admin/mesas', {
         method: 'POST',
-        body: { codigo: codigoNuevo.trim() },
+        body: { codigo: codigoNuevo.trim(), sucursalId: Number(sucursalId) },
       })
       setCodigoNuevo('')
       setMesas((prev) => [...prev, mesa])
@@ -120,7 +145,14 @@ export default function MesasPage() {
         </div>
       )}
 
-      {puedeEditar && (
+      {puedeEditar && sucursales.length === 0 && !cargando && (
+        <div className="mb-4 text-sm text-crema/40 bg-carbon-800/60 border border-carbon-700 rounded-lg px-3 py-2 print:hidden">
+          Todavía no hay ninguna sucursal activa -- creá una en{' '}
+          <a href="/sucursales" className="underline text-dorado">Sucursales</a> antes de poder agregar mesas.
+        </div>
+      )}
+
+      {puedeEditar && sucursales.length > 0 && (
         <form onSubmit={onCrearMesa} className="card p-4 mb-6 flex flex-col sm:flex-row gap-2 print:hidden">
           <input
             className="input-carbon flex-1"
@@ -128,7 +160,19 @@ export default function MesasPage() {
             value={codigoNuevo}
             onChange={(e) => setCodigoNuevo(e.target.value)}
           />
-          <button type="submit" disabled={creando} className="btn-primario sm:w-auto">
+          {sucursales.length > 1 && (
+            <select
+              className="input-carbon sm:w-48"
+              value={sucursalId}
+              onChange={(e) => setSucursalId(e.target.value)}
+            >
+              <option value="">Elegí una sucursal…</option>
+              {sucursales.map((s) => (
+                <option key={s.id} value={s.id}>{s.nombre}</option>
+              ))}
+            </select>
+          )}
+          <button type="submit" disabled={creando || !sucursalId} className="btn-primario sm:w-auto">
             {creando ? 'Creando…' : '+ Nueva mesa'}
           </button>
         </form>
@@ -148,7 +192,16 @@ export default function MesasPage() {
             return (
               <div key={mesa.id} className="card p-4 animate-fadeInUp">
                 <div className="flex items-start justify-between gap-2 mb-3">
-                  <h3 className="font-medium text-crema">{mesa.codigo}</h3>
+                  <div>
+                    <h3 className="font-medium text-crema">{mesa.codigo}</h3>
+                    {/* Solo vale la pena mostrar la sucursal cuando hay mas
+                        de una -- con una sola es ruido visual obvio. */}
+                    {sucursales.length > 1 && (
+                      <p className="text-[11px] text-crema/40">
+                        {sucursales.find((s) => s.id === mesa.sucursalId)?.nombre || 'Sucursal desconocida'}
+                      </p>
+                    )}
+                  </div>
                   {puedeEditar && (
                     <button onClick={() => onDesactivarMesa(mesa)} className="text-[11px] text-crema/40 hover:text-red-300 transition-colors duration-150">
                       Desactivar

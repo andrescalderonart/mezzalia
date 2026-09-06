@@ -373,6 +373,11 @@ class PedidoServiceTest {
     private Mesa nuevaMesa(Long tenantId, String codigo) {
         Mesa mesa = new Mesa();
         mesa.setTenantId(tenantId);
+        // RF-10: Mesa.sucursalId es NOT NULL desde V16__mesas_sucursal_id.sql,
+        // pero sin FK a nivel de JPA (ver Mesa.java) -- estos tests de pedido
+        // no ejercen nada de Sucursal, un valor fijo alcanza para satisfacer
+        // la restriccion NOT NULL sin crear una Sucursal real de mas.
+        mesa.setSucursalId(1L);
         mesa.setCodigo(codigo);
         return mesa;
     }

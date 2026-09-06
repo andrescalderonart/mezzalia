@@ -5,6 +5,7 @@ import com.mezzalia.mesa.MesaRepository;
 import com.mezzalia.mesa.SesionMesa;
 import com.mezzalia.mesa.SesionMesaRepository;
 import com.mezzalia.mesa.excepcion.MesaExceptions;
+import com.mezzalia.sucursal.servicio.SucursalService;
 import com.mezzalia.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -31,6 +32,7 @@ public class MesaService {
 
     private final MesaRepository mesaRepository;
     private final SesionMesaRepository sesionMesaRepository;
+    private final SucursalService sucursalService;
 
     /**
      * Defensa explicita, mismo criterio que crearMesa()/obtenerMesa():
@@ -73,13 +75,21 @@ public class MesaService {
      * haya cambiado.
      */
     @Transactional
-    public Mesa crearMesa(String codigo) {
+    public Mesa crearMesa(String codigo, Long sucursalId) {
         Long tenantId = tenantActual();
+        // RF-10: valida que la sucursal pertenezca de verdad al tenant
+        // actual y esté activa ANTES de tocar la unicidad de código --
+        // mismo criterio de "no confiar solo en el FK" que el resto de
+        // este proyecto (ver el javadoc de Mesa.sucursalId). Lanza
+        // SucursalNoEncontradaException (404) si no, nunca deja crear una
+        // mesa "huérfana" de una sucursal ajena.
+        sucursalService.obtenerSucursalActivaDelTenantActual(sucursalId);
         if (mesaRepository.existsByTenantIdAndCodigoAndActivaTrue(tenantId, codigo)) {
             throw new MesaExceptions.CodigoMesaDuplicadoException(codigo);
         }
         Mesa mesa = new Mesa();
         mesa.setTenantId(tenantId);
+        mesa.setSucursalId(sucursalId);
         mesa.setCodigo(codigo);
         mesa.setCodigoUnico(codigo);
         try {

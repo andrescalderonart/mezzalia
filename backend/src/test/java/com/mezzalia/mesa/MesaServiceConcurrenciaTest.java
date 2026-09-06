@@ -2,6 +2,9 @@ package com.mezzalia.mesa;
 
 import com.mezzalia.mesa.excepcion.MesaExceptions;
 import com.mezzalia.mesa.servicio.MesaService;
+import com.mezzalia.sucursal.Sucursal;
+import com.mezzalia.sucursal.SucursalRepository;
+import com.mezzalia.sucursal.servicio.SucursalService;
 import com.mezzalia.tenant.Tenant;
 import com.mezzalia.tenant.TenantContext;
 import com.mezzalia.tenant.TenantRepository;
@@ -47,9 +50,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  * test SI prueba es el mecanismo (el segundo insert con el mismo
  * tenant_id+codigo_unico falla, nunca hay dos filas activas), que es
  * comportamiento SQL estandar y por eso portable entre H2 y MySQL.
+ *
+ * RF-10: @Import agrega SucursalService ademas de MesaService -- desde que
+ * crearMesa exige un sucursalId valido, MesaService depende de
+ * SucursalService (ver su constructor), asi que este slice @DataJpaTest
+ * necesita ese bean tambien para poder cablear MesaService automaticamente.
  */
 @DataJpaTest
-@Import(MesaService.class)
+@Import({MesaService.class, SucursalService.class})
 class MesaServiceConcurrenciaTest {
 
     @Autowired
@@ -58,6 +66,8 @@ class MesaServiceConcurrenciaTest {
     private TenantRepository tenantRepository;
     @Autowired
     private MesaRepository mesaRepository;
+    @Autowired
+    private SucursalRepository sucursalRepository;
 
     @AfterEach
     void limpiarContexto() {
@@ -69,6 +79,7 @@ class MesaServiceConcurrenciaTest {
     void dosAltasSimultaneasConElMismoCodigoNuncaCreanDosMesasActivas() throws Exception {
         Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Concurrencia Mesas"));
         Long tenantId = tenant.getId();
+        Long sucursalId = nuevaSucursal(tenantId).getId();
         String codigoCompartido = "M-" + UUID.randomUUID();
 
         CountDownLatch listos = new CountDownLatch(2);
@@ -79,7 +90,7 @@ class MesaServiceConcurrenciaTest {
             try {
                 listos.countDown();
                 salida.await(5, TimeUnit.SECONDS);
-                Mesa mesa = mesaService.crearMesa(codigoCompartido);
+                Mesa mesa = mesaService.crearMesa(codigoCompartido, sucursalId);
                 return Resultado.exito(mesa.getId());
             } catch (MesaExceptions.CodigoMesaDuplicadoException ex) {
                 return Resultado.duplicado();
@@ -137,8 +148,9 @@ class MesaServiceConcurrenciaTest {
     @Test
     void desactivarMesaLimpiaCodigoUnicoEnBaseDeDatos() {
         Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Codigo Unico"));
+        Sucursal sucursal = nuevaSucursal(tenant.getId());
         TenantContext.establecerTenantId(tenant.getId());
-        Mesa mesa = mesaService.crearMesa("M1");
+        Mesa mesa = mesaService.crearMesa("M1", sucursal.getId());
         assertThat(mesa.getCodigoUnico()).isEqualTo("M1");
 
         mesaService.desactivarMesa(mesa.getId());
@@ -157,6 +169,14 @@ class MesaServiceConcurrenciaTest {
         static Resultado duplicado() {
             return new Resultado(false, null);
         }
+    }
+
+    private Sucursal nuevaSucursal(Long tenantId) {
+        Sucursal sucursal = new Sucursal();
+        sucursal.setTenantId(tenantId);
+        sucursal.setNombre("Sucursal Principal");
+        sucursal.setActiva(true);
+        return sucursalRepository.save(sucursal);
     }
 
     private Tenant nuevoTenant(String nombre) {
