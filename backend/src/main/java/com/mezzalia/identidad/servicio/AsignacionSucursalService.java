@@ -47,6 +47,35 @@ public class AsignacionSucursalService {
     }
 
     /**
+     * Reverso de listarSucursalesDe -- uso exclusivo de
+     * SucursalAdminController (vista "qué meseros tiene asignados esta
+     * sucursal", para poder quitarlos desde ahí sin tener que ir a buscar
+     * cada usuario en UsuariosPage.jsx). Reusa
+     * SucursalService.obtenerSucursalActivaDelTenantActual solo para
+     * validar que el sucursalId sea del tenant actual (mismo "no
+     * encontrado" generico que el resto del proyecto) -- el resultado en
+     * si no se usa, la validacion es lo que importa aca.
+     *
+     * A proposito NO exige que la sucursal siga activa para poder listar
+     * sus meseros: una sucursal desactivada puede seguir teniendo filas de
+     * asignacion viejas (AsignacionSucursal no se toca al desactivar una
+     * sucursal, ver Sucursal.desactivarSucursal), y un ADMIN_RESTAURANTE
+     * podria necesitar verlas igual para limpiarlas.
+     */
+    @Transactional(readOnly = true)
+    public List<UsuarioInterno> listarUsuariosDe(Long sucursalId) {
+        sucursalService.obtenerSucursalDelTenantActualSinImportarEstado(sucursalId);
+        List<Long> idsUsuarios = asignacionSucursalRepository
+                .findBySucursalIdOrderByUsuarioInternoId(sucursalId).stream()
+                .map(AsignacionSucursal::getUsuarioInternoId)
+                .toList();
+        if (idsUsuarios.isEmpty()) {
+            return List.of();
+        }
+        return usuarioInternoRepository.findByIdInAndTenantIdOrderByUsernameAsc(idsUsuarios, tenantActual());
+    }
+
+    /**
      * Idempotente a proposito -- mismo criterio que
      * UsuarioInternoAdminService.desactivarUsuario/
      * SucursalService.desactivarSucursal: asignar una sucursal ya

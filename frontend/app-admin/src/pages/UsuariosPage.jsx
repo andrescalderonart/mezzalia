@@ -23,6 +23,17 @@ export default function UsuariosPage() {
   const [passwordNueva, setPasswordNueva] = useState('')
   const [reseteando, setReseteando] = useState(false)
 
+  // RF-10 PR4: sucursales activas del tenant, para poder armar el
+  // selector de "a qué sucursales puede entrar este MESERO" -- ver
+  // GestionSucursalesModal más abajo. Se carga una sola vez acá (no por
+  // fila) porque es la misma lista para todos los usuarios del tenant.
+  const [sucursales, setSucursales] = useState([])
+  const [gestionandoUsuario, setGestionandoUsuario] = useState(null)
+
+  // Pedido de Andrés (2026-09-07): ver horas trabajadas por día -- ver
+  // HorasPorDiaModal más abajo y turno.servicio.TurnoService en el backend.
+  const [viendoHorasDe, setViendoHorasDe] = useState(null)
+
   async function cargarUsuarios() {
     setCargando(true)
     setError('')
@@ -37,6 +48,14 @@ export default function UsuariosPage() {
 
   useEffect(() => {
     cargarUsuarios()
+    apiJson('/api/admin/sucursales')
+      .then(setSucursales)
+      .catch(() => {
+        // Si esto falla, el botón "Sucursales" de cada MESERO simplemente
+        // no va a tener nada para mostrar en el modal (ver el mensaje de
+        // "no hay sucursales" ahí) -- no vale la pena bloquear toda la
+        // pantalla de Usuarios por esto.
+      })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -153,6 +172,22 @@ export default function UsuariosPage() {
                 </div>
               </div>
               <div className="flex gap-2">
+                {/* RF-10 PR4: un MESERO solo puede trabajar (elegir sucursal
+                    al loguearse, ver SeleccionarSucursalPage.jsx) en las
+                    sucursales que un ADMIN_RESTAURANTE le asigne acá --
+                    ADMIN_RESTAURANTE nunca necesita esto, ya ve todas las
+                    de su tenant sin restricción (ver
+                    AsignacionSucursalExceptions.RolNoPermitidoParaAsignacionException
+                    en el backend: asignarle una a un admin ni siquiera está
+                    permitido). */}
+                {usuario.rol === 'MESERO' && (
+                  <button onClick={() => setGestionandoUsuario(usuario)} className="btn-secundario text-xs py-2">
+                    Sucursales
+                  </button>
+                )}
+                <button onClick={() => setViendoHorasDe(usuario)} className="btn-secundario text-xs py-2">
+                  Horas
+                </button>
                 <button
                   onClick={() => {
                     setResetId(usuario.id)
@@ -209,6 +244,230 @@ export default function UsuariosPage() {
           </form>
         </div>
       )}
+
+      {gestionandoUsuario && (
+        <GestionSucursalesModal
+          usuario={gestionandoUsuario}
+          sucursales={sucursales}
+          onCerrar={() => setGestionandoUsuario(null)}
+        />
+      )}
+
+      {viendoHorasDe && (
+        <HorasPorDiaModal usuario={viendoHorasDe} onCerrar={() => setViendoHorasDe(null)} />
+      )}
+    </div>
+  )
+}
+
+/**
+ * RF-10 PR4: modal para asignar/desasignar a un MESERO las sucursales en
+ * las que puede elegir trabajar (ver SeleccionarSucursalPage.jsx del lado
+ * del propio mesero, y AsignacionSucursalService en el backend). Sin
+ * ninguna asignación, un MESERO ve la pantalla de selección de sucursal
+ * completamente vacía y no puede entrar a operar -- por eso el aviso
+ * cuando la lista de asignadas queda en cero.
+ *
+ * Carga sus asignaciones actuales al abrir (GET /api/admin/usuarios/{id}/sucursales)
+ * en vez de mantenerlas precargadas por cada fila de la tabla, para no
+ * disparar un GET extra por cada MESERO listado solo por si acaso se abre
+ * su modal.
+ */
+function GestionSucursalesModal({ usuario, sucursales, onCerrar }) {
+  const apiJson = useApiJson()
+  const [asignadasIds, setAsignadasIds] = useState(null)
+  const [error, setError] = useState('')
+  const [actualizandoId, setActualizandoId] = useState(null)
+
+  useEffect(() => {
+    let vigente = true
+    apiJson(`/api/admin/usuarios/${usuario.id}/sucursales`)
+      .then((datos) => {
+        if (vigente) setAsignadasIds(datos.map((s) => s.id))
+      })
+      .catch((e) => {
+        if (vigente) setError(e.message)
+      })
+    return () => {
+      vigente = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario.id])
+
+  async function onToggle(sucursal) {
+    const yaAsignada = asignadasIds.includes(sucursal.id)
+    setActualizandoId(sucursal.id)
+    setError('')
+    try {
+      await apiJson(`/api/admin/usuarios/${usuario.id}/sucursales/${sucursal.id}`, {
+        method: yaAsignada ? 'DELETE' : 'PUT',
+      })
+      setAsignadasIds((prev) => (yaAsignada ? prev.filter((id) => id !== sucursal.id) : [...prev, sucursal.id]))
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setActualizandoId(null)
+    }
+  }
+
+  const cargando = asignadasIds === null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onCerrar}>
+      <div onClick={(e) => e.stopPropagation()} className="card p-5 w-full max-w-sm flex flex-col gap-3">
+        <div>
+          <h3 className="font-medium text-crema">Sucursales de {usuario.username}</h3>
+          <p className="text-[11px] text-crema/40 mt-1">
+            Solo puede elegir trabajar en las sucursales que marques acá. Sin ninguna, no va a poder
+            entrar a Pedidos.
+          </p>
+        </div>
+
+        {error && (
+          <div className="text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2 animate-fadeInUp">
+            {error}
+          </div>
+        )}
+
+        {cargando ? (
+          <div className="space-y-2">
+            {[1, 2].map((n) => (
+              <div key={n} className="h-10 rounded-lg bg-carbon-800 animate-pulseSoft" />
+            ))}
+          </div>
+        ) : sucursales.length === 0 ? (
+          <p className="text-sm text-crema/40 py-4 text-center">
+            Este restaurante todavía no tiene sucursales creadas -- creá una primero en
+            "Sucursales".
+          </p>
+        ) : (
+          <div className="space-y-1.5 max-h-72 overflow-y-auto">
+            {sucursales.map((sucursal) => {
+              const asignada = asignadasIds.includes(sucursal.id)
+              return (
+                <label
+                  key={sucursal.id}
+                  className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 bg-carbon-800/60 cursor-pointer"
+                >
+                  <span className="text-sm text-crema">{sucursal.nombre}</span>
+                  <input
+                    type="checkbox"
+                    checked={asignada}
+                    disabled={actualizandoId === sucursal.id}
+                    onChange={() => onToggle(sucursal)}
+                    className="w-4 h-4 accent-dorado"
+                  />
+                </label>
+              )
+            })}
+          </div>
+        )}
+
+        {!cargando && sucursales.length > 0 && asignadasIds.length === 0 && (
+          <p className="text-xs text-dorado/80 bg-dorado/10 border border-dorado/20 rounded-lg px-2.5 py-1.5">
+            Todavía no tiene ninguna sucursal asignada.
+          </p>
+        )}
+
+        <button onClick={onCerrar} className="btn-secundario w-full text-xs py-2">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Pedido de Andrés (2026-09-07): ver cuánto tiempo trabajado por día lleva
+ * cada usuario. Backend: GET /api/admin/usuarios/{id}/turnos (nuevo --
+ * ver UsuarioInternoAdminController.horasPorDia/turno.servicio.TurnoService).
+ *
+ * El número de "hoy" puede seguir subiendo mientras la persona siga en
+ * turno (ver el badge "en curso") -- a diferencia de los demás días, que
+ * ya son totales definitivos. El dato depende 100% de que la persona haya
+ * usado "Marcar entrada/Marcar salida" (ver TurnoWidget en el sidebar) --
+ * si nunca lo usó, esta lista sale vacía, no es un bug.
+ */
+function HorasPorDiaModal({ usuario, onCerrar }) {
+  const apiJson = useApiJson()
+  const [dias, setDias] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let vigente = true
+    apiJson(`/api/admin/usuarios/${usuario.id}/turnos?dias=14`)
+      .then((datos) => {
+        if (vigente) setDias(datos)
+      })
+      .catch((e) => {
+        if (vigente) setError(e.message)
+      })
+    return () => {
+      vigente = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario.id])
+
+  function formatearFecha(fechaIso) {
+    const [anio, mes, dia] = fechaIso.split('-').map(Number)
+    return new Date(anio, mes - 1, dia).toLocaleDateString('es-CO', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    })
+  }
+
+  function formatearHoras(horas) {
+    const horasEnteras = Math.floor(horas)
+    const minutos = Math.round((horas - horasEnteras) * 60)
+    return `${horasEnteras}h ${minutos}min`
+  }
+
+  const cargando = dias === null
+  const diasOrdenados = cargando ? [] : [...dias].sort((a, b) => (a.fecha < b.fecha ? 1 : -1))
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onCerrar}>
+      <div onClick={(e) => e.stopPropagation()} className="card p-5 w-full max-w-sm flex flex-col gap-3">
+        <div>
+          <h3 className="font-medium text-crema">Horas de {usuario.username}</h3>
+          <p className="text-[11px] text-crema/40 mt-1">Últimos 14 días, según sus marcas de entrada/salida.</p>
+        </div>
+
+        {error && (
+          <div className="text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2 animate-fadeInUp">
+            {error}
+          </div>
+        )}
+
+        {cargando ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="h-9 rounded-lg bg-carbon-800 animate-pulseSoft" />
+            ))}
+          </div>
+        ) : diasOrdenados.length === 0 ? (
+          <p className="text-sm text-crema/40 py-4 text-center">
+            Todavía no marcó ninguna entrada en los últimos 14 días.
+          </p>
+        ) : (
+          <div className="space-y-1 max-h-72 overflow-y-auto">
+            {diasOrdenados.map((d) => (
+              <div key={d.fecha} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 bg-carbon-800/60">
+                <span className="text-sm text-crema capitalize">{formatearFecha(d.fecha)}</span>
+                <span className="text-sm text-crema/70">
+                  {formatearHoras(d.horas)}
+                  {d.turnoAbiertoIncluido && <span className="text-dorado ml-1">· en curso</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button onClick={onCerrar} className="btn-secundario w-full text-xs py-2">
+          Cerrar
+        </button>
+      </div>
     </div>
   )
 }

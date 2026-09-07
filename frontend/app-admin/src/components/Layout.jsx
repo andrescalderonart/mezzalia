@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import LogoMark from './LogoMark.jsx'
+import TurnoWidget from './TurnoWidget.jsx'
 
 export default function Layout() {
   const { usuario, logout } = useAuth()
@@ -44,11 +45,11 @@ export default function Layout() {
           aria-label="Abrir menú"
           className="flex items-center justify-center w-11 h-11 -mr-2 rounded-lg text-crema/80
                      hover:bg-carbon-800 active:bg-carbon-800 transition-colors duration-150"
-        >
-          <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      >
+        <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M4 7h16M4 12h16M4 17h16" />
-          </svg>
-        </button>
+        </svg>
+      </button>
       </header>
 
       {/* Overlay oscuro detrás del drawer -- tocar afuera cierra */}
@@ -163,6 +164,12 @@ export default function Layout() {
           )}
         </nav>
 
+        {/* Pedido de Andrés (2026-09-07): marcar entrada/salida para poder
+            ver horas trabajadas por día (ver TurnoWidget.jsx). SUPER_ADMIN
+            no tiene tenant ni turnos que marcar -- mismo criterio que los
+            links de arriba. */}
+        {usuario?.rol !== 'SUPER_ADMIN' && <TurnoWidget />}
+
         <div className="px-4 py-4 border-t border-carbon-700">
           <div className="text-sm text-crema/80 truncate">{usuario?.username}</div>
           <div className="text-[11px] text-crema/40 mb-3">{usuario?.rol}</div>
@@ -172,7 +179,7 @@ export default function Layout() {
         </div>
       </aside>
 
-      {/* min-w-0 es obligatorio aquí: sin esto, un hijo con contenido que
+      {/* min-w-0 es obligatorio aquí! sin esto, un hijo con contenido que
           no puede envolver (grids anchos, texto largo) fuerza overflow
           horizontal de TODA la página en viewports angostos, en vez de
           recortarse dentro de su columna flex -- clásico bug de flexbox
