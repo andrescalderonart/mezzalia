@@ -34,4 +34,17 @@ public interface UsuarioInternoRepository extends JpaRepository<UsuarioInterno, 
      * condición de repositorio.
      */
     List<UsuarioInterno> findByTenantIdOrderByUsernameAsc(Long tenantId);
+
+    /**
+     * Uso exclusivo de AsignacionSucursalService.listarUsuariosDe: una vez
+     * resueltos los ids de usuario asignados a una sucursal (via
+     * AsignacionSucursalRepository.findBySucursalIdOrderByUsuarioInternoId),
+     * esto los trae ya ordenados por username y con el mismo guardia
+     * explícito de tenant_id que findByTenantIdOrderByUsernameAsc -- las
+     * filas de asignacion en teoría ya solo pueden apuntar a usuarios del
+     * mismo tenant (ver AsignacionSucursalService.asignar), pero esta
+     * consulta no confía únicamente en esa invariante para no filtrar por
+     * accidente usuarios de otro tenant si esa garantía llegara a romperse.
+     */
+    List<UsuarioInterno> findByIdInAndTenantIdOrderByUsernameAsc(List<Long> ids, Long tenantId);
 }

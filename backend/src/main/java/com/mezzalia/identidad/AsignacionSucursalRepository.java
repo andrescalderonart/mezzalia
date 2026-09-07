@@ -10,6 +10,17 @@ public interface AsignacionSucursalRepository extends JpaRepository<AsignacionSu
 
     List<AsignacionSucursal> findByUsuarioInternoIdOrderBySucursalId(Long usuarioInternoId);
 
+    /**
+     * Reverso de findByUsuarioInternoIdOrderBySucursalId -- uso exclusivo
+     * de AsignacionSucursalService.listarUsuariosDe (vista "qué meseros
+     * tiene asignados esta sucursal" en SucursalesPage.jsx): dado un
+     * sucursalId, todas las filas de asignacion que lo referencian. El
+     * orden es por id de asignacion (orden de creacion), no por nombre --
+     * el service se encarga de pedirle el orden por username al
+     * repositorio de UsuarioInterno una vez que resuelve los ids.
+     */
+    List<AsignacionSucursal> findBySucursalIdOrderByUsuarioInternoId(Long sucursalId);
+
     boolean existsByUsuarioInternoIdAndSucursalId(Long usuarioInternoId, Long sucursalId);
 
     /**

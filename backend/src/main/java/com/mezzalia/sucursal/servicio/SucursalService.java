@@ -126,6 +126,24 @@ public class SucursalService {
         return obtenerSucursal(sucursalId);
     }
 
+    /**
+     * Uso exclusivo de identidad.servicio.AsignacionSucursalService.
+     * listarUsuariosDe: validar que un sucursalId sea del tenant actual
+     * SIN exigir que siga activa -- a diferencia de
+     * obtenerSucursalActivaDelTenantActual, ver aca no es sobre si tiene
+     * sentido operar sobre la sucursal (crear una mesa, asignar a un
+     * mesero nuevo), sino sobre poder seguir consultando quién quedó
+     * asignado a un local que después se desactivó (las filas de
+     * AsignacionSucursal no se tocan al desactivar, ver javadoc de
+     * desactivarSucursal). Wrapper público de obtenerSucursalSinImportarEstado
+     * (privado, ya usado por reactivarSucursal) para no duplicar la
+     * validación de tenant.
+     */
+    @Transactional(readOnly = true)
+    public Sucursal obtenerSucursalDelTenantActualSinImportarEstado(Long sucursalId) {
+        return obtenerSucursalSinImportarEstado(sucursalId);
+    }
+
     private Sucursal obtenerSucursal(Long id) {
         Sucursal sucursal = sucursalRepository.findById(id)
                 .filter(Sucursal::isActiva)
@@ -135,8 +153,8 @@ public class SucursalService {
 
     /**
      * Igual que obtenerSucursal(id) pero SIN el filtro de estado activo --
-     * uso exclusivo de reactivarSucursal(), que por definicion necesita
-     * poder encontrar una sucursal ya inactiva.
+     * usado por reactivarSucursal() y por
+     * obtenerSucursalDelTenantActualSinImportarEstado().
      */
     private Sucursal obtenerSucursalSinImportarEstado(Long id) {
         Sucursal sucursal = sucursalRepository.findById(id)

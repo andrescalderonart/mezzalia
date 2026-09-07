@@ -1,5 +1,7 @@
 package com.mezzalia.sucursal.controlador;
 
+import com.mezzalia.identidad.dto.UsuarioInternoDto;
+import com.mezzalia.identidad.servicio.AsignacionSucursalService;
 import com.mezzalia.sucursal.Sucursal;
 import com.mezzalia.sucursal.dto.CrearSucursalRequest;
 import com.mezzalia.sucursal.dto.SucursalDto;
@@ -26,6 +28,7 @@ import java.util.List;
 public class SucursalAdminController {
 
     private final SucursalService sucursalService;
+    private final AsignacionSucursalService asignacionSucursalService;
 
     @GetMapping
     public ResponseEntity<List<SucursalDto>> listarSucursales() {
@@ -54,5 +57,26 @@ public class SucursalAdminController {
     public ResponseEntity<Void> reactivarSucursal(@PathVariable Long id) {
         sucursalService.reactivarSucursal(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Vista pedida por el dueño del restaurante: qué meseros tiene
+     * asignados esta sucursal, para poder quitarlos sin tener que ir uno
+     * por uno a UsuariosPage.jsx. Restringido a ADMIN_RESTAURANTE a nivel
+     * de método (a diferencia del GET de arriba) -- gestionar el staff de
+     * una sucursal es una decisión operativa del encargado, no algo que un
+     * MESERO necesite consultar. El quitar en sí reusa el DELETE que ya
+     * existe en UsuarioInternoAdminController
+     * (/api/admin/usuarios/{id}/sucursales/{sucursalId}) -- no hace falta
+     * duplicar esa lógica acá, este controlador solo agrega la vista de
+     * lectura que faltaba en el sentido "sucursal -> meseros".
+     */
+    @GetMapping("/{id}/usuarios")
+    @PreAuthorize("hasRole('ADMIN_RESTAURANTE')")
+    public ResponseEntity<List<UsuarioInternoDto>> listarUsuariosAsignados(@PathVariable Long id) {
+        List<UsuarioInternoDto> usuarios = asignacionSucursalService.listarUsuariosDe(id).stream()
+                .map(UsuarioInternoDto::desde)
+                .toList();
+        return ResponseEntity.ok(usuarios);
     }
 }
