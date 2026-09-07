@@ -9,7 +9,9 @@ import UsuariosPage from './pages/UsuariosPage.jsx'
 import Layout from './components/Layout.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import RutaConRol from './components/RutaConRol.jsx'
+import RequiereSucursal from './components/RequiereSucursal.jsx'
 import InicioRedirect from './components/InicioRedirect.jsx'
+import SeleccionarSucursalPage from './pages/SeleccionarSucursalPage.jsx'
 const ROLES_RESTAURANTE = ['ADMIN_RESTAURANTE', 'MESERO']
 
 export default function App() {
@@ -18,11 +20,24 @@ export default function App() {
       <Route path="/login" element={<Login />} />
 
       <Route element={<ProtectedRoute />}>
+        {/* RF-10 PR4: fuera de <Layout> a proposito (como /login) -- ver el
+            javadoc de SeleccionarSucursalPage.jsx. Necesita sesion (por eso
+            va DENTRO de ProtectedRoute) pero todavia no un sucursalId, asi
+            que no puede ir dentro de RequiereSucursal (seria un loop). */}
+        <Route path="/seleccionar-sucursal" element={<SeleccionarSucursalPage />} />
+
         <Route element={<Layout />}>
           <Route element={<RutaConRol permitidos={ROLES_RESTAURANTE} />}>
-            <Route path="/menu" element={<MenuPage />} />
-            <Route path="/mesas" element={<MesasPage />} />
-            <Route path="/pedidos" element={<PedidosPage />} />
+            {/* RF-10 PR4: un MESERO sin sucursalId en su access token
+                actual SIEMPRE recibe 409 de estas tres pantallas (ver
+                sucursal.SucursalContext/"sucursalActual()" en el backend) --
+                RequiereSucursal.jsx lo manda antes a elegir una. No aplica a
+                ADMIN_RESTAURANTE (ver el javadoc de ese componente). */}
+            <Route element={<RequiereSucursal />}>
+              <Route path="/menu" element={<MenuPage />} />
+              <Route path="/mesas" element={<MesasPage />} />
+              <Route path="/pedidos" element={<PedidosPage />} />
+            </Route>
           </Route>
 
           {/* Gestión de usuarios internos (RF-09/§2): exclusivo de
