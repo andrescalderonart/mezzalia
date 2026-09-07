@@ -7,6 +7,8 @@ import com.mezzalia.identidad.dto.UsuarioInternoDto;
 import com.mezzalia.identidad.servicio.AsignacionSucursalService;
 import com.mezzalia.identidad.servicio.UsuarioInternoAdminService;
 import com.mezzalia.sucursal.dto.SucursalDto;
+import com.mezzalia.turno.dto.HorasPorDiaDto;
+import com.mezzalia.turno.servicio.TurnoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -31,6 +33,7 @@ public class UsuarioInternoAdminController {
 
     private final UsuarioInternoAdminService usuarioInternoAdminService;
     private final AsignacionSucursalService asignacionSucursalService;
+    private final TurnoService turnoService;
 
     @GetMapping
     public ResponseEntity<List<UsuarioInternoDto>> listarUsuarios() {
@@ -92,5 +95,23 @@ public class UsuarioInternoAdminController {
     public ResponseEntity<Void> desasignarSucursal(@PathVariable Long id, @PathVariable Long sucursalId) {
         asignacionSucursalService.desasignar(id, sucursalId);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Pedido explicito de Andres (2026-09-07): ver cuanto tiempo trabajado
+     * por dia lleva cada usuario. Ver turno.servicio.TurnoService para la
+     * discusion completa de por que esto depende de que la propia persona
+     * marque entrada/salida (SesionController) en vez de derivarse de
+     * algun dato que ya existiera. `dias` es una ventana simple (default
+     * 14) en vez de un rango desde/hasta explicito -- no hubo pedido de
+     * poder elegir un rango arbitrario, y una ventana de "los ultimos N
+     * dias" es mas facil de entender para el dueño del restaurante que
+     * tener que elegir dos fechas.
+     */
+    @GetMapping("/{id}/turnos")
+    public ResponseEntity<List<HorasPorDiaDto>> horasPorDia(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "14") int dias) {
+        return ResponseEntity.ok(turnoService.horasPorDiaDe(id, dias));
     }
 }

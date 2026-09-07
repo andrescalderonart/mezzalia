@@ -30,6 +30,10 @@ export default function UsuariosPage() {
   const [sucursales, setSucursales] = useState([])
   const [gestionandoUsuario, setGestionandoUsuario] = useState(null)
 
+  // Pedido de Andrés (2026-09-07): ver horas trabajadas por día -- ver
+  // HorasPorDiaModal más abajo y turno.servicio.TurnoService en el backend.
+  const [viendoHorasDe, setViendoHorasDe] = useState(null)
+
   async function cargarUsuarios() {
     setCargando(true)
     setError('')
@@ -181,6 +185,9 @@ export default function UsuariosPage() {
                     Sucursales
                   </button>
                 )}
+                <button onClick={() => setViendoHorasDe(usuario)} className="btn-secundario text-xs py-2">
+                  Horas
+                </button>
                 <button
                   onClick={() => {
                     setResetId(usuario.id)
@@ -244,6 +251,10 @@ export default function UsuariosPage() {
           sucursales={sucursales}
           onCerrar={() => setGestionandoUsuario(null)}
         />
+      )}
+
+      {viendoHorasDe && (
+        <HorasPorDiaModal usuario={viendoHorasDe} onCerrar={() => setViendoHorasDe(null)} />
       )}
     </div>
   )
@@ -356,6 +367,101 @@ function GestionSucursalesModal({ usuario, sucursales, onCerrar }) {
           <p className="text-xs text-dorado/80 bg-dorado/10 border border-dorado/20 rounded-lg px-2.5 py-1.5">
             Todavía no tiene ninguna sucursal asignada.
           </p>
+        )}
+
+        <button onClick={onCerrar} className="btn-secundario w-full text-xs py-2">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Pedido de Andrés (2026-09-07): ver cuánto tiempo trabajado por día lleva
+ * cada usuario. Backend: GET /api/admin/usuarios/{id}/turnos (nuevo --
+ * ver UsuarioInternoAdminController.horasPorDia/turno.servicio.TurnoService).
+ *
+ * El número de "hoy" puede seguir subiendo mientras la persona siga en
+ * turno (ver el badge "en curso") -- a diferencia de los demás días, que
+ * ya son totales definitivos. El dato depende 100% de que la persona haya
+ * usado "Marcar entrada/Marcar salida" (ver TurnoWidget en el sidebar) --
+ * si nunca lo usó, esta lista sale vacía, no es un bug.
+ */
+function HorasPorDiaModal({ usuario, onCerrar }) {
+  const apiJson = useApiJson()
+  const [dias, setDias] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let vigente = true
+    apiJson(`/api/admin/usuarios/${usuario.id}/turnos?dias=14`)
+      .then((datos) => {
+        if (vigente) setDias(datos)
+      })
+      .catch((e) => {
+        if (vigente) setError(e.message)
+      })
+    return () => {
+      vigente = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario.id])
+
+  function formatearFecha(fechaIso) {
+    const [anio, mes, dia] = fechaIso.split('-').map(Number)
+    return new Date(anio, mes - 1, dia).toLocaleDateString('es-CO', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    })
+  }
+
+  function formatearHoras(horas) {
+    const horasEnteras = Math.floor(horas)
+    const minutos = Math.round((horas - horasEnteras) * 60)
+    return `${horasEnteras}h ${minutos}min`
+  }
+
+  const cargando = dias === null
+  const diasOrdenados = cargando ? [] : [...dias].sort((a, b) => (a.fecha < b.fecha ? 1 : -1))
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onCerrar}>
+      <div onClick={(e) => e.stopPropagation()} className="card p-5 w-full max-w-sm flex flex-col gap-3">
+        <div>
+          <h3 className="font-medium text-crema">Horas de {usuario.username}</h3>
+          <p className="text-[11px] text-crema/40 mt-1">Últimos 14 días, según sus marcas de entrada/salida.</p>
+        </div>
+
+        {error && (
+          <div className="text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2 animate-fadeInUp">
+            {error}
+          </div>
+        )}
+
+        {cargando ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="h-9 rounded-lg bg-carbon-800 animate-pulseSoft" />
+            ))}
+          </div>
+        ) : diasOrdenados.length === 0 ? (
+          <p className="text-sm text-crema/40 py-4 text-center">
+            Todavía no marcó ninguna entrada en los últimos 14 días.
+          </p>
+        ) : (
+          <div className="space-y-1 max-h-72 overflow-y-auto">
+            {diasOrdenados.map((d) => (
+              <div key={d.fecha} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 bg-carbon-800/60">
+                <span className="text-sm text-crema capitalize">{formatearFecha(d.fecha)}</span>
+                <span className="text-sm text-crema/70">
+                  {formatearHoras(d.horas)}
+                  {d.turnoAbiertoIncluido && <span className="text-dorado ml-1">· en curso</span>}
+                </span>
+              </div>
+            ))}
+          </div>
         )}
 
         <button onClick={onCerrar} className="btn-secundario w-full text-xs py-2">

@@ -4,6 +4,8 @@ import com.mezzalia.identidad.dto.AccessTokenRespuesta;
 import com.mezzalia.identidad.dto.SeleccionarSucursalRequest;
 import com.mezzalia.identidad.servicio.AuthService;
 import com.mezzalia.sucursal.dto.SucursalDto;
+import com.mezzalia.turno.dto.EstadoTurnoDto;
+import com.mezzalia.turno.servicio.TurnoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,13 +24,17 @@ import java.util.List;
  * vía JWT, ver JwtAuthenticationFilter) ni a mesa.SesionMesa (la sesión de
  * UNA MESA para el QR del comensal, un concepto completamente distinto).
  *
+ * También vive acá, por el mismo criterio, "marcar entrada/marcar salida"
+ * (ver turno.servicio.TurnoService): es otro dato sobre "qué está haciendo
+ * el usuario autenticado ahora mismo", igual que la sucursal elegida.
+ *
  * A propósito bajo /api/admin/** y NO bajo /api/auth/**, aunque
  * conceptualmente está más cerca de login/refresh: SecurityConfig marca
  * /api/auth/** como permitAll() (login/refresh/logout no requieren token
- * previo, por diseño -- ver el comentario de esa clase). Estos dos
- * endpoints SÍ necesitan la identidad de un usuario YA autenticado (vía el
- * JWT del header), así que deben vivir en un prefijo que SecurityConfig
- * exija autenticado a nivel de FILTRO -- no confiar esa garantía solo a un
+ * previo, por diseño -- ver el comentario de esa clase). Estos endpoints
+ * SÍ necesitan la identidad de un usuario YA autenticado (vía el JWT del
+ * header), así que deben vivir en un prefijo que SecurityConfig exija
+ * autenticado a nivel de FILTRO -- no confiar esa garantía solo a un
  * @PreAuthorize de método, más frágil de verificar sin poder correr la
  * suite real en este entorno (sin Maven/JDK disponibles).
  */
@@ -38,6 +44,7 @@ import java.util.List;
 public class SesionController {
 
     private final AuthService authService;
+    private final TurnoService turnoService;
 
     @GetMapping("/sucursales-disponibles")
     public ResponseEntity<List<SucursalDto>> sucursalesDisponibles() {
@@ -50,5 +57,20 @@ public class SesionController {
     @PostMapping("/sucursal")
     public ResponseEntity<AccessTokenRespuesta> seleccionarSucursal(@Valid @RequestBody SeleccionarSucursalRequest request) {
         return ResponseEntity.ok(authService.seleccionarSucursal(request.sucursalId()));
+    }
+
+    @GetMapping("/turno")
+    public ResponseEntity<EstadoTurnoDto> estadoTurno() {
+        return ResponseEntity.ok(turnoService.estadoActual());
+    }
+
+    @PostMapping("/turno/entrada")
+    public ResponseEntity<EstadoTurnoDto> marcarEntrada() {
+        return ResponseEntity.ok(turnoService.marcarEntrada());
+    }
+
+    @PostMapping("/turno/salida")
+    public ResponseEntity<EstadoTurnoDto> marcarSalida() {
+        return ResponseEntity.ok(turnoService.marcarSalida());
     }
 }
