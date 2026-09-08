@@ -1,17 +1,18 @@
 package com.mezzalia.common.excepcion;
 
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.Instant;
 import java.util.Map;
@@ -75,6 +76,35 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Auditoria 2026-09-08 (encontrado corriendo por primera vez el nuevo
+     * AutorizacionAdminTest en CI, no a mano): Spring Security 6 lanza
+     * AuthorizationDeniedException desde el interceptor de metodo de
+     * @PreAuthorize (AuthorizationManagerBeforeMethodInterceptor) DURANTE la
+     * invocacion del metodo del controller -- a diferencia del
+     * AccessDeniedException clasico de versiones anteriores, que interceptaba
+     * ExceptionTranslationFilter a nivel de FILTRO de servlet, antes de que
+     * el request llegara siquiera al DispatcherServlet. Esta nueva excepcion
+     * ocurre DENTRO del ciclo de invocacion de Spring MVC, asi que para
+     * cualquier endpoint restringido SOLO por @PreAuthorize (sin un
+     * requestMatcher de rol en SecurityConfig -- que es la mayoria de los
+     * endpoints de escritura de menu/mesas/sucursales/usuarios internos)
+     * nunca llegaba al accessDeniedHandler de SecurityConfig: la resolucion
+     * de excepciones de Spring MVC la atrapaba primero, y sin este handler
+     * explicito terminaba cayendo en el catch-all de abajo. Resultado real en
+     * produccion: un MESERO que intentaba, por ejemplo, crear un item del
+     * menu recibia un 500 "Error interno del servidor" en vez de un 403
+     * claro -- un bug de verdad, no solo un hueco de tests. Mismo mensaje que
+     * usa accessDeniedHandler de SecurityConfig (para las rutas que SI se
+     * bloquean a nivel de filtro, como /api/admin/tenants/**), asi la
+     * respuesta es consistente sin importar en que capa se decidio negar el
+     * acceso.
+     */
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAutorizacionDenegada(AuthorizationDeniedException ex) {
+        return respuesta(HttpStatus.FORBIDDEN, "No tiene permisos para este recurso");
+    }
+
+    /**
      * Auditoria 2026-09-08: antes este handler devolvia el 500 generico sin
      * loguear nada -- cualquier excepcion no prevista (NullPointerException,
      * timeout de MySQL, lo que sea) desaparecia sin dejar rastro en el
@@ -85,18 +115,9 @@ public class GlobalExceptionHandler {
      * existe en application.yml (logging.pattern.console), este era el
      * unico handler que no lo aprovechaba. Se loguea con el stacktrace
      * completo (nivel ERROR, nunca expuesto al cliente -- la respuesta HTTP
-     * sigue siendo el mismo mensaje generico de siempre).
-     *
-     * Firma SIN HttpServletRequest a proposito (a diferencia de un primer
-     * intento de este mismo fix): GlobalExceptionHandlerTest instancia este
-     * handler directo, sin contexto de Spring (ver el javadoc de esa clase
-     * -- es deliberado, para no pagar el costo de un @WebMvcTest solo para
-     * verificar un status HTTP), asi que agregar un parametro obligatorio
-     * rompia la compilacion de ese test. RequestContextHolder (poblado por
-     * DispatcherServlet en cualquier request real) es el mismo patron de
-     * "dato ambiental via un holder" que TenantContext/SucursalContext ya
-     * usan en este proyecto -- aca se usa de solo lectura, nunca se
-     * establece desde este handler.
+     * sigue siendo el mismo mensaje generico de siempre) y la URI del
+     * request para poder correlacionar un ticket de soporte con la linea de
+     * log real.
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGenerico(Exception ex) {
@@ -104,9 +125,6 @@ public class GlobalExceptionHandler {
         if (request != null) {
             log.error("Error no manejado en {} {}: {}", request.getMethod(), request.getRequestURI(), ex.getMessage(), ex);
         } else {
-            // Sin contexto de request real (ej. GlobalExceptionHandlerTest,
-            // que instancia este handler directo): se loguea igual, solo
-            // que sin poder decir en que endpoint paso.
             log.error("Error no manejado (sin contexto de request): {}", ex.getMessage(), ex);
         }
         return respuesta(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor");

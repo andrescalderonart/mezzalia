@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import com.mezzalia.tenant.TenantContext;
 
 import java.util.stream.Stream;
 
@@ -74,6 +75,13 @@ class AutorizacionAdminTest {
     @Autowired
     private MockMvc mockMvc;
 
+    // Cualquier valor sirve: la base H2 de test arranca vacia en cada clase
+    // (ddl-auto: create-drop) y ninguno de estos tests le pide al servicio
+    // que devuelva datos reales de un tenant especifico -- solo que no
+    // rechace la request por "no hay tenant en contexto". No confundir con
+    // un id que exista en la base: no hace falta que exista.
+    private static final Long TENANT_ID_DE_PRUEBA = 1L;
+
     /**
      * Endpoints de UsuarioInternoAdminController, MenuAdminController,
      * MesaAdminController, SucursalAdminController y ComensalAdminController
@@ -123,15 +131,37 @@ class AutorizacionAdminTest {
     @Nested
     class AccesibleParaCualquierAutenticado {
 
+        /**
+         * Primera corrida real en CI (2026-09-08): estos SI llegan a
+         * ejecutar el metodo real del controller/service -- no los bloquea
+         * ningun @PreAuthorize -- y esos servicios llaman a
+         * TenantContext.obtenerTenantId() para resolver el tenant. En
+         * produccion eso lo puebla JwtAuthenticationFilter a partir del
+         * claim del JWT real, pero @WithMockUser no manda ningun header
+         * Authorization, asi que sin establecerlo a mano el servicio ve el
+         * contexto vacio y responde 403 (SinTenantEnContextoException de
+         * cada modulo) por una razon completamente distinta a la que este
+         * test quiere probar -- asi fallaron los 4 casos la primera vez que
+         * corrio esto en CI. Se establece igual que lo haria el filtro real
+         * para MESERO/ADMIN_RESTAURANTE (a diferencia de SUPER_ADMIN,
+         * siempre tienen tenantId): MockMvc en modo MOCK corre sincronico en
+         * el mismo hilo del test, asi que el ThreadLocal llega intacto al
+         * service sin necesidad de nada mas elaborado.
+         */
         @ParameterizedTest(name = "{0} {1} -> NO 403/401 para MESERO")
         @MethodSource("com.mezzalia.common.seguridad.AutorizacionAdminTest#endpointsLecturaCompartida")
         @WithMockUser(roles = "MESERO")
         void meseroNoRecibeProhibido(String metodo, String url) throws Exception {
-            int status = mockMvc.perform(construirRequest(metodo, url, null))
-                    .andReturn().getResponse().getStatus();
-            org.assertj.core.api.Assertions.assertThat(status)
-                    .as("MESERO deberia poder llamar a %s %s sin que el rol se lo bloquee (403) ni pedirle login (401)", metodo, url)
-                    .isNotIn(401, 403);
+            TenantContext.establecerTenantId(TENANT_ID_DE_PRUEBA);
+            try {
+                int status = mockMvc.perform(construirRequest(metodo, url, null))
+                        .andReturn().getResponse().getStatus();
+                org.assertj.core.api.Assertions.assertThat(status)
+                        .as("MESERO deberia poder llamar a %s %s sin que el rol se lo bloquee (403) ni pedirle login (401)", metodo, url)
+                        .isNotIn(401, 403);
+            } finally {
+                TenantContext.limpiar();
+            }
         }
     }
 
