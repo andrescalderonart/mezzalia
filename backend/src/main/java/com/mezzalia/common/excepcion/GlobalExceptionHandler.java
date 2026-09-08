@@ -1,6 +1,8 @@
 package com.mezzalia.common.excepcion;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -83,14 +85,38 @@ public class GlobalExceptionHandler {
      * existe en application.yml (logging.pattern.console), este era el
      * unico handler que no lo aprovechaba. Se loguea con el stacktrace
      * completo (nivel ERROR, nunca expuesto al cliente -- la respuesta HTTP
-     * sigue siendo el mismo mensaje generico de siempre) y la URI del
-     * request para poder correlacionar un ticket de soporte con la linea de
-     * log real.
+     * sigue siendo el mismo mensaje generico de siempre).
+     *
+     * Firma SIN HttpServletRequest a proposito (a diferencia de un primer
+     * intento de este mismo fix): GlobalExceptionHandlerTest instancia este
+     * handler directo, sin contexto de Spring (ver el javadoc de esa clase
+     * -- es deliberado, para no pagar el costo de un @WebMvcTest solo para
+     * verificar un status HTTP), asi que agregar un parametro obligatorio
+     * rompia la compilacion de ese test. RequestContextHolder (poblado por
+     * DispatcherServlet en cualquier request real) es el mismo patron de
+     * "dato ambiental via un holder" que TenantContext/SucursalContext ya
+     * usan en este proyecto -- aca se usa de solo lectura, nunca se
+     * establece desde este handler.
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGenerico(Exception ex, HttpServletRequest request) {
-        log.error("Error no manejado en {} {}: {}", request.getMethod(), request.getRequestURI(), ex.getMessage(), ex);
+    public ResponseEntity<Map<String, Object>> handleGenerico(Exception ex) {
+        HttpServletRequest request = requestActual();
+        if (request != null) {
+            log.error("Error no manejado en {} {}: {}", request.getMethod(), request.getRequestURI(), ex.getMessage(), ex);
+        } else {
+            // Sin contexto de request real (ej. GlobalExceptionHandlerTest,
+            // que instancia este handler directo): se loguea igual, solo
+            // que sin poder decir en que endpoint paso.
+            log.error("Error no manejado (sin contexto de request): {}", ex.getMessage(), ex);
+        }
         return respuesta(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor");
+    }
+
+    private HttpServletRequest requestActual() {
+        if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes atributos) {
+            return atributos.getRequest();
+        }
+        return null;
     }
 
     private ResponseEntity<Map<String, Object>> respuesta(HttpStatus status, String mensaje) {
