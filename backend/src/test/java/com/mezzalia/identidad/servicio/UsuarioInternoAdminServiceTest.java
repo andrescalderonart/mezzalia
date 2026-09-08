@@ -7,6 +7,7 @@ import com.mezzalia.identidad.excepcion.UsuarioInternoExceptions;
 import com.mezzalia.tenant.Tenant;
 import com.mezzalia.tenant.TenantContext;
 import com.mezzalia.tenant.TenantRepository;
+import com.mezzalia.tenant.servicio.TenantService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -177,7 +178,7 @@ class UsuarioInternoAdminServiceTest {
     }
 
     private UsuarioInternoAdminService nuevoServicio() {
-        return new UsuarioInternoAdminService(usuarioInternoRepository, passwordEncoder);
+        return new UsuarioInternoAdminService(usuarioInternoRepository, passwordEncoder, new TenantService(tenantRepository));
     }
 
     private Tenant nuevoTenant(String nombre) {

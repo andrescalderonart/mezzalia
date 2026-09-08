@@ -5,6 +5,7 @@ import com.mezzalia.identidad.UsuarioInterno;
 import com.mezzalia.identidad.UsuarioInternoRepository;
 import com.mezzalia.identidad.excepcion.UsuarioInternoExceptions;
 import com.mezzalia.tenant.TenantContext;
+import com.mezzalia.tenant.servicio.TenantService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -35,6 +36,7 @@ public class UsuarioInternoAdminService {
 
     private final UsuarioInternoRepository usuarioInternoRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TenantService tenantService;
 
     /**
      * Defensa explícita, mismo criterio que el resto de los servicios de
@@ -74,6 +76,72 @@ public class UsuarioInternoAdminService {
         usuario.setPasswordHash(passwordEncoder.encode(passwordEnTextoPlano));
         usuario.setRol(rol);
         usuario.setTenantId(tenantActual());
+        usuario.setActivo(true);
+        try {
+            return usuarioInternoRepository.save(usuario);
+        } catch (DataIntegrityViolationException ex) {
+            throw new UsuarioInternoExceptions.UsuarioYaExisteException(username);
+        }
+    }
+
+    /**
+     * Hallazgo posterior al cierre de la auditoria del 2026-09-08 (SS1.1):
+     * hasta este metodo, no existia NINGUN camino de API para crear el
+     * primer usuario de un tenant nuevo. TenantAdminController.crearTenant
+     * (SUPER_ADMIN) solo crea la fila de Tenant; crearUsuario (arriba) esta
+     * detras de @PreAuthorize("hasRole('ADMIN_RESTAURANTE')") a nivel de
+     * clase en el controller y siempre resuelve el tenant via
+     * tenantActual() (TenantContext, poblado del JWT del que llama) -- un
+     * SUPER_ADMIN nunca tiene tenantId, asi que ese mismo endpoint no puede
+     * servir para dar de alta el admin inicial de un tenant que el
+     * SUPER_ADMIN acaba de crear. En la practica, antes de este metodo, la
+     * unica forma de onboardear un restaurante nuevo de punta a punta era
+     * un INSERT manual a la base -- justo lo que documentacion-tecnica.md
+     * §5 (fase 1, "onboarding asistido por ustedes") da por hecho que existe
+     * como capacidad, pero nunca se habia construido.
+     *
+     * Deliberadamente SEPARADO de TenantService.crearTenant (dos llamadas
+     * de API, no una transaccion atomica que abarque ambas cosas):
+     * TenantService (modulo `tenant`) no importa nada de otros modulos --
+     * es la base de la que todos los demas modulos dependen (identidad,
+     * menu, mesa, sucursal, pedido y turno ya importan `tenant`, nunca al
+     * reves). Meter la creacion de un UsuarioInterno dentro de
+     * TenantService.crearTenant invertiria esa direccion de dependencia.
+     * Este metodo vive en `identidad` (que SI puede depender de `tenant`,
+     * ver TenantContext) y llama a TenantService.obtenerParaAdministracion
+     * primero para poder devolver un 404 claro (TenantNoEncontradoException)
+     * si el tenantId no existe -- sin este chequeo, la unica senal de error
+     * seria una DataIntegrityViolationException por el FK
+     * fk_usuarios_internos_tenant, un 500 opaco en vez de un error de
+     * negocio legible.
+     *
+     * `tenantId` viene explicito por parametro, no de TenantContext (que
+     * para SUPER_ADMIN esta vacio a proposito) -- unica excepcion al
+     * criterio de "nunca confiar en un tenant que el cliente podria
+     * manipular en el body" que documenta CrearUsuarioInternoRequest: aca
+     * el llamador (SUPER_ADMIN, ya autorizado por @PreAuthorize a nivel de
+     * clase del controller) es precisamente quien decide para que tenant es
+     * el alta, via el path de la URL
+     * (/api/admin/tenants/{tenantId}/admin-inicial) -- mismo patron que
+     * TenantAdminController.actualizarBranding/suspenderTenant/reactivarTenant,
+     * que tambien toman el id del path, no del body.
+     *
+     * No valida "que no haya ya un admin para este tenant": no hace falta,
+     * tener mas de un ADMIN_RESTAURANTE por tenant no es un estado
+     * invalido (ver UsuarioInterno, no hay ninguna regla de unicidad de rol
+     * por tenant, solo la de username a nivel de plataforma).
+     */
+    @Transactional
+    public UsuarioInterno crearAdminInicial(Long tenantId, String username, String passwordEnTextoPlano) {
+        tenantService.obtenerParaAdministracion(tenantId);
+        if (usuarioInternoRepository.existsByUsername(username)) {
+            throw new UsuarioInternoExceptions.UsuarioYaExisteException(username);
+        }
+        UsuarioInterno usuario = new UsuarioInterno();
+        usuario.setUsername(username);
+        usuario.setPasswordHash(passwordEncoder.encode(passwordEnTextoPlano));
+        usuario.setRol(RolUsuario.ADMIN_RESTAURANTE);
+        usuario.setTenantId(tenantId);
         usuario.setActivo(true);
         try {
             return usuarioInternoRepository.save(usuario);

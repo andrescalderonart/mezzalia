@@ -284,6 +284,10 @@ class AutorizacionAdminTest {
                 Arguments.of("PATCH", "/api/admin/tenants/1/suspender", null),
                 Arguments.of("PATCH", "/api/admin/tenants/1/reactivar", null),
 
+                // TenantAdminInicialController: mismo prefijo de ruta que TenantAdminController
+                // pero vive en el modulo identidad (ver su javadoc para el porque).
+                Arguments.of("POST", "/api/admin/tenants/1/admin-inicial", "{\"username\":\"nuevo.admin\",\"password\":\"password123\"}"),
+
                 // ComensalMantenimientoController: idem, bajo /api/superadmin/**.
                 Arguments.of("POST", "/api/superadmin/comensales/reencriptar", null)
         );
