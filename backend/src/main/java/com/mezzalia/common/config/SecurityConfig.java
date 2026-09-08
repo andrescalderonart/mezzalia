@@ -42,12 +42,42 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // Auditoria 2026-09-08: CSP como segunda capa contra robo de
+            // sesion via XSS -- el access y el refresh token viven en
+            // localStorage (ver frontend/app-admin/src/api/client.js), no en
+            // cookies httpOnly, porque no hay CSRF que mitigar (CSRF esta
+            // deshabilitado arriba a proposito). Eso deja "que nunca haya
+            // XSS" como el unico perimetro real; hoy no hay ningun
+            // dangerouslySetInnerHTML/innerHTML en ninguno de los dos
+            // frontends, pero esto es la capa que hay que tener puesta ANTES
+            // de necesitarla, no despues. style-src/font-src incluyen Google
+            // Fonts porque ambos index.html lo cargan asi (ver
+            // frontend/*/index.html). Cubre lo que ESTE backend sirve
+            // directamente (API, /uploads, /test.html) -- si en produccion
+            // el HTML/JS compilado de las SPA termina servido por un reverse
+            // proxy separado en vez de pasar por Spring, hay que replicar
+            // esta misma cabecera ahi tambien; no se puede confirmar esa
+            // topologia desde este repo todavia (ver docker-compose.yml,
+            // servicio backend comentado).
+            .headers(headers -> headers.contentSecurityPolicy(csp -> csp.policyDirectives(
+                "default-src 'self'; "
+                + "script-src 'self'; "
+                + "style-src 'self' https://fonts.googleapis.com; "
+                + "font-src 'self' https://fonts.gstatic.com; "
+                + "img-src 'self' data:; "
+                + "connect-src 'self'; "
+                + "base-uri 'self'; "
+                + "form-action 'self'; "
+                + "frame-ancestors 'none'")))
             .authorizeHttpRequests(auth -> auth
                 // Login/refresh/logout: por definición, sin autenticación previa.
                 .requestMatchers("/api/auth/**").permitAll()
                 // Carta pública, branding y pedidos sin login (QR del comensal)
                 .requestMatchers("/api/publico/**").permitAll()
-                // Panel de pruebas manual en dev (ver docs) - no debe existir en produccion
+                // Panel de pruebas manual en dev (ver docs). El permitAll sigue siendo
+                // necesario (es una herramienta sin login), pero YA NO alcanza por si solo
+                // para mantenerlo fuera de produccion -- ver common.config.PanelPruebasController
+                // (auditoria 2026-09-08), que devuelve 404 salvo que el perfil dev este activo.
                 .requestMatchers("/test.html").permitAll()
                 // Fotos de platos: publicas porque el comensal las ve en la carta sin login (RF-01)
                 .requestMatchers("/uploads/**").permitAll()
