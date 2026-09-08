@@ -1,5 +1,10 @@
 package com.mezzalia.common.excepcion;
 
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -24,6 +29,8 @@ import java.util.Map;
 @Order(Ordered.LOWEST_PRECEDENCE)
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(DomainExceptions.TenantNoEncontradoException.class)
     public ResponseEntity<Map<String, Object>> handleTenantNoEncontrado(DomainExceptions.TenantNoEncontradoException ex) {
@@ -67,9 +74,49 @@ public class GlobalExceptionHandler {
         return respuesta(HttpStatus.BAD_REQUEST, "El cuerpo de la solicitud es invalido o esta mal formado");
     }
 
+    /**
+     * Auditoria 2026-09-08: antes este handler devolvia el 500 generico sin
+     * loguear nada -- cualquier excepcion no prevista (NullPointerException,
+     * timeout de MySQL, lo que sea) desaparecia sin dejar rastro en el
+     * servidor, justo el unico lugar donde mas importa (es el que atrapa lo
+     * que nadie preveyo). documentacion-tecnica.md §11 pide logging
+     * estructurado desde el primer commit para poder rastrear un incidente
+     * de un cliente especifico -- el patron JSON con tenantId/requestId ya
+     * existe en application.yml (logging.pattern.console), este era el
+     * unico handler que no lo aprovechaba. Se loguea con el stacktrace
+     * completo (nivel ERROR, nunca expuesto al cliente -- la respuesta HTTP
+     * sigue siendo el mismo mensaje generico de siempre).
+     *
+     * Firma SIN HttpServletRequest a proposito (a diferencia de un primer
+     * intento de este mismo fix): GlobalExceptionHandlerTest instancia este
+     * handler directo, sin contexto de Spring (ver el javadoc de esa clase
+     * -- es deliberado, para no pagar el costo de un @WebMvcTest solo para
+     * verificar un status HTTP), asi que agregar un parametro obligatorio
+     * rompia la compilacion de ese test. RequestContextHolder (poblado por
+     * DispatcherServlet en cualquier request real) es el mismo patron de
+     * "dato ambiental via un holder" que TenantContext/SucursalContext ya
+     * usan en este proyecto -- aca se usa de solo lectura, nunca se
+     * establece desde este handler.
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGenerico(Exception ex) {
+        HttpServletRequest request = requestActual();
+        if (request != null) {
+            log.error("Error no manejado en {} {}: {}", request.getMethod(), request.getRequestURI(), ex.getMessage(), ex);
+        } else {
+            // Sin contexto de request real (ej. GlobalExceptionHandlerTest,
+            // que instancia este handler directo): se loguea igual, solo
+            // que sin poder decir en que endpoint paso.
+            log.error("Error no manejado (sin contexto de request): {}", ex.getMessage(), ex);
+        }
         return respuesta(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor");
+    }
+
+    private HttpServletRequest requestActual() {
+        if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes atributos) {
+            return atributos.getRequest();
+        }
+        return null;
     }
 
     private ResponseEntity<Map<String, Object>> respuesta(HttpStatus status, String mensaje) {
