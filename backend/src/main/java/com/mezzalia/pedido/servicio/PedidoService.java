@@ -282,6 +282,11 @@ public class PedidoService {
         comensal.setTenantId(tenantId);
         comensal.setNombre(nombre);
         comensal.setTelefono(telefono);
+        // V19: deja un registro explicito de que hubo consentimiento (antes
+        // solo se podia inferir de que esta fila existiera) --
+        // consentimientoRegistradoEn se completa solo, en el mismo instante
+        // que creadoEn (ver Comensal.alCrear()).
+        comensal.setConsentimientoMarketing(true);
         return comensalRepository.save(comensal).getId();
     }
 

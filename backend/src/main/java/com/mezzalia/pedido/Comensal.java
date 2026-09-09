@@ -32,6 +32,20 @@ import java.time.LocalDateTime;
  * fuera de este sistema) -- una decision de alcance documentada, no un
  * olvido. El texto real de aviso de privacidad para el consentimiento sigue
  * pendiente de revision legal (documentacion-tecnica.md §15.2).
+ *
+ * `consentimientoMarketing`/`consentimientoRegistradoEn` (V19): hasta esta
+ * version, el unico rastro del consentimiento era que esta fila existiera
+ * (ver el parrafo de arriba y crearComensalSiAplica) -- eso alcanza para que
+ * la aplicacion se comporte bien, pero no deja un registro auditable de
+ * CUANDO se dio, que es justo lo que Habeas Data exige poder demostrar.
+ * `consentimientoRegistradoEn` se completa sola en alCrear() -- mismo
+ * instante que `creadoEn`, porque hoy solo existe un camino de creacion y
+ * ambos eventos son simultaneos (ver la migracion V19 para el razonamiento
+ * del backfill de las filas existentes). `consentimientoMarketing` en
+ * cambio NUNCA se autocompleta aca: quien crea el Comensal tiene que
+ * decidirlo explicitamente (ver PedidoService.crearComensalSiAplica), para
+ * que este campo no pueda terminar en `true` por default sin que nadie lo
+ * haya decidido de verdad.
  */
 @Entity
 @Table(name = "comensales")
@@ -56,10 +70,19 @@ public class Comensal extends EntidadConTenant {
     @Column(name = "creado_en", nullable = false, updatable = false)
     private LocalDateTime creadoEn;
 
+    @Column(name = "consentimiento_marketing", nullable = false)
+    private boolean consentimientoMarketing;
+
+    @Column(name = "consentimiento_registrado_en")
+    private LocalDateTime consentimientoRegistradoEn;
+
     @PrePersist
     private void alCrear() {
         if (creadoEn == null) {
             creadoEn = LocalDateTime.now();
+        }
+        if (consentimientoMarketing && consentimientoRegistradoEn == null) {
+            consentimientoRegistradoEn = creadoEn;
         }
     }
 }
