@@ -184,7 +184,11 @@ class PedidoServiceTest {
                 List.of(new ItemSolicitadoRequest(item.getId(), 1)), null, conConsentimiento);
 
         assertThat(pedido.getComensalId()).isNotNull();
-        assertThat(comensalRepository.findById(pedido.getComensalId())).isPresent();
+        Comensal comensal = comensalRepository.findById(pedido.getComensalId()).orElseThrow();
+        // V19: el consentimiento ahora queda registrado explicitamente en la
+        // fila, no solo inferido de que exista (ver Comensal.java).
+        assertThat(comensal.isConsentimientoMarketing()).isTrue();
+        assertThat(comensal.getConsentimientoRegistradoEn()).isNotNull();
     }
 
     @Test
