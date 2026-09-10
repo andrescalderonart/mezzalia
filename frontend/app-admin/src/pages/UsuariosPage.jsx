@@ -272,10 +272,27 @@ export default function UsuariosPage() {
  * en vez de mantenerlas precargadas por cada fila de la tabla, para no
  * disparar un GET extra por cada MESERO listado solo por si acaso se abre
  * su modal.
+ *
+ * FIX 2026-09-10 (backlog del proyecto, punto 1): las opciones del modal
+ * ya NO son solo `sucursales` (la prop, activas del tenant) -- se le suman
+ * las sucursales que este usuario ya tiene asignadas aunque estén
+ * inactivas. Antes de este fix, si un MESERO quedaba asignado a una
+ * sucursal que después se desactivaba, la asignación seguía viva en la
+ * base (AsignacionSucursal no se toca al desactivar, a propósito) pero
+ * desaparecía por completo de este modal: no había fila ni checkbox para
+ * verla ni para desasignarla. GET /api/admin/usuarios/{id}/sucursales ya
+ * devuelve esas sucursales inactivas (ver el javadoc de
+ * SucursalRepository.findByTenantIdAndIdInOrderByNombreAsc en el
+ * backend) -- lo único que faltaba era usarlas para render, no solo para
+ * marcar el checkbox. Una sucursal inactiva se muestra atenuada, con
+ * "(inactiva)", y su checkbox solo permite QUITAR (DELETE), nunca volver
+ * a asignarla (PUT) -- mismo criterio que ya usa
+ * abrirAsignacionSucursales en este mismo archivo para el histórico
+ * previo de esta pantalla.
  */
 function GestionSucursalesModal({ usuario, sucursales, onCerrar }) {
   const apiJson = useApiJson()
-  const [asignadasIds, setAsignadasIds] = useState(null)
+  const [asignadas, setAsignadas] = useState(null) // objetos completos (id + nombre + activa), no solo ids
   const [error, setError] = useState('')
   const [actualizandoId, setActualizandoId] = useState(null)
 
@@ -283,7 +300,7 @@ function GestionSucursalesModal({ usuario, sucursales, onCerrar }) {
     let vigente = true
     apiJson(`/api/admin/usuarios/${usuario.id}/sucursales`)
       .then((datos) => {
-        if (vigente) setAsignadasIds(datos.map((s) => s.id))
+        if (vigente) setAsignadas(datos)
       })
       .catch((e) => {
         if (vigente) setError(e.message)
@@ -294,6 +311,8 @@ function GestionSucursalesModal({ usuario, sucursales, onCerrar }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuario.id])
 
+  const asignadasIds = asignadas === null ? [] : asignadas.map((s) => s.id)
+
   async function onToggle(sucursal) {
     const yaAsignada = asignadasIds.includes(sucursal.id)
     setActualizandoId(sucursal.id)
@@ -302,7 +321,7 @@ function GestionSucursalesModal({ usuario, sucursales, onCerrar }) {
       await apiJson(`/api/admin/usuarios/${usuario.id}/sucursales/${sucursal.id}`, {
         method: yaAsignada ? 'DELETE' : 'PUT',
       })
-      setAsignadasIds((prev) => (yaAsignada ? prev.filter((id) => id !== sucursal.id) : [...prev, sucursal.id]))
+      setAsignadas((prev) => (yaAsignada ? prev.filter((s) => s.id !== sucursal.id) : [...prev, sucursal]))
     } catch (e) {
       setError(e.message)
     } finally {
@@ -310,7 +329,16 @@ function GestionSucursalesModal({ usuario, sucursales, onCerrar }) {
     }
   }
 
-  const cargando = asignadasIds === null
+  const cargando = asignadas === null
+
+  // Union de "activas del tenant" + "asignadas a este usuario aunque
+  // estén inactivas" -- ver el comentario largo arriba del componente.
+  const opciones =
+    asignadas === null
+      ? sucursales
+      : [...sucursales, ...asignadas.filter((s) => !sucursales.some((activa) => activa.id === s.id))].sort(
+          (a, b) => a.nombre.localeCompare(b.nombre),
+        )
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onCerrar}>
@@ -335,25 +363,31 @@ function GestionSucursalesModal({ usuario, sucursales, onCerrar }) {
               <div key={n} className="h-10 rounded-lg bg-carbon-800 animate-pulseSoft" />
             ))}
           </div>
-        ) : sucursales.length === 0 ? (
+        ) : opciones.length === 0 ? (
           <p className="text-sm text-crema/40 py-4 text-center">
             Este restaurante todavía no tiene sucursales creadas -- creá una primero en
             "Sucursales".
           </p>
         ) : (
           <div className="space-y-1.5 max-h-72 overflow-y-auto">
-            {sucursales.map((sucursal) => {
+            {opciones.map((sucursal) => {
               const asignada = asignadasIds.includes(sucursal.id)
+              const esInactivaNoReasignable = !sucursal.activa
               return (
                 <label
                   key={sucursal.id}
-                  className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 bg-carbon-800/60 cursor-pointer"
+                  className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 bg-carbon-800/60 cursor-pointer ${
+                    esInactivaNoReasignable ? 'opacity-60' : ''
+                  }`}
                 >
-                  <span className="text-sm text-crema">{sucursal.nombre}</span>
+                  <span className="text-sm text-crema">
+                    {sucursal.nombre}
+                    {esInactivaNoReasignable && <span className="text-[10px] text-crema/40"> (inactiva)</span>}
+                  </span>
                   <input
                     type="checkbox"
                     checked={asignada}
-                    disabled={actualizandoId === sucursal.id}
+                    disabled={actualizandoId === sucursal.id || (esInactivaNoReasignable && !asignada)}
                     onChange={() => onToggle(sucursal)}
                     className="w-4 h-4 accent-dorado"
                   />
@@ -363,7 +397,7 @@ function GestionSucursalesModal({ usuario, sucursales, onCerrar }) {
           </div>
         )}
 
-        {!cargando && sucursales.length > 0 && asignadasIds.length === 0 && (
+        {!cargando && opciones.length > 0 && asignadasIds.length === 0 && (
           <p className="text-xs text-dorado/80 bg-dorado/10 border border-dorado/20 rounded-lg px-2.5 py-1.5">
             Todavía no tiene ninguna sucursal asignada.
           </p>
