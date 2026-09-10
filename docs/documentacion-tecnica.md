@@ -3,7 +3,7 @@
 **Stack decidido:** Java (Spring Boot) + React + MySQL — Equipo: 2 desarrolladores (Java/React senior + Java/Python)
 **Modelo:** SaaS multi-tenant · **Alcance MVP:** Carta digital + comanda desde la mesa (sin pagos online)
 **País de operación:** Colombia (único, por ahora) · **Pricing:** suscripción mensual fija por sucursal · **Dato del comensal:** nombre + teléfono (CRM/fidelización futura) · **Soporte MVP:** manual (WhatsApp/teléfono de los fundadores)
-**Fecha:** Agosto 2026 — v1.1, con las decisiones de la sección 15 ya cerradas
+**Fecha:** Agosto 2026 — v1.1, con las decisiones de la sección 15 ya cerradas. **Actualizado 2026-09-10** (v1.2): RF-15/16/17 (selección de sucursal, turnos, alta de admin inicial de tenant) documentados por primera vez — existían en código desde antes de esta actualización, ver nota al final de la sección 3.
 
 ---
 
@@ -52,8 +52,8 @@ La forma correcta de que un mismo sistema sirva a un restaurante de barrio y a u
 
 - **Carta digital**: categorías, ítems con foto/descripción/precio, variantes (tamaño, extras), disponibilidad en tiempo real (marcar "agotado" sin borrar el ítem).
 - **Comanda digital desde la mesa**: el cliente arma un carrito y lo envía; el pedido llega en vivo al panel del restaurante con el número de mesa.
-- **Panel del restaurante**: gestión de carta, gestión de mesas (generación de QR por mesa), vista de pedidos en vivo con cambio de estado (recibido → en preparación → entregado), gestión de usuarios internos con roles.
-- **Panel super-admin (de ustedes)**: alta/baja de restaurantes (tenants), asignación de plan, ver uso vs. límites del plan.
+- **Panel del restaurante**: gestión de carta, gestión de mesas (generación de QR por mesa), vista de pedidos en vivo con cambio de estado (recibido → en preparación → entregado), gestión de usuarios internos con roles, gestión de sucursales (RF-10, ver también RF-15), control de turnos y horas trabajadas (RF-16).
+- **Panel super-admin (de ustedes)**: alta/baja de restaurantes (tenants), asignación de plan, ver uso vs. límites del plan, alta del admin inicial de un tenant nuevo (RF-17).
 
 ### Explícitamente NO incluido en el MVP
 
@@ -81,8 +81,13 @@ Si el equipo comercial promete algo de esta lista a un cliente antes de que exis
 | RF-12 | Auditoría | Todo cambio de precio en la carta queda registrado (quién, cuándo, valor anterior/nuevo). |
 | RF-13 | Comensal/CRM | Al confirmar el pedido, se captura nombre y teléfono del comensal, con casilla de consentimiento explícito para uso futuro de esos datos (fidelización/marketing) — ver nota de compliance en §10. |
 | RF-14 | Comensal/CRM | El comensal puede confirmar el pedido sin dar nombre/teléfono si así lo decide el negocio (campo opcional) **a menos que** el restaurante configure ese dato como obligatorio para su operación (por ejemplo, para llamar al cliente si el pedido tiene un problema). |
+| RF-15 | Sucursales | Un usuario con rol `mesero` debe elegir una sucursal, entre las que un `admin_restaurante` le haya asignado, antes de poder ver u operar Mesas/Pedidos/Carta — la elección viaja como claim `sucursalId` en el access token vigente (no se re-valida contra la base en cada request, ver el trade-off documentado en §10) y se puede volver a elegir en cualquier momento desde el panel. `admin_restaurante` nunca necesita elegir: opera todas las sucursales de su tenant sin restricción. |
+| RF-16 | Personal | Un usuario interno puede marcar entrada/salida de turno desde el panel; el sistema calcula horas trabajadas por día a partir de esas marcas, visibles para `admin_restaurante` por usuario. Un turno sin cerrar se cierra solo a las 12h de iniciado y se atribuye al día calendario en que empezó (ver nota de diseño en §9). |
+| RF-17 | Onboarding | Un tenant nuevo puede recibir un usuario `admin_restaurante` inicial sin que el super-admin tenga que crearlo manualmente usuario por usuario. |
 
-Nota sobre RF-13/RF-14: ustedes decidieron capturar nombre y teléfono del comensal para CRM/fidelización futura, no el camino "pedido anónimo" que yo recomendaba para el MVP. Lo respeto como decisión de negocio, pero tiene un costo que no pueden dejar para después: desde el primer pedido capturado ya están tratando datos personales bajo el régimen de Habeas Data colombiano (Ley 1581 de 2012), lo que exige, como mínimo, aviso de privacidad, registro del consentimiento (no un checkbox marcado por defecto) y un mecanismo real para que el comensal pueda pedir que se borren sus datos. Esto es trabajo de Fase 1, no de Fase 4, precisamente porque decidieron capturar el dato desde el MVP.
+**Nota sobre RF-15/16/17 (agregada 2026-09-10):** las tres ya estaban construidas y en producción-de-facto en `main` antes de escribirse en esta tabla — RF-15 y la asignación mesero↔sucursal que lo sostiene llevan varios PRs de trabajo real (incluida cobertura de tests de autorización), RF-16 salió de un pedido informal de uno de los desarrolladores documentado solo en un comentario de código, y RF-17 de un `TenantAdminInicialController` sin ninguna mención fuera del código. Esta tabla dejó de ser la fuente de verdad de lo que existe realmente en el sistema durante varias semanas — la regla nueva en `CONTRIBUTING.md` ("si tu PR agrega un requisito real, actualizá esta tabla en el mismo PR") es la forma de que no vuelva a pasar, no una formalidad.
+
+Nota sobre RF-13/RF-14: ustedes decidieron capturar nombre y teléfono del comensal para CRM/fidelización futura, no el camino "pedido anónimo" que yo recomendaba para el MVP. Lo respeto como decisión de negocio, pero tiene un costo que no pueden dejar para después: desde el primer pedido capturado ya están tratando datos personales bajo el régimen de Habeas Data colombiano (Ley 1581 de 2012), lo que exige, como mínimo, aviso de privacidad, registro del consentimiento (no un checkbox marcado por defecto) y un mecanismo real para que el comensal pueda pedir que se borren sus datos. Esto es trabajo de Fase 1, no de Fase 4, precisamente porque decidieron capturar el dato desde el MVP. Ver borrador de aviso de privacidad y política de retención en §15.3.
 
 Esta tabla es un punto de partida deliberadamente incompleto — cuando empiecen a construir van a descubrir requisitos que no están aquí (por ejemplo: ¿qué pasa con un pedido si el cliente cierra la pestaña antes de que el mesero lo confirme? ¿se cancela solo? ¿queda pendiente para siempre?). Añadan esos casos a esta tabla a medida que aparecen, no los resuelvan solo en el código.
 
@@ -153,12 +158,12 @@ flowchart TB
 | Persistencia | Spring Data JPA + Hibernate | Ver §6 para la estrategia de filtrado por tenant — **este es el punto donde más fácil se filtran datos entre restaurantes si no se hace con disciplina**. |
 | Migraciones DB | Flyway | Obligatorio desde el commit inicial. Nada de `ddl-auto: update` en ningún ambiente que no sea el laptop de desarrollo. |
 | Base de datos | MySQL 8 | Coherente con la experiencia de ambos desarrolladores. |
-| Cache / sesiones de mesa | Redis | Cache de carta (lectura muy frecuente, escritura poco frecuente) y almacenamiento de sesión de mesa con expiración. |
-| Tiempo real | WebSocket (STOMP sobre SockJS) | Solo para el canal de "pedido nuevo" hacia el panel del restaurante. Evalúen si el MVP puede arrancar con *polling corto* (cada 5-8s) en vez de WebSocket — es más simple de operar con equipo chico y para un MVP con pocos tenants el ahorro de latencia no justifica la complejidad operativa todavía. |
-| Frontend | React 18 + TypeScript + Vite | TS no es opcional en un equipo de 2 personas: sin tipos, el segundo desarrollador hereda bugs de contrato de API que un compilador atraparía gratis. |
+| Cache / sesiones de mesa | Redis | Cache de carta (lectura muy frecuente, escritura poco frecuente) y almacenamiento de sesión de mesa con expiración. Provisionado en `docker-compose.yml` desde el inicio, pero al 2026-09-10 todavía no hay ninguna dependencia de Redis en el backend — no se está usando en código, no hace falta levantarlo hasta que algo lo consuma de verdad. |
+| Tiempo real | WebSocket (STOMP sobre SockJS) | Solo para el canal de "pedido nuevo" hacia el panel del restaurante. Evalúen si el MVP puede arrancar con *polling corto* (cada 5-8s) en vez de WebSocket — es más simple de operar con equipo chico y para un MVP con pocos tenants el ahorro de latencia no justifica la complejidad operativa todavía. (Al 2026-09-10, `PedidosPage.jsx` sigue con polling, no WebSocket — consistente con esta recomendación.) |
+| Frontend | React 18 + TypeScript + Vite | TS no es opcional en un equipo de 2 personas: sin tipos, el segundo desarrollador hereda bugs de contrato de API que un compilador atraparía gratis. **Nota 2026-09-10**: el código real de `app-admin`/`app-cliente` es JSX, no TSX — decisión que se tomó en la práctica sin volver a este documento; si fue deliberada, dejarlo escrito acá en vez de que quede como una divergencia silenciosa entre lo decidido y lo construido. |
 | Estado / data fetching | TanStack Query | Evita reinventar cache de red y reintentos a mano. |
-| Contenedores | Docker + docker-compose para desarrollo | Un solo `docker-compose up` debe levantar backend + MySQL + Redis para cualquiera de los dos devs. |
-| CI/CD | GitHub Actions | Build + tests + lint en cada PR como mínimo no negociable. |
+| Contenedores | Docker + docker-compose para desarrollo | Un solo `docker-compose up` debe levantar backend + MySQL + Redis para cualquiera de los dos devs. **Nota 2026-09-10**: el servicio `backend` del `docker-compose.yml` real está comentado — hoy `docker-compose up` solo levanta MySQL y Redis, no el backend. El backend se corre aparte con Maven (perfil `dev,h2` sin Docker, o perfil `dev` contra el MySQL del compose). Decidir si vale la pena descomentar el servicio o si dejarlo así es la norma. |
+| CI/CD | GitHub Actions | Build + tests + lint en cada PR como mínimo no negociable. Ya implementado y ya bloqueando merges de verdad (encontró bugs reales de autorización antes de mergear, ver `docs/auditoria-tecnica-2026-09-08.md §1.1`). |
 | Hosting sugerido | Un único VPS/instancia gestionada al inicio (ej. Railway, Render, o una instancia EC2/DigitalOcean simple) | No monten Kubernetes para 3 clientes piloto. Es sobre-ingeniería que va a consumir tiempo de desarrollo de producto. |
 
 Sobre el Python del segundo desarrollador: no lo metan en el core transaccional (menú, pedidos, tenants). Resérvenlo para scripts auxiliares fuera del camino crítico (ETL de reportes, análisis de datos de uso) si en algún momento hace falta. Meter dos lenguajes en el backend principal de un equipo de 2 personas duplica la carga cognitiva para cero beneficio funcional en esta etapa.
@@ -177,9 +182,9 @@ Hay tres estrategias estándar:
 
 **Recomendación**: arrancar con **schema compartido + `tenant_id`** para todos los tenants, con la fila `tenant_id` presente en cada tabla del dominio de negocio y **enforcement centralizado** (un `Filter` de Hibernate o un aspecto que inyecta la condición de tenant en cada consulta, no confiar en que cada desarrollador se acuerde de agregar el `WHERE tenant_id = ?` a mano en cada repositorio nuevo). Dejar la puerta abierta a mover un tenant Enterprise específico a schema aislado más adelante si lo exige un contrato — pero no construir eso ahora.
 
-**El riesgo #1 de este diseño, dicho sin rodeos**: una sola query sin el filtro de tenant es una fuga de datos entre restaurantes — el mesero del restaurante A ve pedidos del restaurante B. Esto no es hipotético, es el bug más común en SaaS multi-tenant mal implementados. Mitigación obligatoria, no opcional:
+**El riesgo #1 de este diseño, dicho sin rodeos**: una sola query sin el filtro de tenant es una fuga de datos entre restaurantes — el mesero del restaurante A ve pedidos del restaurante B. Esto no es hipotético, es el bug más común en SaaS multi-tenant mal implementados, y de hecho ya pasó una vez en este proyecto (una fuga real vía `SUPER_ADMIN` en los listados de menú/mesa/pedido, encontrada y corregida el 2026-09-02). Mitigación obligatoria, no opcional:
 
-- Todo repositorio de acceso a datos de negocio pasa por una capa que aplica el filtro de tenant automáticamente (Hibernate `@Filter` a nivel de sesión, o un aspecto AOP).
+- Todo repositorio de acceso a datos de negocio pasa por una capa que aplica el filtro de tenant automáticamente (Hibernate `@Filter` a nivel de sesión, o un aspecto AOP) **y además** un guardia explícito (`tenantActual()`/`perteneceAlTenantActual()`) en cada método de servicio — no confiar solo en el filtro de Hibernate, que no se activa en todos los contextos (ej. `@DataJpaTest`).
 - Test automatizado específico: "usuario del tenant A no puede leer ni escribir recursos del tenant B", corrido en cada build, no solo probado manualmente una vez.
 - Ninguna query nativa (`@Query nativeQuery=true`) sin revisión explícita de que incluye el filtro de tenant.
 
@@ -201,11 +206,26 @@ erDiagram
     }
     SUCURSAL ||--o{ MESA : tiene
     SUCURSAL ||--o{ CATEGORIA_MENU : define
+    SUCURSAL ||--o{ ASIGNACION_SUCURSAL : autoriza
     SUCURSAL {
         bigint id PK
         bigint tenant_id FK
         string nombre
         string direccion
+        boolean activa
+    }
+    USUARIO_INTERNO ||--o{ ASIGNACION_SUCURSAL : recibe
+    USUARIO_INTERNO ||--o{ TURNO : marca
+    ASIGNACION_SUCURSAL {
+        bigint id PK
+        bigint usuario_interno_id FK
+        bigint sucursal_id FK
+    }
+    TURNO {
+        bigint id PK
+        bigint usuario_interno_id FK
+        datetime entrada
+        datetime salida "nullable si el turno sigue abierto"
     }
     CATEGORIA_MENU ||--o{ ITEM_MENU : agrupa
     ITEM_MENU ||--o{ VARIANTE_ITEM : ofrece
@@ -271,6 +291,8 @@ Notas de diseño que no son obvias mirando el diagrama:
 - Borrado de `ITEM_MENU` referenciado por pedidos históricos: **soft delete** (`activo = false`), nunca hard delete, o van a romper la integridad referencial de pedidos pasados.
 - `COMENSAL` es una entidad **por tenant, no global**: el mismo número de teléfono en dos restaurantes distintos son dos registros `COMENSAL` distintos, sin cruce de datos entre tenants — cualquier tentación de "unificar" comensales entre restaurantes para enriquecer un perfil global es, otra vez, una fuga de datos entre tenants (§6), esta vez de datos personales de terceros, que es peor. Ni lo consideren sin asesoría legal explícita.
 - `comensal_id` en `PEDIDO` es nullable a propósito: RF-14 permite que el comensal no dé sus datos, así que el modelo no puede forzar la relación.
+- `ASIGNACION_SUCURSAL` (RF-15) es la tabla que autoriza a un `USUARIO_INTERNO` con rol MESERO a elegir una `SUCURSAL` para trabajar — desasignar a alguien no borra su historial de pedidos ni de turnos, solo le quita la opción de volver a elegir esa sucursal a futuro. **No se borra al desactivar la sucursal** (a propósito, para poder auditar quién quedó asignado a una sucursal ya cerrada) — ver el gap de UI abierto sobre esto en el backlog del proyecto.
+- `TURNO` (RF-16): `salida` nullable mientras el turno sigue abierto. Un turno se cierra solo (sin intervención del usuario) a las 12 horas de `entrada` si nadie marcó salida antes, y se atribuye siempre al día calendario de `entrada` — decisión explícita para no partir a la mitad un turno real de un restaurante que cierra pasada la medianoche.
 
 ---
 
@@ -290,8 +312,15 @@ Autenticación: JWT de acceso (vida corta, ~15 min) + refresh token (vida larga,
 | POST | `/api/admin/mesas` | Generar mesa + QR. |
 | GET/POST | `/api/superadmin/tenants` | Alta y listado de tenants (uso exclusivo del equipo). |
 | PATCH | `/api/superadmin/tenants/{id}/plan` | Cambiar plan/límites de un tenant. |
+| POST | `/api/admin/sesion/sucursal` | RF-15: el MESERO autenticado elige una sucursal entre las que tiene asignadas; reemite el access token con el claim `sucursalId`. También la usa `admin_restaurante` para "enfocar" su sesión en una sucursal activa. |
+| GET | `/api/admin/sucursales/{id}/usuarios` | RF-15: usuarios (MESERO) asignados a una sucursal — funciona aunque la sucursal esté inactiva, para poder auditar asignaciones existentes. |
+| GET | `/api/admin/usuarios/{id}/sucursales` | RF-15: sucursales asignadas a un usuario interno — incluye inactivas, mismo motivo. |
+| PUT/DELETE | `/api/admin/usuarios/{id}/sucursales/{sucursalId}` | RF-15: asignar/desasignar una sucursal a un MESERO. |
+| PATCH | `/api/admin/sesion/turno/entrada` y `/api/admin/sesion/turno/salida` | RF-16: marcar inicio/fin del turno del usuario autenticado (`SesionController`). |
+| GET | `/api/admin/usuarios/{id}/turnos?dias=` | RF-16: horas trabajadas por día de un usuario, últimos N días (`UsuarioInternoAdminController`). |
+| POST | `/api/superadmin/tenants/{id}/admin-inicial` *(ruta exacta sin confirmar — verificar contra `TenantAdminInicialController.java`)* | RF-17: alta del primer usuario `admin_restaurante` de un tenant nuevo, sin pasar por el flujo genérico de creación de usuarios. |
 
-Canal WebSocket: `/ws/sucursales/{sucursalId}/pedidos` — el panel del restaurante se suscribe y recibe eventos `PEDIDO_CREADO` / `PEDIDO_ACTUALIZADO`. El backend valida que el usuario suscrito pertenece al `tenant`/`sucursal` antes de aceptar la suscripción (mismo riesgo de fuga entre tenants que en REST, aplica igual acá).
+Canal WebSocket: `/ws/sucursales/{sucursalId}/pedidos` — el panel del restaurante se suscribe y recibe eventos `PEDIDO_CREADO` / `PEDIDO_ACTUALIZADO`. El backend valida que el usuario suscrito pertenece al `tenant`/`sucursal` antes de aceptar la suscripción (mismo riesgo de fuga entre tenants que en REST, aplica igual acá). **Nota 2026-09-10**: este canal sigue sin implementarse — `PedidosPage.jsx` usa polling corto, consistente con la sugerencia de §5.2 de arrancar así antes de justificar WebSocket con datos reales de uso.
 
 ---
 
@@ -307,6 +336,8 @@ Nada de esto es opcional ni "para después" — son la diferencia entre un siste
 - **Cambio de menú mientras el cliente lo tiene abierto en el celular** → no es crítico resolverlo con websockets de carta (over-engineering para el MVP); alcanza con que el servidor sea la fuente de verdad al momento de confirmar el pedido (ya cubierto por RF-05).
 - **Un tenant Starter crece de golpe a 40 sucursales** → el modelo de shared-schema debe soportar esto sin cambio de esquema; solo cambia el `plan` y los límites. La migración a schema aislado (si hiciera falta) es un proceso operativo aparte, no algo que el modelo de datos deba prever con código especial ahora.
 - **Borrado de un ítem de menú con pedidos históricos** → soft delete, ya cubierto en §7.
+- **Un turno que nadie cierra** (RF-16, el mesero se olvida de marcar salida) → se cierra solo a las 12h desde su inicio y se atribuye al día en que empezó, nunca se corta a medianoche — un restaurante que cierra pasada la medianoche tiene turnos reales que cruzan de día calendario, cortar ahí los partiría a la mitad sin razón real.
+- **Una sucursal se desactiva mientras un MESERO sigue con la pestaña abierta operando ahí** → ver el trade-off de revocación no instantánea documentado en §10, y el gap de visibilidad de esas asignaciones desde la UI de administración (backlog del proyecto, sin resolver al 2026-09-10).
 
 ---
 
@@ -319,8 +350,9 @@ Nada de esto es opcional ni "para después" — son la diferencia entre un siste
 - **CORS**: configurado explícitamente para los dominios del frontend, no `*` en producción.
 - **Rol super-admin**: separado del resto de roles, con 2FA si es posible — es la cuenta que puede ver/tocar todos los tenants.
 - **Auditoría**: cambios de precio, cambios de plan y suspensiones de tenant quedan registrados con usuario y timestamp (RF-12).
-- **Datos personales del comensal (RF-13)**: al decidir capturar nombre y teléfono, `COMENSAL` (§7) requiere cifrado en reposo del teléfono (no es información pública como el nombre de un plato), acceso restringido por rol (un `mesero` no necesita ver el teléfono completo, un `admin_restaurante` sí), y un endpoint de borrado a solicitud del titular que efectivamente elimine el dato, no solo lo oculte en la UI.
-- **Revocación de acceso a sucursal no es instantánea (nota agregada 2026-09-08, tras auditoría)**: la selección de sucursal de un MESERO (RF-10 PR4) vive en el claim `sucursalId` del access token JWT, no se re-valida contra la base en cada request. Si un ADMIN_RESTAURANTE desactiva una sucursal o le quita la asignación a un MESERO, ese MESERO sigue operando con normalidad sobre esa sucursal hasta que su access token expira (hasta `app.jwt.expiracion-acceso-ms`, 15 minutos por defecto) y el frontend reintenta la reselección automática — que sí revalida contra la base (ver `AuthService.seleccionarSucursal`) y en ese momento lo bloquea. Trade-off aceptado explícitamente de un diseño stateless: si algún caso de uso real exige revocación más rápida (ej. offboarding de un mesero problemático a mitad de turno), la opción más barata es bajar ese TTL sin tocar arquitectura; la alternativa (revalidar contra BD en cada request de `MesaService`/`PedidoService`) reintroduce una consulta por request a cambio de cerrar la ventana del todo.
+- **Datos personales del comensal (RF-13)**: al decidir capturar nombre y teléfono, `COMENSAL` (§7) requiere cifrado en reposo del teléfono (no es información pública como el nombre de un plato), acceso restringido por rol (un `mesero` no necesita ver el teléfono completo, un `admin_restaurante` sí), y un endpoint de borrado a solicitud del titular que efectivamente elimine el dato, no solo lo oculte en la UI. **Estado al 2026-09-10**: el cifrado (AES-256-GCM, con rotación de clave) y el registro explícito del consentimiento ya están implementados. El endpoint de borrado real sigue en una rama local sin pushear (ver backlog del proyecto) y el control de "el mesero no ve el teléfono completo" todavía no está aplicado en el DTO que se le sirve al frontend — pendiente en esa misma rama.
+- **Revocación de acceso a sucursal no es instantánea (RF-15, nota agregada 2026-09-08, tras auditoría)**: la selección de sucursal de un MESERO vive en el claim `sucursalId` del access token JWT, no se re-valida contra la base en cada request. Si un ADMIN_RESTAURANTE desactiva una sucursal o le quita la asignación a un MESERO, ese MESERO sigue operando con normalidad sobre esa sucursal hasta que su access token expira (hasta `app.jwt.expiracion-acceso-ms`, 15 minutos por defecto) y el frontend reintenta la reselección automática — que sí revalida contra la base (ver `AuthService.seleccionarSucursal`) y en ese momento lo bloquea. Trade-off aceptado explícitamente de un diseño stateless: si algún caso de uso real exige revocación más rápida (ej. offboarding de un mesero problemático a mitad de turno), la opción más barata es bajar ese TTL sin tocar arquitectura; la alternativa (revalidar contra BD en cada request de `MesaService`/`PedidoService`) reintroduce una consulta por request a cambio de cerrar la ventana del todo.
+- **Content-Security-Policy: todavía no implementada (hallazgo abierto, `auditoria-tecnica-2026-09-08.md §1.5`)**. Ambos tokens JWT viven en `localStorage`, no en cookies `httpOnly` (decisión razonable, no hay CSRF que mitigar) — pero eso hace que el único perímetro real contra robo de sesión sea "que nunca haya XSS". Agregar una CSP básica (`default-src 'self'`) es barato y sigue pendiente.
 
 ---
 
@@ -328,28 +360,31 @@ Nada de esto es opcional ni "para después" — son la diferencia entre un siste
 
 Con un equipo de 2 personas es tentador saltarse esto "por ahora". No lo hagan — es más barato construirlo desde el día 1 que reconstruirlo cuando ya hay clientes reales dependiendo del sistema y un incidente en producción sin logs útiles.
 
-- **Logging estructurado** (JSON) desde el primer commit, con `tenant_id` y `request_id` en cada línea para poder rastrear un incidente de un cliente específico.
-- **Métricas** (Micrometer + Prometheus/Grafana, o el equivalente gestionado del proveedor de hosting elegido): latencia de API, tasa de error, pedidos creados por minuto.
-- **Health checks** (`/actuator/health`) conectados a lo que sea que use el hosting para reiniciar instancias caídas.
-- **Backups de MySQL automatizados y probados**: un backup que nunca se restauró en un ensayo no es un backup, es una suposición.
-- **Migraciones versionadas con Flyway desde el commit inicial** — no dejar que la base de datos de producción diverja del código por ediciones manuales "rápidas".
+- **Logging estructurado** (JSON) desde el primer commit, con `tenant_id` y `request_id` en cada línea para poder rastrear un incidente de un cliente específico. Ya implementado, incluido el catch-all de excepciones no previstas (resuelto 2026-09-08, ver `auditoria-tecnica-2026-09-08.md §1.2`).
+- **Métricas** (Micrometer + Prometheus/Grafana, o el equivalente gestionado del proveedor de hosting elegido): latencia de API, tasa de error, pedidos creados por minuto. Sin implementar.
+- **Health checks** (`/actuator/health`) conectados a lo que sea que use el hosting para reiniciar instancias caídas. Sin implementar.
+- **Backups de MySQL automatizados y probados**: un backup que nunca se restauró en un ensayo no es un backup, es una suposición. Sin implementar — es infraestructura, no código, pero exactamente el tipo de cosa que "nadie prioriza hasta que ya es tarde".
+- **Migraciones versionadas con Flyway desde el commit inicial** — no dejar que la base de datos de producción diverja del código por ediciones manuales "rápidas". Implementado.
 - **Deuda técnica a vigilar activamente en un monolito modular**: sin disciplina, los módulos (`menu`, `pedidos`, `tenant`) empiezan a llamarse entre sí sin control y en 6 meses ya no hay límites reales entre ellos. Definan desde el inicio qué puede importar qué (por ejemplo, con reglas de arquitectura tipo ArchUnit) para no perder la separación que justifica llamarlo "modular".
 
 ---
 
-## 12. Estructura de repositorio sugerida
+## 12. Estructura de repositorio (real al 2026-09-10)
 
 ```
 backend/
-  tenant/          -> gestión de tenants, planes, límites
+  tenant/          -> gestión de tenants, planes, límites, alta de admin inicial (RF-17)
+  identidad/       -> usuarios, roles, JWT, asignación mesero↔sucursal (RF-15)
   menu/            -> categorías, ítems, variantes
-  pedidos/         -> comanda, estados, websocket
-  identidad/       -> usuarios, roles, JWT
-  notificaciones/  -> (futuro) email/whatsapp de confirmación
+  mesa/            -> mesas, códigos QR
+  sucursal/        -> sucursales, selección obligatoria para MESERO (RF-15)
+  pedido/          -> comanda, estados, datos del comensal (RF-13/14)
+  turno/           -> marcar entrada/salida, horas trabajadas (RF-16)
+  notificaciones/  -> (futuro) email/whatsapp de confirmación, todavía sin código
   common/          -> filtros de tenant, manejo de errores, config compartida
 frontend/
-  app-cliente/     -> SPA pública (carta + carrito), sin login
-  app-admin/       -> SPA panel restaurante + super-admin
+  app-cliente/     -> SPA pública (carta + carrito), sin login — todavía sin código
+  app-admin/       -> SPA panel restaurante + super-admin — implementada
 ```
 
 Dos frontends separados (no uno solo con rutas condicionales) porque tienen audiencias, requisitos de auth y ciclos de release distintos — el cliente final nunca necesita build de las pantallas de admin.
@@ -399,10 +434,22 @@ Sugeridas como punto de partida, no como objetivo ya validado: % de mesas que us
 Cerrar estas cuatro preguntas de negocio no cierra todas las preguntas abiertas — solo las que dependían de una decisión que ustedes podían tomar directamente en una conversación. Estas otras necesitan trabajo (números, texto legal, o una prueba con el cliente piloto) antes de la Fase 1:
 
 - **El precio en COP de cada plan** (§1.2) — requiere calcular costo real de servir a un tenant, no solo elegir un número que "suene bien".
-- **El texto del aviso de privacidad y el flujo de consentimiento** para RF-13 — esto es trabajo legal, no de arquitectura; no lo escriban ustedes mismos sin revisión, es la parte del sistema con más exposición si sale mal.
-- **Cuánto tiempo se retienen los datos del comensal** si nunca vuelve a pedir — Habeas Data exige que la retención tenga un propósito y un límite, "para siempre por si acaso" no es una respuesta válida.
+- **El texto del aviso de privacidad y el flujo de consentimiento** para RF-13 — esto es trabajo legal, no de arquitectura; no lo escriban ustedes mismos sin revisión, es la parte del sistema con más exposición si sale mal. Ver §15.3 para un borrador de partida — **no es texto legal final, no publicarlo sin que un abogado lo revise**.
+- **Cuánto tiempo se retienen los datos del comensal** si nunca vuelve a pedir — Habeas Data exige que la retención tenga un propósito y un límite, "para siempre por si acaso" no es una respuesta válida. Ver propuesta técnica en §15.3.
 - **Quién de los dos atiende soporte y cuándo** (mencionado en §13) — no técnico, pero sin esto el primer sábado con dos restaurantes reclamando a la vez va a definirlo por ustedes, de la peor manera.
+
+### 15.3 Borrador de aviso de privacidad y de política de retención (RF-13/14) — agregado 2026-09-10
+
+**Esto NO es asesoría legal ni texto listo para publicar.** Es un punto de partida técnico para que la revisión legal real (obligatoria antes de usar cualquiera de los dos en producción, Ley 1581 de 2012) tenga algo concreto sobre qué trabajar, en vez de arrancar de una hoja en blanco. Ningún desarrollador de este equipo debería considerarse autorizado a decidir esto por su cuenta.
+
+**Borrador de aviso de privacidad** (para mostrar en el paso de checkout, junto al campo de teléfono, antes de que el comensal confirme el pedido):
+
+> *"Vamos a usar tu nombre y teléfono para confirmarte este pedido. Si marcás la casilla de abajo, [NOMBRE DEL RESTAURANTE] también puede escribirte por WhatsApp/SMS sobre promociones o novedades — podés pedir que dejemos de hacerlo o que borremos tus datos en cualquier momento escribiendo a [CANAL DE CONTACTO]. Tratamos tus datos conforme a la Ley 1581 de 2012 (Habeas Data)."*
+
+Puntos que la revisión legal tiene que confirmar o corregir, no asumir resueltos por este borrador: si hace falta un texto separado y más largo (una "política de privacidad" completa, no solo el aviso corto en el flujo), qué canal de contacto es válido para ejercer el derecho de borrado/rectificación bajo la ley colombiana, y si el consentimiento de marketing necesita ser una casilla separada del consentimiento de "tratar el dato para confirmar el pedido" (probablemente sí — confirmar dos consentimientos distintos, no uno solo).
+
+**Propuesta técnica de retención** (punto de partida, no una política ya decidida): retener los datos de un `COMENSAL` mientras tenga al menos un `PEDIDO` en los últimos 24 meses; pasado ese período sin actividad, anonimizar el registro (borrar `nombre`/`telefono`, dejar el `id` y los `PEDIDO` históricos intactos para no romper reportes) en vez de hacer hard delete. El borrado a solicitud explícita del titular (el endpoint que sigue pendiente de pushear, ver backlog del proyecto) debe poder saltarse ese plazo y anonimizar de inmediato cuando lo pide el propio comensal — la ventana de 24 meses es solo para el caso de "nunca pidió que se borre, pero tampoco volvió". El número de 24 meses es una propuesta de trabajo, no un mínimo ni un máximo legal — confirmarlo en la misma revisión legal del aviso de privacidad.
 
 ---
 
-*Documento vivo: a medida que el equipo tome decisiones sobre las preguntas de la sección 15.2, o descubra requisitos no listados en la sección 3, este documento debería actualizarse — no debería quedar como una foto fija de agosto 2026 mientras el producto cambia debajo.*
+*Documento vivo: a medida que el equipo tome decisiones sobre las preguntas de la sección 15.2, o descubra requisitos no listados en la sección 3, este documento debería actualizarse — no debería quedar como una foto fija de agosto 2026 mientras el producto cambia debajo. La actualización de 2026-09-10 (RF-15/16/17) es exactamente el tipo de retraso que esta nota pide evitar: existían en código semanas antes de llegar acá.*
