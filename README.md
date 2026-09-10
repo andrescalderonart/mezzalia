@@ -4,7 +4,7 @@ Plataforma SaaS multi-tenant de carta digital y comanda desde la mesa, vía QR. 
 
 ## Estado actual (actualizado 2026-09-10)
 
-Ya no es Fase 0. Hay lógica real y con tests en `tenant`, `identidad`, `menu`, `mesa`, `pedido`, `sucursal` y `turno`. `app-admin` (panel del restaurante) está construido: login, gestión de carta, mesas, pedidos en vivo, usuarios internos, sucursales, asignación mesero↔sucursal, y control de turnos/horas trabajadas. `app-cliente` (la SPA pública del comensal) sigue siendo un stub sin código — es lo único que todavía corresponde a Fase 0.
+Ya no es Fase 0. Hay lógica real y con tests en `tenant`, `identidad`, `menu`, `mesa`, `pedido`, `sucursal` y `turno`. `app-admin` (panel del restaurante) está construido: login, gestión de carta, mesas, pedidos en vivo, usuarios internos, sucursales, asignación mesero↔sucursal, y control de turnos/horas trabajadas. `app-cliente` (la SPA pública del comensal) está implementada: carta con navegación por categorías (scroll-spy vía `IntersectionObserver`), carrito con selector de cantidad, checkout con captura de datos del comensal gateada por consentimiento explícito (RF-13 — sin consentimiento, `comensal` va como `null`, nunca como objeto vacío), idempotency key en la creación del pedido y pantalla de confirmación.
 
 ## Estructura
 
@@ -25,7 +25,7 @@ backend/
     application-h2.yml    Perfil `h2`: levanta todo sin Docker/MySQL, para dev local (ver más abajo)
     db/migration/          Migraciones Flyway, versionadas desde el commit inicial
 frontend/
-  app-cliente/       SPA pública: carta + carrito, sin login (React + Vite) — todavía sin código
+  app-cliente/       SPA pública: carta + carrito + checkout, sin login (React + Vite) — implementada
   app-admin/         SPA panel restaurante + super-admin (React + Vite) — implementada
 docs/
   documentacion-tecnica.md          Requisitos, arquitectura, modelo de datos, API, roadmap
@@ -78,7 +78,7 @@ Si `backend/data/` viene de antes de un pull que agregó una columna `NOT NULL` 
 
 Usuarios demo del perfil `dev`: `admin.demo` / `Demo1234!` (ADMIN_RESTAURANTE) y `mesero.demo` / `Demo1234!` (MESERO).
 
-## Cómo levantar el frontend (app-admin)
+## Cómo levantar el frontend (app-admin y app-cliente)
 
 ```powershell
 cd frontend/app-admin
@@ -88,7 +88,15 @@ npm run dev
 
 Abre `http://localhost:5173`. Vite hace de proxy de `/api` y `/uploads` hacia `http://localhost:8080` (ver `vite.config.js`).
 
-`app-cliente` todavía no tiene código — no hay nada que levantar ahí todavía.
+Para levantar `app-cliente`:
+
+```powershell
+cd frontend/app-cliente
+npm install
+npm run dev
+```
+
+Vite le asigna otro puerto si `5173` ya está ocupado por `app-admin` (en este equipo cae en `5174`). La carta de una mesa se accede vía `/carta/{token}` (ej. `http://localhost:5174/carta/{token}`), token que genera `app-admin` al crear una sesión de mesa (RF-08, QR con validez de 4 horas); un token inválido o vencido muestra una pantalla de error ("No pudimos abrir la carta") en vez de una página en blanco. Para probar desde un teléfono real en la misma red Wi-Fi, `app-admin` necesita apuntar a la IP LAN de `app-cliente` en vez de `localhost` (que en el celular resuelve al celular mismo, no a tu máquina) — configurar `VITE_APP_CLIENTE_URL` en `frontend/app-admin/.env.local`.
 
 ## Próximos pasos
 
