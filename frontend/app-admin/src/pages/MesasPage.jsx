@@ -4,7 +4,11 @@ import { useAuth, useApiJson } from '../context/AuthContext.jsx'
 
 // Sin esta variable de entorno, cae a localhost:5174 (puerto de dev de
 // app-cliente) -- sirve para desarrollar, pero un QR pensado para imprimir
-// en producción necesita el dominio público real. Ver .env.example.
+// en producción necesita el dominio público real. Ver .env.example. Para
+// probar con un celular real en la misma red Wi-Fi que esta laptop, hace
+// falta apuntar a la IP de LAN (ver .env.local), no a localhost -- un
+// celular resolviendo "localhost" se apunta a sí mismo, nunca a esta
+// máquina.
 const URL_APP_CLIENTE = import.meta.env.VITE_APP_CLIENTE_URL || 'http://localhost:5174'
 
 const formatoHora = new Intl.DateTimeFormat('es-CO', { hour: '2-digit', minute: '2-digit' })
@@ -28,11 +32,14 @@ export default function MesasPage() {
   const [sucursales, setSucursales] = useState([])
   const [sucursalId, setSucursalId] = useState('')
 
-  // sesiones[mesaId] = { token, expiraEn } -- solo lo que se generó en ESTA
-  // sesión del navegador. No hay endpoint para "recuperar" un token viejo a
-  // propósito (ver MesaService.generarSesion en el backend): una vez
-  // impreso, el panel no necesita volver a mostrar el mismo QR salvo que se
-  // regenere explícitamente.
+  // sesiones[mesaId] = { token, expiraEn }. Se hidrata en cargarMesas()
+  // desde `mesa.sesionActiva` (GET /api/admin/mesas ya la incluye, ver
+  // MesaAdminController.listarMesas) para que un refresh de página no
+  // muestre "sin QR" en una mesa que ya tiene uno impreso y vigente --
+  // antes de esto, este estado SOLO se llenaba con lo generado en la
+  // misma pestaña del navegador, y no había forma de recuperarlo sin
+  // regenerar (lo que invalida el QR físico ya pegado en la mesa, ver
+  // MesaService.generarSesion).
   const [sesiones, setSesiones] = useState({})
   const [generandoId, setGenerandoId] = useState(null)
   const [mesaImprimiendo, setMesaImprimiendo] = useState(null)
@@ -43,6 +50,15 @@ export default function MesasPage() {
     try {
       const datos = await apiJson('/api/admin/mesas')
       setMesas(datos)
+      setSesiones((prev) => {
+        const hidratadas = { ...prev }
+        datos.forEach((mesa) => {
+          if (mesa.sesionActiva) {
+            hidratadas[mesa.id] = mesa.sesionActiva
+          }
+        })
+        return hidratadas
+      })
     } catch (e) {
       setError(e.message)
     } finally {
@@ -103,6 +119,12 @@ export default function MesasPage() {
   }
 
   async function onGenerarSesion(mesa) {
+    if (
+      sesiones[mesa.id] &&
+      !window.confirm('Ya hay un QR vigente para esta mesa. Regenerarlo invalida el que esté impreso -- ¿seguro?')
+    ) {
+      return
+    }
     setGenerandoId(mesa.id)
     setError('')
     try {

@@ -16,7 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -159,6 +162,31 @@ public class MesaService {
         sesion.setToken(UUID.randomUUID().toString());
         sesion.setExpiraEn(ahora.plusHours(HORAS_VIGENCIA_SESION));
         return sesionMesaRepository.save(sesion);
+    }
+
+    /**
+     * Uso exclusivo de MesaAdminController.listarMesas: resuelve, en una
+     * sola consulta, la sesión de QR vigente de cada mesa de la lista (si
+     * tiene) -- antes de este método, el panel (MesasPage.jsx) solo conocía
+     * una sesión generada en la MISMA pestaña del navegador, así que un
+     * simple refresh de página hacía que TODAS las mesas se vieran como
+     * "sin QR", tentando a volver a tocar "Generar" -- lo que invalida (por
+     * diseño, ver generarSesion) el QR ya impreso y pegado en la mesa
+     * física. Con esto el panel puede hidratar el QR vigente sin
+     * regenerarlo. Devuelve un mapa vacío sin tocar la base de datos si la
+     * lista de ids viene vacía (mismo criterio que listarPorIds en
+     * SucursalService).
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, SesionMesa> obtenerSesionesActivas(List<Long> mesaIds) {
+        if (mesaIds.isEmpty()) {
+            return Map.of();
+        }
+        return sesionMesaRepository.findByMesaIdInAndExpiraEnAfter(mesaIds, LocalDateTime.now()).stream()
+                .collect(Collectors.toMap(
+                        SesionMesa::getMesaId,
+                        Function.identity(),
+                        (a, b) -> a.getExpiraEn().isAfter(b.getExpiraEn()) ? a : b));
     }
 
     /**
