@@ -2,6 +2,8 @@
 
 Revisor: Claude (rol de auditor/crítico de arquitectura configurado en este proyecto). Alcance: revisión estática del código en `main` (commit `defdd79`, incluye PR #20) — backend Spring Boot + frontend `app-admin`/`app-cliente`. **No incluye**: correr la suite de tests real (sin Maven/JDK en este entorno), `npm audit` de dependencias, ni un pentest dinámico contra una instancia corriendo. Todo lo que sigue es lo que el código dice que hace, no lo que se observó corriendo.
 
+**Seguimiento agregado 2026-09-10** (no reemplaza el cuerpo original de abajo, solo lo anota): de los 5 hallazgos de §1, 3 ya están resueltos en código según el log de commits — se marcó cada uno en su lugar. Este documento había quedado como una foto fija sin que nadie volviera a marcar qué se cerró, que es exactamente el mismo problema de fondo que motivó actualizar `documentacion-tecnica.md` el mismo día (RF-15/16/17 sin documentar). La lección para el equipo es la misma: un hallazgo o un requisito que se resuelve en código y no se marca en su documento de origen queda indistinguible de uno que nunca se tocó, para cualquiera que lea el documento después.
+
 ---
 
 ## 0. Veredicto general, sin rodeos
@@ -16,6 +18,8 @@ Dicho eso, encontré problemas reales — algunos de seguridad, uno de observabi
 
 ### 1.1 — MEDIO-ALTO: el control de acceso por rol no tiene ni un test automatizado
 
+> **→ RESUELTO** (commits `0c59f50` + `faac2d9`, antes del 2026-09-10). Se agregó `AutorizacionAdminTest` y, al correrlo por primera vez en CI, **encontró 2 bugs reales de autorización** — exactamente la clase de regresión silenciosa que este hallazgo advertía. Validación directa de que el hallazgo era real, no teórico.
+
 `SecurityConfig` solo exige `authenticated()` para todo `/api/admin/**`; la restricción real por rol (`ADMIN_RESTAURANTE` vs `MESERO`) vive **exclusivamente** en anotaciones `@PreAuthorize` repartidas por cada método de cada controlador (`UsuarioInternoAdminController`, `MenuAdminController`, `MesaAdminController`, `SucursalAdminController`, `TenantAdminController`...). Revisé todas y hoy están bien puestas — pero no hay una sola prueba (`@WebMvcTest` + `@WithMockUser` con rol MESERO, por ejemplo) que falle si alguien borra o tipea mal una de esas anotaciones en un PR futuro. Con la cantidad de PRs por rama que ya llevan (20 y subiendo), esto es una cuestión de "cuándo", no de "si", un `@PreAuthorize` desaparece silenciosamente en un refactor y un MESERO termina pudiendo, por ejemplo, crear/desactivar sucursales o usuarios.
 
 **Por qué me preocupa más que su severidad técnica actual**: el propio historial de este repo ya demostró exactamente este patrón — un PR (#19) se mergeó con el flujo de selección de sucursal completamente roto para su único usuario real, sin que nada lo detectara, porque cero tests cubrían ese camino. Un `@PreAuthorize` faltante es el mismo problema, pero en autorización en vez de en UX: mucho más caro de descubrir después del hecho.
@@ -24,11 +28,15 @@ Dicho eso, encontré problemas reales — algunos de seguridad, uno de observabi
 
 ### 1.2 — MEDIO: el catch-all de excepciones no deja rastro en logs
 
+> **→ RESUELTO** (commit `323409c`, antes del 2026-09-10).
+
 `GlobalExceptionHandler.handleGenerico(Exception ex)` devuelve correctamente un 500 genérico sin filtrar detalles internos al cliente (bien) — pero **no llama a ningún logger**. Cualquier excepción no prevista (NullPointerException, timeout de conexión a MySQL, lo que sea) se traduce en un JSON `"Error interno del servidor"` para el cliente y **desaparece sin dejar traza en el servidor**. La propia `documentacion-tecnica.md` §11 dice explícitamente "logging estructurado desde el primer commit... para poder rastrear un incidente de un cliente específico" — y de hecho el patrón de log JSON con `tenantId`/`requestId` ya existe en `application.yml`. Este handler es la única pieza que no lo usa, justo donde más importa (es el que atrapa lo que nadie previó).
 
 **Recomendación**: una línea, `log.error("Error no manejado en {}: {}", request.getRequestURI(), ex.getMessage(), ex)` (con MDC de tenantId ya poblado por el logging pattern existente). Cambio de bajo riesgo, alto valor — arreglenlo antes de tener el primer incidente real en producción sin poder diagnosticarlo.
 
 ### 1.3 — MEDIO: `test.html` se empaqueta y se sirve públicamente en TODOS los builds, incluida producción
+
+> **→ RESUELTO** (commit `7b973f3`, antes del 2026-09-10). Pendiente de confirmar en revisión de código (no verificado línea por línea en este seguimiento): que el mecanismo elegido realmente impida el registro/empaquetado fuera del perfil `dev`, no solo que lo oculte tras una ruta protegida — la recomendación original pedía específicamente evitar depender de "que nadie lo olvide".
 
 Vive en `backend/src/main/resources/static/test.html` — Spring Boot empaqueta automáticamente todo lo que hay en `static/` en el JAR, sin excepción por perfil (los recursos estáticos no tienen `@Profile`). `SecurityConfig` además lo permite explícitamente sin autenticación (`permitAll` sobre `/test.html`). El comentario en el propio código dice "no debe existir en producción", pero no hay ningún mecanismo — ni de build, ni de deploy, ni de código — que lo garantice; depende 100% de que nadie lo olvide.
 
@@ -38,11 +46,15 @@ No es una puerta trasera por sí sola (no otorga ningún permiso que la API real
 
 ### 1.4 — MEDIO, ya documentado pero vale precisarlo: revocar el acceso de un MESERO a una sucursal no es instantáneo
 
-`MesaService.sucursalActual()`/`PedidoService.sucursalActual()` confían directamente en el claim `sucursalId` del JWT vigente — no re-consultan la base en cada request. `AuthService.seleccionarSucursal()` sí valida contra la BD (sucursal activa + asignación vigente), pero esa validación solo se repite cuando el access token expira y el frontend reintenta la reselección automática (hasta cada 15 minutos, `expiracion-acceso-ms`). Entre que un ADMIN_RESTAURANTE desactiva una sucursal o le quita la asignación a un MESERO, y que el token de ese MESERO expira, ese MESERO sigue operando con normalidad sobre mesas/pedidos de esa sucursal. Es un trade-off razonable de un diseño stateless (y está parcialmente documentado en el código), pero no está documentado como una decisión de seguridad aceptada explícitamente — y una ventana de hasta 15 minutos es mucho si el escenario real es "le acabo de quitar acceso a alguien porque hubo un problema".
+> **→ Documentado correctamente** (`documentacion-tecnica.md §10`, nota agregada 2026-09-08 y ampliada 2026-09-10 con la referencia a RF-15). Es el único de los cinco hallazgos de esta sección que se cerró de la forma correcta: no como fix de código (es un trade-off aceptado, no un bug), sino como decisión explícita anotada en el documento de arquitectura. Sigue siendo el patrón a seguir para el resto.
 
-**Recomendación**: si esto importa para el negocio (ej. offboarding de un mesero problemático a mitad de turno), la solución barata es bajar `expiracion-acceso-ms` bastante (a 2-3 min) sin tocar arquitectura, o agregar una revalidación liviana (un `EXISTS` contra `AsignacionSucursal`+`Sucursal.activa`) en el punto de entrada de `MesaService`/`PedidoService` en vez de confiar ciegamente en el claim. Como mínimo, decídanlo conscientemente y anótenlo en `documentacion-tecnica.md` §10 en vez de dejarlo como comportamiento implícito.
+`MesaService.sucursalActual()`/`PedidoService.sucursalActual()` confían directamente en el claim `sucursalId` del JWT vigente — no re-consultan la base en cada request. `AuthService.seleccionarSucursal()` sí valida contra la BD (sucursal activa + asignación vigente), pero esa validación solo se repite cuando el access token expira y el frontend reintenta la reselección automática — que sí revalida contra la base y en ese momento lo bloquea. Es un trade-off razonable de un diseño stateless (y está parcialmente documentado en el código), pero no está documentado como una decisión de seguridad aceptada explícitamente — y una ventana de hasta 15 minutos es mucho si el escenario real es "le acabo de quitar acceso a alguien porque hubo un problema".
+
+**Recomendación**: si esto importa para el negocio (ej. offboarding de un mesero problemático a mitad de turno), la solución barata es bajar `expiracion-acceso-ms` bastante (a 2-3 min) sin tocar arquitectura, o agregar una revalidación liviana (un `EXISTS` contra `AsignacionSucursal`+`Sucursal.activa`) en el punto de entrada de `MesaService`/`PedidoService` en vez de confiar ciegamente en el claim. Como mínimo, decídanlo conscientemente y anótenlo en `documentacion-tecnica.md §10` en vez de dejarlo como comportamiento implícito.
 
 ### 1.5 — BAJO: sin Content-Security-Policy, con JWT (access + refresh) en `localStorage`
+
+> **Sigue ABIERTO al 2026-09-10** — es el único de los cinco hallazgos de esta sección sin ningún commit relacionado en el historial revisado.
 
 Ambos tokens viven en `localStorage` (`client.js`), no en cookies `httpOnly`. Es una decisión razonable dado que no hay CSRF que mitigar (CSRF está deshabilitado a propósito, correctamente, porque no hay auth por cookie) — pero significa que el único perímetro real contra robo de sesión es "que nunca haya XSS". Hoy no encontré `dangerouslySetInnerHTML` ni `innerHTML` en ningún lado de los dos frontends (React escapa por defecto), así que el riesgo actual es bajo. Pero no hay ningún `Content-Security-Policy` (ni meta tag ni header) que actúe como segunda capa si algún día una dependencia nueva o un descuido futuro introduce un vector de XSS. Con refresh tokens de 7 días de vida, el costo de un robo exitoso es alto.
 
@@ -62,18 +74,19 @@ Ambos tokens viven en `localStorage` (`client.js`), no en cookies `httpOnly`. Es
 
 ### 2.1 Deuda funcional real (no solo seguridad)
 
-- **El gap de sucursales desactivadas sigue abierto** (ya reportado el 2026-09-08 en la sesión anterior): una sucursal desactivada con un mesero todavía asignado desaparece de toda la UI (`GET /api/admin/sucursales` filtra `activa=true`), sin forma de auditarla ni desasignar desde la interfaz. El backend soporta verla (`obtenerSucursalDelTenantActualSinImportarEstado`) pero nada en el frontend lo expone. Sigue pendiente de que Sebas decida prioridad.
+- **El gap de sucursales desactivadas sigue abierto** (ya reportado el 2026-09-08 en la sesión anterior, y confirmado sin resolver el 2026-09-10 desde dos pantallas distintas — `GestionSucursalesModal` en `UsuariosPage.jsx` y `SucursalesPage.jsx` — ver backlog del proyecto): una sucursal desactivada con un mesero todavía asignado desaparece de toda la UI (`GET /api/admin/sucursales` filtra `activa=true`), sin forma de auditarla ni desasignar desde la interfaz. El backend soporta verla (`obtenerSucursalDelTenantActualSinImportarEstado`, y el endpoint `GET /api/admin/sucursales/{id}/usuarios` que sí funciona sobre sucursales inactivas) pero nada en el frontend lo expone del todo. Sigue pendiente de que Sebas decida prioridad.
 - **`frontend/app-admin` no tiene ningún test ni test runner** (`package.json` sin Vitest/Jest). Es la causa raíz documentada del bug de PR #19. Mientras esto siga así, cualquier regresión de UI (no solo de sucursales) puede volver a pasar desapercibida hasta que un usuario real la encuentre.
-- **RF-13/14 (datos del comensal) sigue con el mismo hueco legal que `documentacion-tecnica.md` §15.2 marca como pendiente desde agosto**: el mecanismo técnico de cifrado y borrado ya está — lo que falta es el texto real de aviso de privacidad, el flujo de consentimiento revisado legalmente, y una política de retención. Esto no es deuda técnica, es exposición legal activa (Habeas Data, Ley 1581) desde el primer comensal real que capturaron.
-- **Backend sin Maven/JDK verificable en este entorno de trabajo remoto** (ya documentado): toda la rama de turno/sucursal (4 commits) sigue sin correr contra Maven real ni MySQL real. Antes de mergear a producción, correr la suite completa y probar el flujo end-to-end a mano.
+- **RF-13/14 (datos del comensal) sigue con el mismo hueco legal que `documentacion-tecnica.md §15.2` marca como pendiente desde agosto**: el mecanismo técnico de cifrado ya está, y desde el 2026-09-10 también el registro explícito del consentimiento (migración V19) — lo que falta es el texto real de aviso de privacidad revisado legalmente y una política de retención confirmada (hay un borrador de partida agregado en `documentacion-tecnica.md §15.3`, explícitamente no apto para publicar sin revisión de un abogado) y el endpoint de borrado real a solicitud del titular (existe en una rama local sin pushear). Esto no es deuda técnica, es exposición legal activa (Habeas Data, Ley 1581) desde el primer comensal real que capturaron.
+- **Backend sin Maven/JDK verificable en este entorno de trabajo remoto** (ya documentado): toda la rama de turno/sucursal (4 commits) sigue sin correr contra Maven real ni MySQL real por quien la escribió. **Actualización 2026-09-10**: sí se corrió contra Maven/JDK 21 real y MySQL fue reemplazado por H2 (perfil `dev,h2`) en otra sesión, después de mergear esos commits a `main` — arrancó limpio tras resolver un desajuste de versión de JDK en el `PATH` del equipo y un conflicto de esquema en una base H2 vieja. Sigue sin correrse contra MySQL real (Flyway deshabilitado en el perfil usado) — antes de producción, correr igual contra `docker compose up -d mysql` + perfil `dev` sin `h2`.
 - **Cobertura de tests con puntos ciegos específicos**: nada cubre `JwtService`, `AuthService`, `LoginAttemptService`, ni `TurnoService` (el feature más nuevo). El resto del dominio (pedido, mesa, tenant, sucursal, aislamiento de tenant) tiene cobertura sólida y hasta tests de concurrencia — la asimetría llama la atención.
 
 ### 2.2 Mejoras que no son "features nuevas" sino terminar lo empezado
 
-- Loggear el catch-all (§1.2).
-- Excluir `test.html` de producción (§1.3).
-- Tests de autorización por rol (§1.1).
-- Cerrar el gap de sucursales inactivas en la UI (decisión de Sebas, pero técnicamente barato: reusar `obtenerSucursalDelTenantActualSinImportarEstado` para una vista de "sucursales inactivas con asignaciones" en `SucursalesPage.jsx`).
+- ~~Loggear el catch-all (§1.2).~~ Resuelto.
+- ~~Excluir `test.html` de producción (§1.3).~~ Resuelto.
+- ~~Tests de autorización por rol (§1.1).~~ Resuelto.
+- Agregar una CSP básica (§1.5) — sigue sin hacer, es el único hallazgo de seguridad de este informe sin ningún avance.
+- Cerrar el gap de sucursales inactivas en la UI (decisión de Sebas, pero técnicamente barato: reusar `obtenerSucursalDelTenantActualSinImportarEstado` para una vista de "sucursales inactivas con asignaciones" en `SucursalesPage.jsx`, y hacer que `GestionSucursalesModal` incluya las sucursales ya asignadas aunque estén inactivas en su lista de opciones, no solo en el conteo).
 - Health check (`/actuator/health`) — mencionado en el roadmap propio (§11) y no implementado todavía; es prácticamente gratis con `spring-boot-starter-actuator` y cualquier hosting lo va a pedir para reiniciar instancias caídas.
 - Backups de MySQL automatizados y probados — sigue sin mención en el repo (no es código, es infraestructura, pero es exactamente el tipo de cosa que "nadie prioriza hasta que ya es tarde", como dice su propio documento).
 
@@ -98,32 +111,29 @@ No recomendaría tocar pagos, reservas, ni facturación electrónica todavía �
 
 ---
 
-## 4. Plan paso a paso
+## 4. Plan paso a paso (estado real al 2026-09-10, ver anotaciones)
 
 Ordenado por lo que bloquea o expone más, no por lo más entretenido de construir.
 
-**Paso 1 — Cerrar lo que ya está a medio camino (esta semana).**
-Pushear y mergear la rama `fix/frontend-seleccion-sucursal-mesero` (ya tiene los 4 commits listos). Antes de mergear: correr la suite de backend completa con Maven/JDK real (no se pudo verificar desde este entorno) y probar a mano el flujo completo descrito en la sesión anterior (crear sucursal → asignar mesero → loguearse → marcar entrada/salida → reporte de horas → desactivar sucursal y confirmar el gap conocido).
+**Paso 1 — Cerrar lo que ya está a medio camino.** ✅ Hecho: la rama de selección de sucursal para MESERO se mergeó a `main`, junto con la de turnos. Sí se probó el arranque completo contra Maven/JDK real (perfil `dev,h2`) el 2026-09-10 — sigue faltando probarlo contra MySQL real antes de producción.
 
-**Paso 2 — Cerrar los hallazgos de seguridad de este informe, en este orden de costo/beneficio:**
-1. Loggear el catch-all de excepciones (§1.2) — 1 línea, altísimo valor.
-2. Excluir `test.html` de producción (§1.3) — bajo esfuerzo.
-3. Decidir y documentar explícitamente el trade-off de revocación de sucursal (§1.4) — o bajar el TTL del access token, o aceptarlo por escrito.
-4. Agregar una CSP básica (§1.5).
-5. Escribir tests de autorización por rol para los controladores admin (§1.1) — el de mayor esfuerzo de los cinco, pero el que previene la clase de bug más cara.
+**Paso 2 — Cerrar los hallazgos de seguridad de este informe:**
+1. ~~Loggear el catch-all de excepciones (§1.2).~~ ✅ Hecho.
+2. ~~Excluir `test.html` de producción (§1.3).~~ ✅ Hecho.
+3. Decidir y documentar explícitamente el trade-off de revocación de sucursal (§1.4). ✅ Hecho.
+4. Agregar una CSP básica (§1.5). ❌ Sigue pendiente.
+5. ~~Escribir tests de autorización por rol para los controladores admin (§1.1).~~ ✅ Hecho — y encontró 2 bugs reales.
 
-**Paso 3 — Cerrar el hueco legal de RF-13/14 (no técnico, pero bloqueante).**
-Esto no es negociable según su propio documento (§15.2): texto de aviso de privacidad revisado legalmente, consentimiento explícito (no checkbox premarcado — ya verificado que no lo está, bien), y una política de retención de datos del comensal. Cada día que pasa con comensales reales capturados sin esto resuelto es exposición real bajo Ley 1581, no deuda técnica.
+**Paso 3 — Cerrar el hueco legal de RF-13/14 (no técnico, pero bloqueante).** Parcialmente avanzado: consentimiento explícito ya se registra (V19) y hay un borrador de aviso de privacidad/retención agregado a `documentacion-tecnica.md §15.3` para que la revisión legal tenga de dónde partir. Sigue sin revisión legal real y sin el endpoint de borrado pusheado.
 
-**Paso 4 — Cerrar el gap de sucursales inactivas en la UI**, una vez que Sebas decida si lo prioriza (§2.1) — es barato técnicamente, el trabajo real es la decisión de producto.
+**Paso 4 — Cerrar el gap de sucursales inactivas en la UI.** ❌ Sigue pendiente, decisión de Sebas.
 
-**Paso 5 — Observabilidad mínima antes de tener el primer cliente real dependiendo del sistema (§11 de su propio doc, todavía no aplicado):**
-`/actuator/health`, backups de MySQL automatizados y probados (restaurar uno de prueba, no asumir que el backup sirve). Ninguno de los dos es opcional una vez que haya un restaurante piloto real operando un sábado a la noche.
+**Paso 5 — Observabilidad mínima antes de tener el primer cliente real dependiendo del sistema.** ❌ `/actuator/health` y backups de MySQL siguen sin implementar.
 
-**Paso 6 — Frontend: agregar un test runner** (Vitest, ya que usan Vite) y al menos cubrir el flujo de selección de sucursal + el gate de rutas protegidas — el camino que ya falló una vez.
+**Paso 6 — Frontend: agregar un test runner** (Vitest). ❌ Sigue pendiente.
 
-**Paso 7 — Recién ahí, un diferenciador (§3.1: vista de cocina)**, como pieza de validación con el cliente piloto que su propio roadmap (Fase 0) pide confirmar: que el mesero realmente usa el panel bajo presión de servicio. Una vista de cocina es la extensión más directa de esa misma pregunta ("¿esto realmente ahorra tiempo en un sábado real?").
+**Paso 7 — Un diferenciador (§3.1: vista de cocina).** ❌ Sigue pendiente.
 
-**Paso 8 — Solo después de validar con el piloto, seguir con Fase 2 de su propio roadmap** (self-service, aplicación real de límites por plan, precios en COP definidos con costos reales — sigue pendiente según §15.2).
+**Paso 8 — Fase 2 del roadmap propio** (self-service, límites por plan, precios en COP). ❌ Sigue pendiente.
 
 No mencioné pagos/reservas/KDS físico/facturación electrónica en este plan a propósito: siguen correctamente fuera de alcance según su propio documento, y nada de lo que encontré hoy cambia esa conclusión.
