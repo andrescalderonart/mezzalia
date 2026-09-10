@@ -25,17 +25,17 @@ import java.util.List;
 
 /**
  * RF-09: tanto ADMIN_RESTAURANTE como MESERO pueden ver y actualizar
- * pedidos -- es el trabajo diario del mesero en el salon. Por eso, a
- * diferencia de MenuAdminController/MesaAdminController, NINGUN endpoint de
+ * pedidos -- es el trabajo diario del mesero en el salón. Por eso, a
+ * diferencia de MenuAdminController/MesaAdminController, NINGÚN endpoint de
  * este controlador lleva @PreAuthorize("hasRole('ADMIN_RESTAURANTE')"): la
- * autenticacion que ya exige SecurityConfig para /api/admin/** alcanza para
+ * autenticación que ya exige SecurityConfig para /api/admin/** alcanza para
  * ambos roles del tenant.
  *
  * Eso NO significa que ambos roles reciban el mismo payload: §10 de
- * documentacion-tecnica.md exige que el telefono del comensal solo se vea
+ * documentacion-tecnica.md exige que el teléfono del comensal solo se vea
  * completo para ADMIN_RESTAURANTE. Por eso los dos endpoints que arman un
  * PedidoAdminDto calculan {@link #telefonoCompleto()} a partir del rol
- * autenticado y se lo pasan explicito a PedidoAdminDto.desde() -- el
+ * autenticado y se lo pasan explícito a PedidoAdminDto.desde() -- el
  * gating no es por endpoint (@PreAuthorize), es por campo dentro de la
  * misma respuesta.
  */
@@ -51,15 +51,15 @@ public class PedidoAdminController {
     /**
      * Sin WebSocket (ver documentacion-tecnica.md, roadmap): el panel
      * consulta este endpoint por polling cada 5-8s (ver PedidosPage.jsx en
-     * app-admin) en vez de mantener una conexion persistente -- mas simple
+     * app-admin) en vez de mantener una conexión persistente -- más simple
      * de operar en un solo VPS sin infraestructura extra, al costo de
      * hasta ~8s de latencia percibida en ver un pedido nuevo. Aceptado
-     * explicitamente para el alcance actual.
+     * explícitamente para el alcance actual.
      *
      * N+1 conocido y aceptado: por cada pedido se hace una query de items y
      * otra de comensal. Para el tamaño esperado (un restaurante, pedidos
      * activos de un turno) esto no es un problema real; si la lista crece
-     * mucho (reportes historicos, por ejemplo) esto necesitaria un fetch
+     * mucho (reportes históricos, por ejemplo) esto necesitaría un fetch
      * por lote en vez de por pedido -- no es la necesidad de hoy.
      */
     @GetMapping
@@ -87,18 +87,18 @@ public class PedidoAdminController {
 
     /**
      * true solo para ADMIN_RESTAURANTE. Default seguro es false: un rol
-     * nuevo que en el futuro tambien pueda autenticarse contra
+     * nuevo que en el futuro también pueda autenticarse contra
      * /api/admin/** (hoy solo existen ADMIN_RESTAURANTE y MESERO llegando
-     * hasta aca -- SUPER_ADMIN no tiene tenant y PedidoService.tenantActual()
-     * lo bloquea antes de llegar a este punto) empieza viendo el telefono
-     * enmascarado hasta que alguien decida explicitamente lo contrario,
-     * nunca al reves.
+     * hasta acá -- SUPER_ADMIN no tiene tenant y PedidoService.tenantActual()
+     * lo bloquea antes de llegar a este punto) empieza viendo el teléfono
+     * enmascarado hasta que alguien decida explícitamente lo contrario,
+     * nunca al revés.
      *
-     * Visibilidad de paquete (no private) a proposito: PedidoAdminControllerTest
-     * la llama directo, mismo patron que el resto del proyecto prefiere
-     * (instanciar la clase real y probar el metodo, en vez de mockear
-     * SecurityContextHolder a traves de una capa HTTP completa que este
-     * proyecto todavia no monta en tests).
+     * Visibilidad de paquete (no private) a propósito: PedidoAdminControllerTest
+     * la llama directo, mismo patrón que el resto del proyecto prefiere
+     * (instanciar la clase real y probar el método, en vez de mockear
+     * SecurityContextHolder a través de una capa HTTP completa que este
+     * proyecto todavía no monta en tests).
      */
     boolean telefonoCompleto() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
