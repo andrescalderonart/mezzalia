@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * RF-09: mismo criterio que MenuAdminController -- ver la lista de mesas
@@ -36,10 +37,27 @@ public class MesaAdminController {
 
     private final MesaService mesaService;
 
+    /**
+     * Incluye la sesión de QR vigente de cada mesa (si tiene) en el mismo
+     * viaje -- ver el javadoc de MesaService.obtenerSesionesActivas: sin
+     * esto, MesasPage.jsx solo sabía de una sesión generada en la MISMA
+     * pestaña del navegador, y un simple refresh de página hacía que todas
+     * las mesas se vieran como "sin QR", tentando a regenerar (lo que
+     * invalida el QR ya impreso y pegado en la mesa física).
+     */
     @GetMapping
     public ResponseEntity<List<MesaDto>> listarMesas() {
-        List<MesaDto> mesas = mesaService.listarMesas().stream().map(MesaDto::desde).toList();
-        return ResponseEntity.ok(mesas);
+        List<Mesa> mesas = mesaService.listarMesas();
+        Map<Long, SesionMesa> sesionesActivas = mesaService.obtenerSesionesActivas(
+                mesas.stream().map(Mesa::getId).toList());
+        List<MesaDto> resultado = mesas.stream()
+                .map(mesa -> {
+                    SesionMesa sesion = sesionesActivas.get(mesa.getId());
+                    SesionMesaDto sesionDto = sesion == null ? null : SesionMesaDto.desde(sesion);
+                    return MesaDto.desde(mesa, sesionDto);
+                })
+                .toList();
+        return ResponseEntity.ok(resultado);
     }
 
     @PostMapping
