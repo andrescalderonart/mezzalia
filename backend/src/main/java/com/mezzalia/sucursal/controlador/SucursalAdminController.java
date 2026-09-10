@@ -38,6 +38,23 @@ public class SucursalAdminController {
         return ResponseEntity.ok(sucursales);
     }
 
+    /**
+     * Vista de gestión para ADMIN_RESTAURANTE: a diferencia de
+     * listarSucursales() (el GET general, también consumido por MESERO al
+     * elegir en qué sucursal trabajar -- por eso ese no lleva
+     * @PreAuthorize ni devuelve inactivas), esta sí incluye las
+     * desactivadas, para que el dueño pueda reactivarlas o revisar qué
+     * meseros quedaron asignados a una que ya cerró (SucursalesPage.jsx).
+     */
+    @GetMapping("/todas")
+    @PreAuthorize("hasRole('ADMIN_RESTAURANTE')")
+    public ResponseEntity<List<SucursalDto>> listarSucursalesTodas() {
+        List<SucursalDto> sucursales = sucursalService.listarSucursalesTodas().stream()
+                .map(SucursalDto::desde)
+                .toList();
+        return ResponseEntity.ok(sucursales);
+    }
+
     @PostMapping
     @PreAuthorize("hasRole('ADMIN_RESTAURANTE')")
     public ResponseEntity<SucursalDto> crearSucursal(@Valid @RequestBody CrearSucursalRequest request) {

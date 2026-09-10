@@ -48,6 +48,22 @@ public class SucursalService {
     }
 
     /**
+     * Vista de gestión para ADMIN_RESTAURANTE (GET
+     * /api/admin/sucursales/todas, SucursalAdminController.
+     * listarSucursalesTodas) -- a diferencia de listarSucursales(), esta
+     * SI devuelve las inactivas: la vista de gestión (SucursalesPage.jsx)
+     * necesita poder reactivarlas o ver qué meseros quedaron asignados a
+     * una sucursal ya cerrada, no solo esconderla. El GET general
+     * (listarSucursales) sigue filtrando activa=true a propósito -- lo
+     * consume también un MESERO al elegir en qué sucursal trabaja, y ahí
+     * no tiene sentido ofrecerle una cerrada.
+     */
+    @Transactional(readOnly = true)
+    public List<Sucursal> listarSucursalesTodas() {
+        return sucursalRepository.findByTenantIdOrderByNombreAsc(tenantActual());
+    }
+
+    /**
      * Uso exclusivo de AsignacionSucursalService.listarSucursalesDe (RF-10
      * PR4): dado un conjunto de ids de sucursal (las que un MESERO tiene
      * asignadas), devuelve las que pertenecen al tenant actual -- SIN

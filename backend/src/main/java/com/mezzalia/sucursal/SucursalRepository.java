@@ -59,4 +59,17 @@ public interface SucursalRepository extends JpaRepository<Sucursal, Long> {
      * de AuthService.seleccionarSucursal).
      */
     boolean existsByIdAndTenantIdAndActivaTrue(Long id, Long tenantId);
+
+    /**
+     * Uso exclusivo de SucursalService.listarSucursalesTodas, para la
+     * vista de gestión de ADMIN_RESTAURANTE (SucursalesPage.jsx): a
+     * diferencia de findByTenantIdAndActivaTrueOrderByNombreAsc (que
+     * respalda el GET general, también consumido por MESERO para elegir
+     * sucursal -- ver SucursalAdminController), esta sí incluye las
+     * inactivas, porque el ADMIN_RESTAURANTE necesita poder reactivarlas o
+     * ver sus meseros asignados. No exponer este método vía el GET
+     * general: el filtro de activa=true ahí es intencional, no un
+     * descuido.
+     */
+    List<Sucursal> findByTenantIdOrderByNombreAsc(Long tenantId);
 }
