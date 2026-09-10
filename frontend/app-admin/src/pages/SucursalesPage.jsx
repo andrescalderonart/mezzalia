@@ -6,6 +6,13 @@ import { useApiJson } from '../context/AuthContext.jsx'
 // ALCANCE REAL (ver el aviso largo en backend/.../sucursal/Sucursal.java):
 // hoy solo Mesa queda asociada a una sucursal -- la carta y los pedidos
 // todavía se comparten entre todas las sucursales de un tenant.
+//
+// Usa GET /api/admin/sucursales/todas (no el GET general que consume el
+// selector de sucursal del MESERO) porque esta pantalla es de gestión y
+// necesita ver también las desactivadas -- si no, "Meseros" quedaba
+// inalcanzable para una sucursal ya cerrada, y "Reactivar" no tenía forma
+// de mostrarse (el backend ya soportaba PATCH /{id}/reactivar desde antes,
+// pero esta pantalla nunca lo llamaba).
 export default function SucursalesPage() {
   const apiJson = useApiJson()
 
@@ -23,7 +30,7 @@ export default function SucursalesPage() {
     setCargando(true)
     setError('')
     try {
-      setSucursales(await apiJson('/api/admin/sucursales'))
+      setSucursales(await apiJson('/api/admin/sucursales/todas'))
     } catch (e) {
       setError(e.message)
     } finally {
@@ -64,6 +71,16 @@ export default function SucursalesPage() {
     try {
       await apiJson(`/api/admin/sucursales/${sucursal.id}/desactivar`, { method: 'PATCH' })
       setSucursales((prev) => prev.map((s) => (s.id === sucursal.id ? { ...s, activa: false } : s)))
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
+  async function onReactivar(sucursal) {
+    setError('')
+    try {
+      await apiJson(`/api/admin/sucursales/${sucursal.id}/reactivar`, { method: 'PATCH' })
+      setSucursales((prev) => prev.map((s) => (s.id === sucursal.id ? { ...s, activa: true } : s)))
     } catch (e) {
       setError(e.message)
     }
@@ -112,18 +129,28 @@ export default function SucursalesPage() {
       ) : (
         <div className="card divide-y divide-carbon-700">
           {sucursales.map((sucursal) => (
-            <div key={sucursal.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <div
+              key={sucursal.id}
+              className={`flex flex-wrap items-center justify-between gap-3 p-4 ${sucursal.activa ? '' : 'opacity-60'}`}
+            >
               <div>
-                <div className="text-sm text-crema">{sucursal.nombre}</div>
+                <div className="text-sm text-crema">
+                  {sucursal.nombre}
+                  {!sucursal.activa && <span className="ml-2 text-[11px] text-crema/40">(inactiva)</span>}
+                </div>
                 <div className="text-[11px] text-crema/40">{sucursal.direccion || 'Sin dirección registrada'}</div>
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => setViendoUsuariosDe(sucursal)} className="btn-secundario text-xs py-2">
                   Meseros
                 </button>
-                {sucursal.activa && (
+                {sucursal.activa ? (
                   <button onClick={() => onDesactivar(sucursal)} className="text-xs py-2 px-3 rounded-lg text-crema/40 hover:text-red-300 transition-colors duration-150">
                     Desactivar
+                  </button>
+                ) : (
+                  <button onClick={() => onReactivar(sucursal)} className="text-xs py-2 px-3 rounded-lg text-crema/40 hover:text-emerald-300 transition-colors duration-150">
+                    Reactivar
                   </button>
                 )}
               </div>
