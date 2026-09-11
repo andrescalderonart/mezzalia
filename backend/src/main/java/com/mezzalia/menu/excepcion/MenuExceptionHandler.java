@@ -56,6 +56,16 @@ public class MenuExceptionHandler {
         return respuesta(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 
+    @ExceptionHandler(MenuExceptions.SucursalOrigenSinCartaException.class)
+    public ResponseEntity<Map<String, Object>> handleSucursalOrigenSinCarta(MenuExceptions.SucursalOrigenSinCartaException ex) {
+        return respuesta(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(MenuExceptions.SucursalDestinoYaTieneCartaException.class)
+    public ResponseEntity<Map<String, Object>> handleSucursalDestinoYaTieneCarta(MenuExceptions.SucursalDestinoYaTieneCartaException ex) {
+        return respuesta(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, Object>> handleArchivoDemasiadoGrande(MaxUploadSizeExceededException ex) {
         return respuesta(HttpStatus.PAYLOAD_TOO_LARGE, "El archivo supera el tamaño máximo permitido");

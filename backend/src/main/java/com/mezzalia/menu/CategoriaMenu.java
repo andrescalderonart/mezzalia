@@ -17,6 +17,15 @@ import java.time.LocalDateTime;
  * Categoría de la carta (ej. "Entradas", "Fuertes", "Postres").
  * Soft delete via `activo`, nunca borrado físico: un ItemMenu podría seguir
  * referenciando esta categoría.
+ *
+ * `sucursalId` (2026-09-10): cada sucursal tiene una carta totalmente
+ * independiente -- decisión de producto, no el modelo "menú maestro +
+ * overrides" que también se evaluó. Consecuencia directa: una sucursal
+ * nueva arranca con la carta vacía (ver MenuService.duplicarMenuDesdeSucursal
+ * para la herramienta que mitiga eso). Todo ItemMenu que referencia una
+ * categoría hereda su sucursalId -- nunca se asigna por separado (ver
+ * MenuService.crearItem), así que "item y su categoría en sucursales
+ * distintas" es estructuralmente imposible, no solo validado.
  */
 @Entity
 @Table(name = "categorias_menu")
@@ -30,6 +39,9 @@ public class CategoriaMenu extends EntidadConTenant {
 
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
+
+    @Column(name = "sucursal_id", nullable = false)
+    private Long sucursalId;
 
     @Column(nullable = false, length = 150)
     private String nombre;

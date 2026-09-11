@@ -29,6 +29,11 @@ export default function CartaPage() {
   // sesiones[] en MesasPage.jsx del panel: no hay backend de "borrador de
   // pedido", el pedido solo existe una vez que se confirma y se envia).
   const [carrito, setCarrito] = useState({})
+  // 2026-09-11: un solo plato expandido a la vez (acordeón, no todos a la
+  // vez) -- una carta con 30 platos con todas las fotos abiertas de una
+  // seria un scroll interminable y iria en contra del punto de la lista
+  // tradicional (compacta, fácil de escanear con la vista).
+  const [expandidoId, setExpandidoId] = useState(null)
   const [modalAbierto, setModalAbierto] = useState(false)
   const [notas, setNotas] = useState('')
   const [comensalNombre, setComensalNombre] = useState('')
@@ -257,7 +262,15 @@ export default function CartaPage() {
           </p>
         )}
 
-        <div className="space-y-10">
+        {/* lg:columns-2: carta tradicional impresa a dos columnas en
+            pantallas anchas (tablet apoyada en la mesa, o alguien mirando
+            desde el celular en horizontal) -- en el celular en vertical
+            (el caso real más común, comensal con el teléfono escaneando el
+            QR) columns-2 no aplica y queda una sola columna apilada, que es
+            lo que de verdad hace falta ahí. break-inside-avoid evita que
+            una categoría se corte a la mitad entre una columna y la
+            siguiente. */}
+        <div className="space-y-10 lg:space-y-0 lg:columns-2 lg:gap-x-12">
           {carta.categorias.map((cat) => (
             <section
               key={cat.id}
@@ -265,18 +278,28 @@ export default function CartaPage() {
               ref={(el) => {
                 seccionesRef.current[cat.id] = el
               }}
-              className="scroll-mt-28"
+              className="scroll-mt-28 break-inside-avoid mb-10 lg:mb-12"
             >
-              <h2 className="font-display text-2xl text-carbon-950 mb-4">{cat.nombre}</h2>
+              <h2 className="font-display text-2xl text-carbon-950 mb-1.5">{cat.nombre}</h2>
+              {/* Doble línea fina bajo el título -- el detalle clásico de
+                  carta impresa que pediste imitar de la referencia. */}
+              <div className="mb-3">
+                <div className="h-px bg-carbon-950/20" />
+                <div className="h-px bg-carbon-950/20 mt-[3px]" />
+              </div>
 
               {cat.items.length === 0 ? (
                 <p className="text-sm text-carbon-900/40">Sin platos en esta categoría todavía.</p>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="divide-y divide-carbon-950/10">
                   {cat.items.map((item) => (
-                    <ItemCarta
+                    <ItemFila
                       key={item.id}
                       item={item}
+                      expandido={expandidoId === item.id}
+                      onAlternarExpandido={() =>
+                        setExpandidoId((prev) => (prev === item.id ? null : item.id))
+                      }
                       cantidadEnCarrito={carrito[item.id] || 0}
                       onAgregar={() => agregarUnidad(item.id)}
                       onQuitar={() => quitarUnidad(item.id)}
@@ -333,81 +356,210 @@ export default function CartaPage() {
   )
 }
 
-function ItemCarta({ item, cantidadEnCarrito, onAgregar, onQuitar }) {
+/**
+ * 2026-09-11: fila de carta tradicional (nombre ... línea punteada ... precio,
+ * descripción de una línea debajo) en vez de la tarjeta con foto de antes --
+ * pedido explícito de Andrés, imitando una carta impresa de restaurante. La
+ * foto ya NO se ve por defecto: aparece solo al expandir (RF de "imagen
+ * interactiva por plato"), con FotoZoomable (pellizco para acercar).
+ *
+ * Todo el <button> de la fila es el disparador de expandir/colapsar -- el
+ * stepper de agregar/quitar vive DENTRO del bloque expandido, nunca en la
+ * fila colapsada, para que tocar la fila nunca agregue al carrito por
+ * accidente (a diferencia de la tarjeta anterior, donde "+ Agregar" y el
+ * resto de la tarjeta eran áreas de toque separadas pero visualmente
+ * confundibles en una lista compacta).
+ */
+function ItemFila({ item, expandido, onAlternarExpandido, cantidadEnCarrito, onAgregar, onQuitar }) {
   return (
-    <div className={`tarjeta-item animate-fadeInUp ${!item.disponible ? 'opacity-70' : ''}`}>
-      <div className="relative aspect-[4/3] bg-papel-200">
-        {item.imagenUrl ? (
-          <img
-            src={item.imagenUrl}
-            alt={item.nombre}
-            className={`w-full h-full object-cover ${!item.disponible ? 'grayscale-[35%]' : ''}`}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-carbon-900/20 text-xs">
-            Sin foto
-          </div>
-        )}
-        {/* RF-02: agotado se muestra visualmente distinto, NUNCA desaparece
-            de la carta -- el comensal debe poder seguir viendo que el plato
-            existe, solo que hoy no está disponible. Tampoco se puede
-            agregar al carrito -- ver el stepper mas abajo, que ni siquiera
-            se renderiza si !item.disponible. */}
-        {!item.disponible && (
-          <div className="absolute inset-0 flex items-center justify-center bg-carbon-950/40">
-            <span className="bg-carbon-950/80 text-white text-xs font-medium px-3 py-1 rounded-full tracking-wide">
+    <div className={!item.disponible ? 'opacity-60' : ''}>
+      <button
+        onClick={onAlternarExpandido}
+        aria-expanded={expandido}
+        className="w-full text-left py-3.5 group"
+      >
+        <div className="flex items-baseline gap-2">
+          <span className="font-medium text-carbon-950 text-[15px] shrink-0">{item.nombre}</span>
+          {/* Línea punteada "de relleno" entre el nombre y el precio -- el
+              detalle clásico de carta impresa. flex-1 + overflow-hidden en
+              vez de border-dotted directo en un elemento de ancho fijo,
+              para que se estire solo lo que falta sea cual sea el largo del
+              nombre. */}
+          <span className="flex-1 min-w-[12px] border-b border-dotted border-carbon-950/30 translate-y-[-4px]" aria-hidden="true" />
+          {item.disponible ? (
+            <span className="text-sm font-semibold whitespace-nowrap shrink-0" style={{ color: 'var(--color-acento)' }}>
+              {formatoPrecio.format(item.precio)}
+            </span>
+          ) : (
+            // RF-02: agotado se muestra distinto, nunca desaparece de la
+            // carta -- ver el mismo criterio que tenía la tarjeta anterior.
+            <span className="text-[11px] font-medium uppercase tracking-wide text-carbon-900/40 shrink-0">
               Agotado
             </span>
-          </div>
-        )}
-      </div>
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="font-medium text-carbon-950 text-sm">{item.nombre}</h3>
-          <span
-            className="text-sm font-semibold whitespace-nowrap"
-            style={{ color: 'var(--color-acento)' }}
+          )}
+          <svg
+            viewBox="0 0 24 24"
+            className={`w-4 h-4 shrink-0 text-carbon-900/30 transition-transform duration-200 ${expandido ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
           >
-            {formatoPrecio.format(item.precio)}
-          </span>
+            <path d="M6 9l6 6 6-6" />
+          </svg>
         </div>
         {item.descripcion && (
-          <p className="text-xs text-carbon-900/50 mt-1 line-clamp-2">{item.descripcion}</p>
+          <p className={`text-xs text-carbon-900/50 mt-1 pr-2 ${expandido ? '' : 'line-clamp-1'}`}>
+            {item.descripcion}
+          </p>
         )}
+      </button>
 
-        {item.disponible && (
-          <div className="mt-3 flex justify-end">
-            {cantidadEnCarrito > 0 ? (
-              <div className="flex items-center gap-3 bg-papel-200 rounded-full pl-1 pr-1 py-1">
-                <button
-                  onClick={onQuitar}
-                  aria-label={`Quitar una unidad de ${item.nombre}`}
-                  className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-carbon-950 font-semibold leading-none"
-                >
-                  −
-                </button>
-                <span className="text-sm font-semibold w-4 text-center tabular-nums">{cantidadEnCarrito}</span>
+      {expandido && (
+        <div className="pb-4 -mt-1 animate-fadeInUp">
+          {item.imagenUrl ? (
+            <FotoZoomable src={item.imagenUrl} alt={item.nombre} apagada={!item.disponible} />
+          ) : (
+            <div className="w-full aspect-[4/3] rounded-2xl bg-papel-200 flex items-center justify-center text-carbon-900/20 text-xs">
+              Sin foto
+            </div>
+          )}
+
+          {item.disponible && (
+            <div className="mt-3.5 flex justify-end">
+              {cantidadEnCarrito > 0 ? (
+                <div className="flex items-center gap-3 bg-papel-200 rounded-full pl-1 pr-1 py-1">
+                  <button
+                    onClick={onQuitar}
+                    aria-label={`Quitar una unidad de ${item.nombre}`}
+                    className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-carbon-950 font-semibold leading-none"
+                  >
+                    −
+                  </button>
+                  <span className="text-sm font-semibold w-4 text-center tabular-nums">{cantidadEnCarrito}</span>
+                  <button
+                    onClick={onAgregar}
+                    aria-label={`Agregar una unidad de ${item.nombre}`}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-white font-semibold leading-none"
+                    style={{ backgroundColor: 'var(--color-acento)' }}
+                  >
+                    +
+                  </button>
+                </div>
+              ) : (
                 <button
                   onClick={onAgregar}
-                  aria-label={`Agregar una unidad de ${item.nombre}`}
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-white font-semibold leading-none"
+                  className="text-xs font-medium px-3.5 py-1.5 rounded-full text-white"
                   style={{ backgroundColor: 'var(--color-acento)' }}
                 >
-                  +
+                  + Agregar
                 </button>
-              </div>
-            ) : (
-              <button
-                onClick={onAgregar}
-                className="text-xs font-medium px-3.5 py-1.5 rounded-full text-white"
-                style={{ backgroundColor: 'var(--color-acento)' }}
-              >
-                + Agregar
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Foto grande con zoom táctil (pellizco con dos dedos) + arrastre cuando
+ * está acercada, y doble-tap/doble-click como atajo para alternar entre 1x
+ * y ~2.2x -- sin librería externa: son ~40 líneas de touch events crudos,
+ * no vale la pena la dependencia (y el peso extra) para esto.
+ *
+ * Deliberadamente con estado propio (no vive en CartaPage): cada foto tiene
+ * su propio zoom/paneo independiente, y al colapsar la fila el componente
+ * se desmonta entero -- la próxima vez que se expanda este mismo plato
+ * arranca limpio en 1x, no "recuerda" el acercamiento anterior.
+ */
+function FotoZoomable({ src, alt, apagada }) {
+  const [transform, setTransform] = useState({ escala: 1, x: 0, y: 0 })
+  const gestoRef = useRef({ modo: null, inicioDistancia: 0, inicioEscala: 1, ultimoX: 0, ultimoY: 0 })
+  const ultimoTapRef = useRef(0)
+
+  function distanciaEntreDedos(touches) {
+    const [a, b] = touches
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
+  }
+
+  function alternarZoom() {
+    setTransform((prev) => (prev.escala > 1 ? { escala: 1, x: 0, y: 0 } : { escala: 2.2, x: 0, y: 0 }))
+  }
+
+  function onTouchStart(e) {
+    if (e.touches.length === 2) {
+      gestoRef.current = {
+        modo: 'pellizco',
+        inicioDistancia: distanciaEntreDedos(e.touches),
+        inicioEscala: transform.escala,
+      }
+      return
+    }
+    if (e.touches.length === 1) {
+      const ahora = Date.now()
+      if (ahora - ultimoTapRef.current < 300) {
+        alternarZoom()
+        ultimoTapRef.current = 0
+        return
+      }
+      ultimoTapRef.current = ahora
+      if (transform.escala > 1) {
+        gestoRef.current = { modo: 'arrastre', ultimoX: e.touches[0].clientX, ultimoY: e.touches[0].clientY }
+      }
+    }
+  }
+
+  function onTouchMove(e) {
+    const gesto = gestoRef.current
+    if (gesto.modo === 'pellizco' && e.touches.length === 2) {
+      e.preventDefault()
+      const factor = distanciaEntreDedos(e.touches) / gesto.inicioDistancia
+      const nuevaEscala = Math.min(4, Math.max(1, gesto.inicioEscala * factor))
+      setTransform((prev) => ({
+        escala: nuevaEscala,
+        x: nuevaEscala === 1 ? 0 : prev.x,
+        y: nuevaEscala === 1 ? 0 : prev.y,
+      }))
+    } else if (gesto.modo === 'arrastre' && e.touches.length === 1) {
+      e.preventDefault()
+      const dx = e.touches[0].clientX - gesto.ultimoX
+      const dy = e.touches[0].clientY - gesto.ultimoY
+      gestoRef.current = { ...gesto, ultimoX: e.touches[0].clientX, ultimoY: e.touches[0].clientY }
+      setTransform((prev) => ({ ...prev, x: prev.x + dx, y: prev.y + dy }))
+    }
+  }
+
+  function onTouchEnd(e) {
+    if (e.touches.length === 0) gestoRef.current = { modo: null }
+  }
+
+  return (
+    <div
+      className="relative w-full aspect-[4/3] overflow-hidden rounded-2xl bg-papel-200 touch-none select-none"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onDoubleClick={alternarZoom}
+    >
+      <img
+        src={src}
+        alt={alt}
+        draggable={false}
+        className={`w-full h-full object-cover ${apagada ? 'grayscale-[35%]' : ''}`}
+        style={{
+          transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.escala})`,
+          transition: gestoRef.current.modo ? 'none' : 'transform 150ms ease-out',
+        }}
+      />
+      {transform.escala === 1 && (
+        <span className="absolute bottom-2 right-2 text-[10px] bg-carbon-950/60 text-white px-2 py-1 rounded-full pointer-events-none">
+          Pellizcá o doble-toque para acercar
+        </span>
+      )}
     </div>
   )
 }

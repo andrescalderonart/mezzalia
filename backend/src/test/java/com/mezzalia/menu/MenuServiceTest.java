@@ -2,6 +2,7 @@ package com.mezzalia.menu;
 
 import com.mezzalia.menu.excepcion.MenuExceptions;
 import com.mezzalia.menu.servicio.MenuService;
+import com.mezzalia.sucursal.SucursalContext;
 import com.mezzalia.tenant.Tenant;
 import com.mezzalia.tenant.TenantContext;
 import com.mezzalia.tenant.TenantRepository;
@@ -33,6 +34,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * @Service beans -- sus @Transactional quedan como metadata inerte acá, pero
  * el propio @DataJpaTest ya envuelve cada test en una transacción que hace
  * rollback al final, así que la persistencia real se prueba igual.
+ *
+ * 2026-09-11: cada categoria/item ahora exige sucursal seleccionada
+ * (MenuService.sucursalActual() nunca acepta null, ver su javadoc), asi que
+ * todo test que llegue a crearCategoria()/crearItem() necesita
+ * SucursalContext.establecerSucursalId(...) antes -- se usa el placeholder
+ * 1L, mismo criterio que Mesa.sucursalId en PedidoServiceTest, porque a
+ * estos tests no les importa el valor real, solo que exista. Los tests de
+ * unSuperAdminSinTenantEnContextoNoPuedeXxx NO lo necesitan: fallan por
+ * SinTenantEnContextoException antes de llegar a sucursalActual() (el chequeo
+ * de tenant va primero).
  */
 @DataJpaTest
 class MenuServiceTest {
@@ -51,6 +62,7 @@ class MenuServiceTest {
     @AfterEach
     void limpiarContexto() {
         TenantContext.limpiar();
+        SucursalContext.limpiar();
         SecurityContextHolder.clearContext();
     }
 
@@ -63,6 +75,7 @@ class MenuServiceTest {
 
         autenticarComo("admin.a");
         TenantContext.establecerTenantId(tenantA.getId());
+        SucursalContext.establecerSucursalId(1L);
         CategoriaMenu categoriaA = menuService.crearCategoria("Entradas", 0);
         ItemMenu itemA = menuService.crearItem(
                 categoriaA.getId(), "Ceviche", "Ceviche de camarón", new BigDecimal("35000"), null);
@@ -72,10 +85,80 @@ class MenuServiceTest {
         // Ahora "entra" un admin del tenant B e intenta tocar el item de A por id.
         autenticarComo("admin.b");
         TenantContext.establecerTenantId(tenantB.getId());
+        SucursalContext.establecerSucursalId(1L);
 
         assertThatThrownBy(() ->
                 menuService.actualizarItem(itemA.getId(), "Hackeado", "desc", new BigDecimal("1"), null))
                 .isInstanceOf(MenuExceptions.ItemMenuNoEncontradoException.class);
+    }
+
+    /**
+     * 2026-09-11: el mismo ataque que arriba pero sin cambiar de tenant --
+     * un admin del MISMO restaurante, logueado sobre otra sucursal, intenta
+     * tocar un item por id que sabe (o adivina) que pertenece a la carta de
+     * otra sucursal. Antes de esta version, MenuService no tenia forma de
+     * distinguir esto (solo comparaba tenant_id); hoy obtenerItem() exige
+     * tambien perteneceALaSucursalActual(), y esta era la unica prueba que
+     * faltaba para confirmarlo (ver MenuService.obtenerItem/obtenerCategoria).
+     */
+    @Test
+    void unaSucursalNoPuedeEditarUnItemDeOtraSucursalDelMismoTenantAunqueAdivineElId() {
+        MenuService menuService = nuevoMenuService();
+
+        Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Multisucursal Edicion"));
+        autenticarComo("admin.multisucursal");
+        TenantContext.establecerTenantId(tenant.getId());
+
+        SucursalContext.establecerSucursalId(10L);
+        CategoriaMenu categoria = menuService.crearCategoria("Entradas", 0);
+        ItemMenu item = menuService.crearItem(
+                categoria.getId(), "Ceviche", "Ceviche de camarón", new BigDecimal("35000"), null);
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        // Mismo tenant, otra sucursal -- debe resolver "no encontrado",
+        // exactamente el mismo criterio que usa este servicio para evitar
+        // confirmarle a un atacante que el recurso existe en otro lado.
+        SucursalContext.establecerSucursalId(20L);
+        assertThatThrownBy(() ->
+                menuService.actualizarItem(item.getId(), "Hackeado", "desc", new BigDecimal("1"), null))
+                .isInstanceOf(MenuExceptions.ItemMenuNoEncontradoException.class);
+    }
+
+    /**
+     * 2026-09-11: del lado de lectura -- listarCategorias() debe devolver
+     * SOLO la carta de la sucursal seleccionada, nunca la de otra sucursal
+     * del mismo tenant mezclada. Es la prueba directa de la decision de
+     * producto "menu totalmente independiente por sucursal" (Andres,
+     * 2026-09-10): sin esto, nada en el suite confirmaba que las dos cartas
+     * de verdad quedan separadas y no solo que "existe una columna
+     * sucursal_id".
+     */
+    @Test
+    void listarCategoriasSoloDevuelveLasDeLaSucursalSeleccionada() {
+        MenuService menuService = nuevoMenuService();
+
+        Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Multisucursal Listado"));
+        autenticarComo("admin.multisucursal");
+        TenantContext.establecerTenantId(tenant.getId());
+
+        SucursalContext.establecerSucursalId(10L);
+        menuService.crearCategoria("Entradas Centro", 0);
+        testEntityManager.flush();
+
+        SucursalContext.establecerSucursalId(20L);
+        menuService.crearCategoria("Entradas Norte", 0);
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        assertThat(menuService.listarCategorias())
+                .extracting(CategoriaMenu::getNombre)
+                .containsExactly("Entradas Norte");
+
+        SucursalContext.establecerSucursalId(10L);
+        assertThat(menuService.listarCategorias())
+                .extracting(CategoriaMenu::getNombre)
+                .containsExactly("Entradas Centro");
     }
 
     @Test
@@ -85,6 +168,7 @@ class MenuServiceTest {
         Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Historial"));
         autenticarComo("admin.demo");
         TenantContext.establecerTenantId(tenant.getId());
+        SucursalContext.establecerSucursalId(1L);
 
         CategoriaMenu categoria = menuService.crearCategoria("Fuertes", 0);
         ItemMenu item = menuService.crearItem(categoria.getId(), "Bandeja paisa", null, new BigDecimal("28000"), null);
@@ -110,6 +194,7 @@ class MenuServiceTest {
         Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante SinCambio"));
         autenticarComo("admin.demo");
         TenantContext.establecerTenantId(tenant.getId());
+        SucursalContext.establecerSucursalId(1L);
 
         CategoriaMenu categoria = menuService.crearCategoria("Entradas", 0);
         ItemMenu item = menuService.crearItem(categoria.getId(), "Sopa", null, new BigDecimal("15000"), null);
@@ -128,6 +213,7 @@ class MenuServiceTest {
         Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Delete"));
         autenticarComo("admin.demo");
         TenantContext.establecerTenantId(tenant.getId());
+        SucursalContext.establecerSucursalId(1L);
 
         CategoriaMenu categoria = menuService.crearCategoria("Postres", 0);
         ItemMenu item = menuService.crearItem(categoria.getId(), "Flan", null, new BigDecimal("9000"), null);
@@ -149,6 +235,7 @@ class MenuServiceTest {
         Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Precio"));
         autenticarComo("admin.demo");
         TenantContext.establecerTenantId(tenant.getId());
+        SucursalContext.establecerSucursalId(1L);
         CategoriaMenu categoria = menuService.crearCategoria("Bebidas", 0);
 
         assertThatThrownBy(() ->
@@ -162,7 +249,8 @@ class MenuServiceTest {
         autenticarComo("superadmin");
         // A propósito NO se llama TenantContext.establecerTenantId(...): así
         // llega un SUPER_ADMIN real (JwtAuthenticationFilter nunca activa
-        // TenantContext para ese rol, ver UsuarioInterno).
+        // TenantContext para ese rol, ver UsuarioInterno). Tampoco hace falta
+        // SucursalContext aca: tenantActual() se evalua primero y ya lanza.
 
         assertThatThrownBy(() -> menuService.crearCategoria("Lo que sea", 0))
                 .isInstanceOf(MenuExceptions.SinTenantEnContextoException.class);

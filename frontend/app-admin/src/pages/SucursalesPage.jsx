@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react'
-import { useApiJson } from '../context/AuthContext.jsx'
+import { useNavigate } from 'react-router-dom'
+import { useApiJson, useAuth } from '../context/AuthContext.jsx'
 
 // RF-10/documentacion-tecnica.md §7 -- exclusivo de ADMIN_RESTAURANTE (ver
 // App.jsx/Layout.jsx). Backend: sucursal.controlador.SucursalAdminController.
 // ALCANCE REAL (ver el aviso largo en backend/.../sucursal/Sucursal.java):
-// hoy solo Mesa queda asociada a una sucursal -- la carta y los pedidos
-// todavía se comparten entre todas las sucursales de un tenant.
+// Mesa, Carta (categorias_menu/items_menu) y Pedido quedan asociados a una
+// sucursal -- cada sucursal tiene su propia carta totalmente independiente
+// (decision de producto, 2026-09-10). Antes de ese cambio esta nota decia lo
+// contrario ("la carta todavia se comparte entre sucursales") -- si ves ese
+// texto en otro lado, esta desactualizado.
 //
 // Usa GET /api/admin/sucursales/todas (no el GET general que consume el
 // selector de sucursal del MESERO) porque esta pantalla es de gestión y
@@ -15,6 +19,8 @@ import { useApiJson } from '../context/AuthContext.jsx'
 // pero esta pantalla nunca lo llamaba).
 export default function SucursalesPage() {
   const apiJson = useApiJson()
+  const { usuario, seleccionarSucursal } = useAuth()
+  const navigate = useNavigate()
 
   const [sucursales, setSucursales] = useState([])
   const [cargando, setCargando] = useState(true)
@@ -25,6 +31,7 @@ export default function SucursalesPage() {
   const [creando, setCreando] = useState(false)
 
   const [viendoUsuariosDe, setViendoUsuariosDe] = useState(null)
+  const [trabajandoEnId, setTrabajandoEnId] = useState(null)
 
   async function cargarSucursales() {
     setCargando(true)
@@ -86,6 +93,32 @@ export default function SucursalesPage() {
     }
   }
 
+  /**
+   * 2026-09-11: antes de esto, la UNICA forma de cambiar de sucursal activa
+   * era navegar a mano a /seleccionar-sucursal -- no habia ningun link ni
+   * boton hacia ahi desde ninguna pantalla (ver App.jsx: esa ruta solo se
+   * alcanza por el 409 SUCURSAL_NO_SELECCIONADA o por URL directa). Eso
+   * generaba justo el tipo de confusion que motivo este cambio: un
+   * ADMIN_RESTAURANTE podia terminar creando categorias/items en una
+   * sucursal sin darse cuenta de en cual estaba, porque nada en la pantalla
+   * lo mostraba y no habia forma facil de cambiar. Este boton reusa el mismo
+   * seleccionarSucursal(...) que ya usa SeleccionarSucursalPage.jsx (mismo
+   * POST /api/admin/sesion/sucursal) y despues manda a /pedidos, el mismo
+   * destino por defecto que ya usa esa pantalla.
+   */
+  async function onTrabajarAqui(sucursal) {
+    setTrabajandoEnId(sucursal.id)
+    setError('')
+    try {
+      await seleccionarSucursal(sucursal.id)
+      navigate('/pedidos')
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setTrabajandoEnId(null)
+    }
+  }
+
   return (
     <div>
       <div className="mb-6">
@@ -141,6 +174,19 @@ export default function SucursalesPage() {
                 <div className="text-[11px] text-crema/40">{sucursal.direccion || 'Sin dirección registrada'}</div>
               </div>
               <div className="flex items-center gap-2">
+                {sucursal.activa && (
+                  usuario?.sucursalId === sucursal.id ? (
+                    <span className="text-[11px] text-dorado px-3 py-2">Trabajando aquí</span>
+                  ) : (
+                    <button
+                      onClick={() => onTrabajarAqui(sucursal)}
+                      disabled={trabajandoEnId !== null}
+                      className="btn-primario text-xs py-2"
+                    >
+                      {trabajandoEnId === sucursal.id ? 'Entrando…' : 'Trabajar aquí'}
+                    </button>
+                  )
+                )}
                 <button onClick={() => setViendoUsuariosDe(sucursal)} className="btn-secundario text-xs py-2">
                   Meseros
                 </button>
