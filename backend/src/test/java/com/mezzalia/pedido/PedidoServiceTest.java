@@ -60,6 +60,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * filtro de Hibernate a proposito: MenuService.obtenerItem hace su propia
  * defensa explicita contra TenantContext (ver ese comentario), no depende
  * del filtro de sesion para este flujo.
+ *
+ * 2026-09-11: MenuService ahora exige sucursal seleccionada SIEMPRE (ver su
+ * javadoc), y ademas obtenerItem()/obtenerCategoria() comparan sucursal_id
+ * igual que tenant_id -- asi que prepararEscenario() establece
+ * SucursalContext con el mismo placeholder (1L) que ya usaba nuevaMesa()
+ * para Mesa.sucursalId, exactamente el mismo criterio que ese metodo. Donde
+ * el propio test ejercita aislamiento entre sucursales reales (sucursalA/
+ * sucursalB) no se usa prepararEscenario(): cada escenario arma su propia
+ * carta bajo la sucursal correcta, porque con "menu totalmente independiente
+ * por sucursal" (decision de producto, 2026-09-10) ya no existe un item
+ * compartible entre mesas de sucursales distintas.
  */
 @DataJpaTest
 class PedidoServiceTest {
@@ -226,7 +237,9 @@ class PedidoServiceTest {
         // tenant que acaba de crear -- la segunda llamada (otraMesa) pisa el
         // valor dejado por la primera. Sin re-establecerlo aca antes del
         // loop, MenuService.obtenerItem busca itemA bajo el tenant de
-        // otraMesa y falla con ItemMenuNoEncontradoException.
+        // otraMesa y falla con ItemMenuNoEncontradoException. SucursalContext
+        // no hace falta re-establecerlo: ambos escenarios usan el mismo
+        // placeholder de sucursal (1L, ver nuevaMesa()).
         TenantContext.establecerTenantId(mesaAgotada.tenant.getId());
         for (int i = 0; i < 20; i++) {
             pedidoService.crearPedido(mesaAgotada.mesa.getId(), UUID.randomUUID().toString(),
@@ -356,6 +369,13 @@ class PedidoServiceTest {
      * /api/admin/pedidos/{id}/estado no tiene @PreAuthorize de rol (ver
      * PedidoAdminController), asi que ese endpoint SI es alcanzable por
      * cualquier MESERO autenticado del tenant.
+     *
+     * 2026-09-11: el item de esta mesa ahora vive en la carta de sucursalB
+     * (menu totalmente independiente por sucursal) -- SucursalContext se
+     * establece en sucursalB ANTES de crear la categoria/item/pedido,
+     * exactamente lo que MenuPublicoController.ejecutarConSucursal hace en
+     * produccion con la sucursal real de la mesa, y solo se cambia a
+     * sucursalA despues, para el intento de cambiarEstado bajo prueba.
      */
     @Test
     void unMeseroConSucursalSeleccionadaNoPuedeCambiarEstadoDePedidosDeOtraSucursalDelMismoTenant() {
@@ -365,6 +385,8 @@ class PedidoServiceTest {
         TenantContext.establecerTenantId(tenant.getId());
         Sucursal sucursalA = nuevaSucursal(tenant.getId());
         Sucursal sucursalB = nuevaSucursal(tenant.getId());
+
+        SucursalContext.establecerSucursalId(sucursalB.getId());
         CategoriaMenu categoria = nuevoMenuService().crearCategoria("Categoria", 0);
         ItemMenu item = crearItem(categoria, "Limonada", "8000");
         Mesa mesaDeB = mesaRepository.save(nuevaMesaEnSucursal(tenant.getId(), "B1", sucursalB.getId()));
@@ -380,6 +402,17 @@ class PedidoServiceTest {
                 .isInstanceOf(PedidoExceptions.PedidoNoEncontradoException.class);
     }
 
+    /**
+     * 2026-09-11: reestructurado para "menu totalmente independiente por
+     * sucursal" -- antes de este cambio el fixture pedia el MISMO item para
+     * la mesa de sucursalA y la de sucursalB, algo que ya no es posible: un
+     * ItemMenu vive en una sola sucursal (hereda sucursal_id de su
+     * categoria, ver ItemMenu.java), asi que pedir itemA desde una mesa de
+     * sucursalB ahora falla con ItemMenuNoEncontradoException (correcto: es
+     * exactamente el mismo chequeo que impide pedir un plato de otro
+     * restaurante). Cada sucursal arma su propia categoria/item bajo su
+     * propio SucursalContext antes de crear su pedido.
+     */
     @Test
     void listarPedidosAcotaPorSucursalCuandoUnMeseroYaSeleccionoUna() {
         PedidoService pedidoService = nuevoPedidoService();
@@ -388,15 +421,25 @@ class PedidoServiceTest {
         TenantContext.establecerTenantId(tenant.getId());
         Sucursal sucursalA = nuevaSucursal(tenant.getId());
         Sucursal sucursalB = nuevaSucursal(tenant.getId());
-        CategoriaMenu categoria = nuevoMenuService().crearCategoria("Categoria", 0);
-        ItemMenu item = crearItem(categoria, "Limonada", "8000");
+
+        SucursalContext.establecerSucursalId(sucursalA.getId());
+        CategoriaMenu categoriaA = nuevoMenuService().crearCategoria("Categoria A", 0);
+        ItemMenu itemA = crearItem(categoriaA, "Limonada", "8000");
+
+        SucursalContext.establecerSucursalId(sucursalB.getId());
+        CategoriaMenu categoriaB = nuevoMenuService().crearCategoria("Categoria B", 0);
+        ItemMenu itemB = crearItem(categoriaB, "Limonada", "8000");
+
         Mesa mesaDeA = mesaRepository.save(nuevaMesaEnSucursal(tenant.getId(), "A1", sucursalA.getId()));
         Mesa mesaDeB = mesaRepository.save(nuevaMesaEnSucursal(tenant.getId(), "B1", sucursalB.getId()));
 
+        SucursalContext.establecerSucursalId(sucursalA.getId());
         Pedido pedidoDeA = pedidoService.crearPedido(mesaDeA.getId(), UUID.randomUUID().toString(),
-                List.of(new ItemSolicitadoRequest(item.getId(), 1)), null, null);
+                List.of(new ItemSolicitadoRequest(itemA.getId(), 1)), null, null);
+
+        SucursalContext.establecerSucursalId(sucursalB.getId());
         pedidoService.crearPedido(mesaDeB.getId(), UUID.randomUUID().toString(),
-                List.of(new ItemSolicitadoRequest(item.getId(), 1)), null, null);
+                List.of(new ItemSolicitadoRequest(itemB.getId(), 1)), null, null);
 
         SucursalContext.marcarRequiereSeleccion(true);
         SucursalContext.establecerSucursalId(sucursalA.getId());
@@ -441,6 +484,11 @@ class PedidoServiceTest {
         Tenant tenant = tenantRepository.save(nuevoTenant(nombreTenant));
         autenticarComo("admin.test");
         TenantContext.establecerTenantId(tenant.getId());
+        // Mismo placeholder que nuevaMesa() usa para Mesa.sucursalId (1L):
+        // a estos tests no les importa el valor real de la sucursal, solo
+        // que MenuService.sucursalActual() encuentre algo (nunca acepta
+        // null, ver su javadoc).
+        SucursalContext.establecerSucursalId(1L);
 
         CategoriaMenu categoria = nuevoMenuService().crearCategoria("Categoria", 0);
         Mesa mesa = mesaRepository.save(nuevaMesa(tenant.getId(), "M1"));
@@ -471,7 +519,8 @@ class PedidoServiceTest {
         // RF-10: Mesa.sucursalId es NOT NULL desde V16__mesas_sucursal_id.sql,
         // pero sin FK a nivel de JPA (ver Mesa.java) -- estos tests de pedido
         // no ejercen nada de Sucursal, un valor fijo alcanza para satisfacer
-        // la restriccion NOT NULL sin crear una Sucursal real de mas.
+        // la restriccion NOT NULL sin crear una Sucursal real de mas. Debe
+        // coincidir con el SucursalContext que establece prepararEscenario().
         mesa.setSucursalId(1L);
         mesa.setCodigo(codigo);
         return mesa;

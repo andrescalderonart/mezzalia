@@ -35,6 +35,12 @@ import java.util.List;
  * GET no llevan @PreAuthorize adicional, solo la autenticación que ya exige
  * SecurityConfig para /api/admin/**. Crear/editar/borrar SÍ está restringido
  * a ADMIN_RESTAURANTE: un mesero no debe poder tocar precios ni la carta.
+ *
+ * 2026-09-10: cada sucursal tiene su propia carta -- todos los endpoints de
+ * este controller operan sobre la sucursal actualmente seleccionada por el
+ * usuario autenticado (ver MenuService.sucursalActual(), que exige
+ * selección siempre, a diferencia de Mesa/Pedido). El frontend debe forzar
+ * la selección de sucursal antes de dejar entrar a la sección de carta.
  */
 @RestController
 @RequestMapping("/api/admin/menu")
@@ -102,5 +108,21 @@ public class MenuAdminController {
     public ResponseEntity<Void> eliminarItem(@PathVariable Long id) {
         menuService.eliminarItem(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 2026-09-10: copia la carta de otra sucursal (sucursalOrigenId) hacia
+     * la sucursal que el usuario tiene seleccionada ahora mismo. Rechaza si
+     * la sucursal destino ya tiene carta activa (ver
+     * MenuExceptions.SucursalDestinoYaTieneCartaException) -- nunca mezcla
+     * ni sobrescribe en silencio.
+     */
+    @PostMapping("/duplicar")
+    @PreAuthorize("hasRole('ADMIN_RESTAURANTE')")
+    public ResponseEntity<List<CategoriaMenuDto>> duplicarMenu(@RequestParam Long sucursalOrigenId) {
+        List<CategoriaMenuDto> categorias = menuService.duplicarMenuDesdeSucursal(sucursalOrigenId).stream()
+                .map(CategoriaMenuDto::desde)
+                .toList();
+        return ResponseEntity.status(HttpStatus.CREATED).body(categorias);
     }
 }

@@ -13,6 +13,7 @@ import com.mezzalia.mesa.servicio.MesaService;
 import com.mezzalia.pedido.dto.ItemSolicitadoRequest;
 import com.mezzalia.pedido.excepcion.PedidoExceptions;
 import com.mezzalia.pedido.servicio.PedidoService;
+import com.mezzalia.sucursal.SucursalContext;
 import com.mezzalia.sucursal.servicio.SucursalService;
 import com.mezzalia.tenant.Tenant;
 import com.mezzalia.tenant.TenantContext;
@@ -79,6 +80,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  *  - TenantContext tambien es ThreadLocal (ver TenantContext.java): hay que
  *    establecerlo DENTRO de cada hilo de fondo, no alcanza con haberlo
  *    puesto en el hilo principal antes de lanzarlos.
+ *  - 2026-09-11: mismo razonamiento aplica ahora a SucursalContext -- tambien
+ *    es ThreadLocal, y MenuService.obtenerItem (llamado desde
+ *    PedidoService.crearPedido via obtenerItemDisponibleParaPedido) exige
+ *    que coincida con la sucursal del item. Se establece en el hilo
+ *    principal para crear la categoria/item, y de nuevo DENTRO de cada hilo
+ *    de fondo antes de crearPedido -- exactamente el mismo patron que
+ *    TenantContext aca abajo.
  */
 @DataJpaTest
 @Import({MenuService.class, PedidoService.class, MesaService.class, SucursalService.class})
@@ -107,6 +115,7 @@ class PedidoServiceConcurrenciaTest {
     @AfterEach
     void limpiarContexto() {
         TenantContext.limpiar();
+        SucursalContext.limpiar();
         SecurityContextHolder.clearContext();
     }
 
@@ -116,10 +125,15 @@ class PedidoServiceConcurrenciaTest {
         autenticarComo("admin.test");
         Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Concurrencia"));
         TenantContext.establecerTenantId(tenant.getId());
+        // Mismo placeholder que nuevaMesa() usa para Mesa.sucursalId (1L):
+        // MenuService.sucursalActual() nunca acepta null (ver su javadoc), y
+        // el item creado aca debe coincidir con la sucursal de la mesa.
+        SucursalContext.establecerSucursalId(1L);
         CategoriaMenu categoria = menuService.crearCategoria("Categoria", 0);
         ItemMenu item = menuService.crearItem(categoria.getId(), "Item", null, new BigDecimal("10000"), null);
         Mesa mesa = mesaRepository.save(nuevaMesa(tenant.getId(), "M1"));
         TenantContext.limpiar(); // el hilo principal no vuelve a llamar a crearPedido: cada hilo de fondo pone la suya
+        SucursalContext.limpiar();
 
         String claveCompartida = UUID.randomUUID().toString();
         List<ItemSolicitadoRequest> items = List.of(new ItemSolicitadoRequest(item.getId(), 1));
@@ -130,6 +144,7 @@ class PedidoServiceConcurrenciaTest {
         Callable<Resultado> tarea = () -> {
             autenticarComo("admin.test");
             TenantContext.establecerTenantId(tenant.getId());
+            SucursalContext.establecerSucursalId(1L);
             try {
                 listos.countDown();
                 salida.await(5, TimeUnit.SECONDS);
@@ -139,6 +154,7 @@ class PedidoServiceConcurrenciaTest {
                 return Resultado.duplicado();
             } finally {
                 TenantContext.limpiar();
+                SucursalContext.limpiar();
             }
         };
 
@@ -209,7 +225,8 @@ class PedidoServiceConcurrenciaTest {
         // RF-10: Mesa.sucursalId es NOT NULL desde V16__mesas_sucursal_id.sql,
         // pero sin FK a nivel de JPA (ver Mesa.java) -- estos tests de pedido
         // no ejercen nada de Sucursal, un valor fijo alcanza para satisfacer
-        // la restriccion NOT NULL sin crear una Sucursal real de mas.
+        // la restriccion NOT NULL sin crear una Sucursal real de mas. Debe
+        // coincidir con el SucursalContext establecido arriba.
         mesa.setSucursalId(1L);
         mesa.setCodigo(codigo);
         return mesa;

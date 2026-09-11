@@ -13,6 +13,7 @@ import com.mezzalia.pedido.servicio.PedidoService;
 import com.mezzalia.menu.dto.CategoriaPublicaDto;
 import com.mezzalia.menu.dto.ItemPublicoDto;
 import com.mezzalia.menu.servicio.MenuService;
+import com.mezzalia.sucursal.SucursalContext;
 import com.mezzalia.tenant.Tenant;
 import com.mezzalia.tenant.TenantFilterActivator;
 import com.mezzalia.tenant.dto.BrandingDto;
@@ -29,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 @RestController
 @RequestMapping("/api/publico/mesas")
@@ -52,6 +54,13 @@ public class MenuPublicoController {
      * tenants, no solo el de esta mesa -- la fuga de datos entre
      * restaurantes que documentacion-tecnica.md §6 marca como el riesgo #1
      * de este tipo de sistema.
+     *
+     * 2026-09-10: mismo argumento aplica ahora a sucursal, no solo a tenant
+     * -- cada sucursal tiene su propia carta, y esta mesa pertenece a UNA
+     * sucursal fija (nunca cambia). ejecutarConSucursal puebla
+     * SucursalContext con esa sucursal, para que MenuService (que ahora
+     * exige sucursal seleccionada siempre, ver su javadoc) devuelva la
+     * carta correcta sin tener que cambiar la firma de sus métodos.
      */
     @GetMapping("/{token}/carta")
     public ResponseEntity<CartaPublicaDto> obtenerCarta(@PathVariable String token) {
@@ -66,20 +75,23 @@ public class MenuPublicoController {
             throw new MesaExceptions.RestauranteNoDisponibleException();
         }
 
-        CartaPublicaDto carta = tenantFilterActivator.ejecutarConTenant(tenantId, () -> {
-            var categorias = menuService.listarCategorias().stream()
-                    .map(categoria -> {
-                        var items = menuService.listarItemsDeCategoria(categoria.getId()).stream()
-                                .map(ItemPublicoDto::desde)
-                                .toList();
-                        return CategoriaPublicaDto.desde(categoria, items);
-                    })
-                    .toList();
+        Long sucursalId = mesaService.obtenerSucursalIdDeMesa(sesion.getMesaId());
 
-            BrandingDto branding = new BrandingDto(
-                    tenant.getLogoUrl(), tenant.getColorPrimario(), tenant.getColorSecundario());
-            return new CartaPublicaDto(sesion.getMesaId(), tenant.getNombre(), branding, categorias);
-        });
+        CartaPublicaDto carta = tenantFilterActivator.ejecutarConTenant(tenantId, () ->
+                ejecutarConSucursal(sucursalId, () -> {
+                    var categorias = menuService.listarCategorias().stream()
+                            .map(categoria -> {
+                                var items = menuService.listarItemsDeCategoria(categoria.getId()).stream()
+                                        .map(ItemPublicoDto::desde)
+                                        .toList();
+                                return CategoriaPublicaDto.desde(categoria, items);
+                            })
+                            .toList();
+
+                    BrandingDto branding = new BrandingDto(
+                            tenant.getLogoUrl(), tenant.getColorPrimario(), tenant.getColorSecundario());
+                    return new CartaPublicaDto(sesion.getMesaId(), tenant.getNombre(), branding, categorias);
+                }));
 
         return ResponseEntity.ok(carta);
     }
@@ -92,6 +104,14 @@ public class MenuPublicoController {
      * (TenantFilterActivator) para poder reusar PedidoService/MenuService
      * sin fuga entre tenants -- ver el comentario de obtenerCarta arriba
      * para el detalle de por que esto no es opcional.
+     *
+     * 2026-09-10: mismo agregado que obtenerCarta -- se puebla
+     * SucursalContext con la sucursal real de la mesa antes de crear el
+     * pedido, para que MenuService.obtenerItemDisponibleParaPedido (llamado
+     * desde PedidoService.crearPedido) rechace un itemMenuId de OTRA
+     * sucursal del mismo tenant con el mismo "no encontrado" generico que
+     * ya usa para tenant -- sin este cambio, el endpoint publico aceptaria
+     * items de cualquier sucursal del restaurante, no solo la de esta mesa.
      */
     @PostMapping("/{token}/pedidos")
     public ResponseEntity<PedidoDto> crearPedido(@PathVariable String token, @Valid @RequestBody CrearPedidoRequest request) {
@@ -106,16 +126,38 @@ public class MenuPublicoController {
             throw new MesaExceptions.RestauranteNoDisponibleException();
         }
 
-        PedidoDto dto = tenantFilterActivator.ejecutarConTenant(tenantId, () -> {
-            Pedido pedido = pedidoService.crearPedido(
-                    sesion.getMesaId(), request.claveIdempotencia(), request.items(),
-                    request.notas(), request.comensal());
-            List<PedidoItemDto> items = pedidoService.listarItems(pedido.getId()).stream()
-                    .map(PedidoItemDto::desde)
-                    .toList();
-            return PedidoDto.desde(pedido, items);
-        });
+        Long sucursalId = mesaService.obtenerSucursalIdDeMesa(sesion.getMesaId());
+
+        PedidoDto dto = tenantFilterActivator.ejecutarConTenant(tenantId, () ->
+                ejecutarConSucursal(sucursalId, () -> {
+                    Pedido pedido = pedidoService.crearPedido(
+                            sesion.getMesaId(), request.claveIdempotencia(), request.items(),
+                            request.notas(), request.comensal());
+                    List<PedidoItemDto> items = pedidoService.listarItems(pedido.getId()).stream()
+                            .map(PedidoItemDto::desde)
+                            .toList();
+                    return PedidoDto.desde(pedido, items);
+                }));
 
         return ResponseEntity.status(HttpStatus.CREATED).body(dto);
+    }
+
+    /**
+     * Mismo patron que TenantFilterActivator.ejecutarConTenant, pero para
+     * SucursalContext -- deliberadamente NO se agrega a esa clase (que es
+     * código de tenant ya verificado; ver su propio javadoc sobre por qué
+     * no se toca) ni se reutiliza JwtAuthenticationFilter. Aquí sucursalId
+     * siempre viene de una mesa real y nunca es null, así que a
+     * MenuService le basta con SucursalContext.obtenerSucursalId() -- no
+     * hace falta poblar requiereSeleccion() (esa distinción es solo para
+     * el camino autenticado de staff, ver SucursalContext).
+     */
+    private <T> T ejecutarConSucursal(Long sucursalId, Supplier<T> accion) {
+        SucursalContext.establecerSucursalId(sucursalId);
+        try {
+            return accion.get();
+        } finally {
+            SucursalContext.limpiar();
+        }
     }
 }
