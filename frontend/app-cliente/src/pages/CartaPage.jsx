@@ -417,47 +417,142 @@ function ItemFila({ item, expandido, onAlternarExpandido, cantidadEnCarrito, onA
         )}
       </button>
 
+      {/* key={item.id}: fuerza a React a desmontar/remontar DetalleExpandido
+          cada vez que cambia el plato expandido (y también al colapsar y
+          volver a expandir el mismo), para que `vista` (foto vs 3D) siempre
+          arranque en 'foto' -- mismo criterio que ya usaba FotoZoomable para
+          resetear su propio zoom. */}
       {expandido && (
-        <div className="pb-4 -mt-1 animate-fadeInUp">
-          {item.imagenUrl ? (
-            <FotoZoomable src={item.imagenUrl} alt={item.nombre} apagada={!item.disponible} />
-          ) : (
-            <div className="w-full aspect-[4/3] rounded-2xl bg-papel-200 flex items-center justify-center text-carbon-900/20 text-xs">
-              Sin foto
-            </div>
-          )}
+        <DetalleExpandido
+          key={item.id}
+          item={item}
+          cantidadEnCarrito={cantidadEnCarrito}
+          onAgregar={onAgregar}
+          onQuitar={onQuitar}
+        />
+      )}
+    </div>
+  )
+}
 
-          {item.disponible && (
-            <div className="mt-3.5 flex justify-end">
-              {cantidadEnCarrito > 0 ? (
-                <div className="flex items-center gap-3 bg-papel-200 rounded-full pl-1 pr-1 py-1">
-                  <button
-                    onClick={onQuitar}
-                    aria-label={`Quitar una unidad de ${item.nombre}`}
-                    className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-carbon-950 font-semibold leading-none"
-                  >
-                    −
-                  </button>
-                  <span className="text-sm font-semibold w-4 text-center tabular-nums">{cantidadEnCarrito}</span>
-                  <button
-                    onClick={onAgregar}
-                    aria-label={`Agregar una unidad de ${item.nombre}`}
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-white font-semibold leading-none"
-                    style={{ backgroundColor: 'var(--color-acento)' }}
-                  >
-                    +
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={onAgregar}
-                  className="text-xs font-medium px-3.5 py-1.5 rounded-full text-white"
-                  style={{ backgroundColor: 'var(--color-acento)' }}
-                >
-                  + Agregar
-                </button>
-              )}
+/**
+ * 2026-09-11: contenido del plato expandido -- foto (o modelo 3D/AR si el
+ * item tiene ambas URLs) + stepper de cantidad. Separado de ItemFila para
+ * que el estado `vista` (foto vs 3D) sea nuevo cada vez que se expande un
+ * plato, en vez de "recordar" la última pestaña elegida en otro plato.
+ *
+ * Por qué el toggle exige las DOS urls (modeloGlbUrl y modeloUsdzUrl) y no
+ * alcanza con una: Safari en iOS no soporta WebXR AR y solo abre AR Quick
+ * Look vía un archivo .usdz; Android usa Scene Viewer vía .glb -- son dos
+ * formatos sin conversión automática entre sí, así que un modelo sin
+ * ambos no puede ofrecer AR real en los dos sistemas operativos (ver
+ * MenuService.actualizarModelo3d, que ya rechaza guardar uno solo).
+ */
+function DetalleExpandido({ item, cantidadEnCarrito, onAgregar, onQuitar }) {
+  const [vista, setVista] = useState('foto') // 'foto' | 'modelo3d'
+  const tieneModelo3d = Boolean(item.modeloGlbUrl && item.modeloUsdzUrl)
+
+  function verModelo3d() {
+    // <model-viewer> (y el archivo .glb/.usdz que carga) pesan varios MB --
+    // mucho más que la foto -- así que se importa bajo demanda, solo si el
+    // comensal de verdad toca "Ver en 3D". Cargarlo siempre que hay un
+    // modelo disponible violaría el mismo NFR de "carta en <2s en wifi de
+    // restaurante" que ya obligó al diseño de CartaPublicaDto en el backend.
+    import('@google/model-viewer').then(() => setVista('modelo3d'))
+  }
+
+  return (
+    <div className="pb-4 -mt-1 animate-fadeInUp">
+      {tieneModelo3d && (
+        <div className="flex gap-2 mb-2.5">
+          <button
+            onClick={() => setVista('foto')}
+            className="text-[11px] font-medium px-3 py-1 rounded-full"
+            style={
+              vista === 'foto'
+                ? { backgroundColor: 'var(--color-acento)', color: '#fff' }
+                : { backgroundColor: 'rgba(13,12,11,0.06)', color: 'rgba(13,12,11,0.6)' }
+            }
+          >
+            Foto
+          </button>
+          <button
+            onClick={verModelo3d}
+            className="text-[11px] font-medium px-3 py-1 rounded-full"
+            style={
+              vista === 'modelo3d'
+                ? { backgroundColor: 'var(--color-acento)', color: '#fff' }
+                : { backgroundColor: 'rgba(13,12,11,0.06)', color: 'rgba(13,12,11,0.6)' }
+            }
+          >
+            Ver en 3D · AR
+          </button>
+        </div>
+      )}
+
+      {vista === 'modelo3d' && tieneModelo3d ? (
+        // ar-modes explícito (aunque coincide con el default de
+        // model-viewer) a propósito, para que quede documentado acá mismo
+        // cuál es el camino real por sistema operativo: quick-look es
+        // AR Quick Look de iOS (usa ios-src/.usdz), scene-viewer es
+        // Android (usa src/.glb), webxr es el fallback in-browser en
+        // Android cuando Scene Viewer no está disponible. En Safari
+        // desktop/iOS sin soporte de AR, el visor cae solo al render
+        // WebGL normal (sin botón de AR).
+        <model-viewer
+          src={item.modeloGlbUrl}
+          ios-src={item.modeloUsdzUrl}
+          poster={item.imagenUrl || undefined}
+          alt={item.nombre}
+          ar="true"
+          ar-modes="webxr scene-viewer quick-look"
+          camera-controls="true"
+          auto-rotate="true"
+          shadow-intensity="1"
+          style={{
+            width: '100%',
+            aspectRatio: '4 / 3',
+            borderRadius: '1rem',
+            backgroundColor: 'rgba(13,12,11,0.04)',
+          }}
+        />
+      ) : item.imagenUrl ? (
+        <FotoZoomable src={item.imagenUrl} alt={item.nombre} apagada={!item.disponible} />
+      ) : (
+        <div className="w-full aspect-[4/3] rounded-2xl bg-papel-200 flex items-center justify-center text-carbon-900/20 text-xs">
+          Sin foto
+        </div>
+      )}
+
+      {item.disponible && (
+        <div className="mt-3.5 flex justify-end">
+          {cantidadEnCarrito > 0 ? (
+            <div className="flex items-center gap-3 bg-papel-200 rounded-full pl-1 pr-1 py-1">
+              <button
+                onClick={onQuitar}
+                aria-label={`Quitar una unidad de ${item.nombre}`}
+                className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-carbon-950 font-semibold leading-none"
+              >
+                −
+              </button>
+              <span className="text-sm font-semibold w-4 text-center tabular-nums">{cantidadEnCarrito}</span>
+              <button
+                onClick={onAgregar}
+                aria-label={`Agregar una unidad de ${item.nombre}`}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white font-semibold leading-none"
+                style={{ backgroundColor: 'var(--color-acento)' }}
+              >
+                +
+              </button>
             </div>
+          ) : (
+            <button
+              onClick={onAgregar}
+              className="text-xs font-medium px-3.5 py-1.5 rounded-full text-white"
+              style={{ backgroundColor: 'var(--color-acento)' }}
+            >
+              + Agregar
+            </button>
           )}
         </div>
       )}

@@ -40,3 +40,4 @@ backend/data/
 
 # Notas/reportes de sesion de Claude (scratch, no es parte del repo)
 /Claude outputs/
+diff_app_cliente.txt 

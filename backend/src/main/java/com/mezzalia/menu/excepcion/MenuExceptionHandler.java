@@ -66,6 +66,11 @@ public class MenuExceptionHandler {
         return respuesta(HttpStatus.CONFLICT, ex.getMessage());
     }
 
+    @ExceptionHandler(MenuExceptions.Modelo3dIncompletoException.class)
+    public ResponseEntity<Map<String, Object>> handleModelo3dIncompleto(MenuExceptions.Modelo3dIncompletoException ex) {
+        return respuesta(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, Object>> handleArchivoDemasiadoGrande(MaxUploadSizeExceededException ex) {
         return respuesta(HttpStatus.PAYLOAD_TOO_LARGE, "El archivo supera el tamaño máximo permitido");

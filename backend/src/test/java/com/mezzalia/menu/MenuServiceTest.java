@@ -243,6 +243,106 @@ class MenuServiceTest {
                 .isInstanceOf(MenuExceptions.PrecioInvalidoException.class);
     }
 
+    /**
+     * 2026-09-11: camino feliz de actualizarModelo3d -- ambas URLs se
+     * guardan, y null+null en una llamada posterior las limpia (quitarle
+     * el modelo 3D a un item que ya lo tenía es un caso válido, no un
+     * error).
+     */
+    @Test
+    void actualizarModelo3dConAmbasUrlsLasGuardaYConNullYNullLasLimpia() {
+        MenuService menuService = nuevoMenuService();
+
+        Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Modelo3d"));
+        autenticarComo("admin.demo");
+        TenantContext.establecerTenantId(tenant.getId());
+        SucursalContext.establecerSucursalId(1L);
+
+        CategoriaMenu categoria = menuService.crearCategoria("Fuertes", 0);
+        ItemMenu item = menuService.crearItem(categoria.getId(), "Bandeja paisa", null, new BigDecimal("28000"), null);
+        testEntityManager.flush();
+
+        ItemMenu actualizado = menuService.actualizarModelo3d(
+                item.getId(), "https://cdn.ejemplo.com/bandeja.glb", "https://cdn.ejemplo.com/bandeja.usdz");
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        assertThat(itemMenuRepository.findById(item.getId()).orElseThrow().getModeloGlbUrl())
+                .isEqualTo("https://cdn.ejemplo.com/bandeja.glb");
+        assertThat(actualizado.getModeloUsdzUrl()).isEqualTo("https://cdn.ejemplo.com/bandeja.usdz");
+
+        menuService.actualizarModelo3d(item.getId(), null, null);
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        ItemMenu limpio = itemMenuRepository.findById(item.getId()).orElseThrow();
+        assertThat(limpio.getModeloGlbUrl()).isNull();
+        assertThat(limpio.getModeloUsdzUrl()).isNull();
+    }
+
+    /**
+     * 2026-09-11: un modelo 3D con una sola URL no sirve -- confirmaria en
+     * la carta publica un boton "Ver en 3D" que solo funciona en un sistema
+     * operativo (ver el javadoc de MenuService.actualizarModelo3d). Ninguna
+     * de las dos combinaciones a medias debe persistirse.
+     */
+    @Test
+    void actualizarModelo3dConUnaSolaUrlLanzaExcepcionYNoPersisteNada() {
+        MenuService menuService = nuevoMenuService();
+
+        Tenant tenant = tenantRepository.save(nuevoTenant("Restaurante Modelo3dIncompleto"));
+        autenticarComo("admin.demo");
+        TenantContext.establecerTenantId(tenant.getId());
+        SucursalContext.establecerSucursalId(1L);
+
+        CategoriaMenu categoria = menuService.crearCategoria("Fuertes", 0);
+        ItemMenu item = menuService.crearItem(categoria.getId(), "Sancocho", null, new BigDecimal("22000"), null);
+        testEntityManager.flush();
+
+        assertThatThrownBy(() ->
+                menuService.actualizarModelo3d(item.getId(), "https://cdn.ejemplo.com/sancocho.glb", null))
+                .isInstanceOf(MenuExceptions.Modelo3dIncompletoException.class);
+
+        assertThatThrownBy(() ->
+                menuService.actualizarModelo3d(item.getId(), null, "https://cdn.ejemplo.com/sancocho.usdz"))
+                .isInstanceOf(MenuExceptions.Modelo3dIncompletoException.class);
+
+        testEntityManager.clear();
+        ItemMenu sinTocar = itemMenuRepository.findById(item.getId()).orElseThrow();
+        assertThat(sinTocar.getModeloGlbUrl()).isNull();
+        assertThat(sinTocar.getModeloUsdzUrl()).isNull();
+    }
+
+    /**
+     * 2026-09-11: mismo ataque que
+     * unTenantNoPuedeEditarUnItemDeOtroTenantAunqueAdivineElId, pero contra
+     * actualizarModelo3d -- confirma que hereda la defensa de obtenerItem()
+     * y no la saltea por ser un metodo nuevo.
+     */
+    @Test
+    void unTenantNoPuedeAsignarleModelo3dAUnItemDeOtroTenantAunqueAdivineElId() {
+        MenuService menuService = nuevoMenuService();
+
+        Tenant tenantA = tenantRepository.save(nuevoTenant("Restaurante Modelo3d A"));
+        Tenant tenantB = tenantRepository.save(nuevoTenant("Restaurante Modelo3d B"));
+
+        autenticarComo("admin.a");
+        TenantContext.establecerTenantId(tenantA.getId());
+        SucursalContext.establecerSucursalId(1L);
+        CategoriaMenu categoriaA = menuService.crearCategoria("Entradas", 0);
+        ItemMenu itemA = menuService.crearItem(categoriaA.getId(), "Ceviche", null, new BigDecimal("35000"), null);
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        autenticarComo("admin.b");
+        TenantContext.establecerTenantId(tenantB.getId());
+        SucursalContext.establecerSucursalId(1L);
+
+        assertThatThrownBy(() ->
+                menuService.actualizarModelo3d(itemA.getId(), "https://cdn.ejemplo.com/x.glb", "https://cdn.ejemplo.com/x.usdz"))
+                .isInstanceOf(MenuExceptions.ItemMenuNoEncontradoException.class);
+    }
+
     @Test
     void unSuperAdminSinTenantEnContextoNoPuedeCrearCategorias() {
         MenuService menuService = nuevoMenuService();

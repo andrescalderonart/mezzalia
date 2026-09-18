@@ -60,6 +60,35 @@ public class ItemMenu extends EntidadConTenant {
     @Column(name = "imagen_url", length = 500)
     private String imagenUrl;
 
+    /**
+     * URL del modelo 3D en formato glTF/GLB (2026-09-11) -- sirve para el
+     * render inline en cualquier navegador (WebGL) y para el AR en Android
+     * (Scene Viewer, disparado desde un link/intent a este mismo archivo).
+     * Ver modeloUsdzUrl para la contraparte obligatoria de iOS.
+     *
+     * Nullable a propósito, sin excepción: la gran mayoría de items nunca
+     * va a tener esto -- el modelo se genera por fotogrametría, plato por
+     * plato, fuera de esta aplicación (no hay endpoint de subida todavía,
+     * se carga la URL ya alojada externamente, ver
+     * MenuService.actualizarModelo3d). CartaPage.jsx (app-cliente) solo
+     * ofrece "Ver en 3D" cuando AMBAS urls (glb y usdz) están presentes --
+     * una sola no alcanza para cubrir iOS + Android.
+     */
+    @Column(name = "modelo_glb_url", length = 500)
+    private String modeloGlbUrl;
+
+    /**
+     * URL del mismo modelo pero en formato USDZ -- Safari en iOS no
+     * soporta WebXR AR (confirmado 2026-09, sigue sin cambios) y solo abre
+     * AR Quick Look vía un archivo .usdz, nunca vía el .glb de arriba. No
+     * hay conversión automática entre ambos formatos con calidad
+     * aceptable -- son dos archivos que hay que generar y alojar por
+     * separado para el mismo plato. Ver modeloGlbUrl y
+     * MenuService.actualizarModelo3d (rechaza cargar una URL sin la otra).
+     */
+    @Column(name = "modelo_usdz_url", length = 500)
+    private String modeloUsdzUrl;
+
     @Column(nullable = false)
     private boolean disponible = true;
 

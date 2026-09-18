@@ -10,6 +10,10 @@ import java.math.BigDecimal;
  * crece con algo interno (costo, margen, notas del proveedor), este no lo
  * hereda por accidente -- un endpoint público nunca debería depender
  * silenciosamente de la forma de un DTO pensado para el panel autenticado.
+ *
+ * modeloGlbUrl/modeloUsdzUrl (2026-09-11): se exponen igual que imagenUrl
+ * -- son URLs de un archivo público, no hay dato sensible que filtrar acá
+ * (a diferencia de, por ejemplo, un costo interno del plato).
  */
 public record ItemPublicoDto(
         Long id,
@@ -17,11 +21,14 @@ public record ItemPublicoDto(
         String descripcion,
         BigDecimal precio,
         String imagenUrl,
+        String modeloGlbUrl,
+        String modeloUsdzUrl,
         boolean disponible
 ) {
     public static ItemPublicoDto desde(ItemMenu item) {
         return new ItemPublicoDto(
                 item.getId(), item.getNombre(), item.getDescripcion(),
-                item.getPrecio(), item.getImagenUrl(), item.isDisponible());
+                item.getPrecio(), item.getImagenUrl(), item.getModeloGlbUrl(), item.getModeloUsdzUrl(),
+                item.isDisponible());
     }
 }

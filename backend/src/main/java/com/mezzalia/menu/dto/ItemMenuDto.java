@@ -11,11 +11,14 @@ public record ItemMenuDto(
         String descripcion,
         BigDecimal precio,
         String imagenUrl,
+        String modeloGlbUrl,
+        String modeloUsdzUrl,
         boolean disponible
 ) {
     public static ItemMenuDto desde(ItemMenu item) {
         return new ItemMenuDto(
                 item.getId(), item.getCategoriaId(), item.getNombre(), item.getDescripcion(),
-                item.getPrecio(), item.getImagenUrl(), item.isDisponible());
+                item.getPrecio(), item.getImagenUrl(), item.getModeloGlbUrl(), item.getModeloUsdzUrl(),
+                item.isDisponible());
     }
 }
