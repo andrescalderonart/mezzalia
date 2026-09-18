@@ -2,14 +2,21 @@ import { useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuth, useApiJson } from '../context/AuthContext.jsx'
 
-// Sin esta variable de entorno, cae a localhost:5174 (puerto de dev de
-// app-cliente) -- sirve para desarrollar, pero un QR pensado para imprimir
-// en producción necesita el dominio público real. Ver .env.example. Para
-// probar con un celular real en la misma red Wi-Fi que esta laptop, hace
-// falta apuntar a la IP de LAN (ver .env.local), no a localhost -- un
-// celular resolviendo "localhost" se apunta a sí mismo, nunca a esta
-// máquina.
-const URL_APP_CLIENTE = import.meta.env.VITE_APP_CLIENTE_URL || 'http://localhost:5174'
+// En produccion, app-cliente vive en un dominio propio -- VITE_APP_CLIENTE_URL
+// es obligatorio ahi y siempre gana si esta seteado. En dev, en vez de
+// depender de una IP de LAN hardcodeada en .env.local (que queda stale
+// cada vez que el DHCP de la red le reasigna otra IP a esta laptop -- ya
+// paso una vez, ver feedback_git_mounted_folder / historial de esta
+// sesion), derivamos el host directo de donde se cargo ESTE panel: si
+// abriste el admin en http://192.168.2.X:5173, el QR sale apuntando a esa
+// misma IP en el puerto 5174 -- coherente sin configuracion manual. Si lo
+// abres por localhost, el QR tambien sale en localhost (correcto para vos,
+// inutil para un celular real -- para eso, abrí el panel usando la IP de
+// LAN, no localhost).
+const PUERTO_DEV_APP_CLIENTE = '5174'
+const URL_APP_CLIENTE =
+  import.meta.env.VITE_APP_CLIENTE_URL ||
+  `${window.location.protocol}//${window.location.hostname}:${PUERTO_DEV_APP_CLIENTE}`
 
 const formatoHora = new Intl.DateTimeFormat('es-CO', { hour: '2-digit', minute: '2-digit' })
 
