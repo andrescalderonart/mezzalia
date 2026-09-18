@@ -75,10 +75,21 @@ public class MenuPublicoController {
             throw new MesaExceptions.RestauranteNoDisponibleException();
         }
 
-        Long sucursalId = mesaService.obtenerSucursalIdDeMesa(sesion.getMesaId());
-
-        CartaPublicaDto carta = tenantFilterActivator.ejecutarConTenant(tenantId, () ->
-                ejecutarConSucursal(sucursalId, () -> {
+        // BUG REAL detectado 2026-09-18 probando el QR en un dispositivo real:
+        // obtenerSucursalIdDeMesa ANTES de entrar a ejecutarConTenant deja
+        // TenantContext sin poblar en ese momento (este es el camino
+        // publico, sin JWT -- JwtAuthenticationFilter nunca lo puebla).
+        // MesaService.obtenerSucursalIdDeMesa filtra explicitamente por
+        // "tenantId != null && tenantId.equals(...)", asi que con
+        // TenantContext en null esa condicion es SIEMPRE falsa y el metodo
+        // devuelve null sin importar la mesa real -- con sucursal ahora
+        // obligatoria en MenuService (sucursalActual() nunca acepta null),
+        // esto rompia el 100% de las cartas publicas con
+        // SucursalNoSeleccionadaException. Fix: resolver la sucursal DENTRO
+        // de ejecutarConTenant, nunca antes. Ver MenuPublicoControllerTest.
+        CartaPublicaDto carta = tenantFilterActivator.ejecutarConTenant(tenantId, () -> {
+            Long sucursalId = mesaService.obtenerSucursalIdDeMesa(sesion.getMesaId());
+            return ejecutarConSucursal(sucursalId, () -> {
                     var categorias = menuService.listarCategorias().stream()
                             .map(categoria -> {
                                 var items = menuService.listarItemsDeCategoria(categoria.getId()).stream()
@@ -91,7 +102,8 @@ public class MenuPublicoController {
                     BrandingDto branding = new BrandingDto(
                             tenant.getLogoUrl(), tenant.getColorPrimario(), tenant.getColorSecundario());
                     return new CartaPublicaDto(sesion.getMesaId(), tenant.getNombre(), branding, categorias);
-                }));
+            });
+        });
 
         return ResponseEntity.ok(carta);
     }
@@ -126,10 +138,11 @@ public class MenuPublicoController {
             throw new MesaExceptions.RestauranteNoDisponibleException();
         }
 
-        Long sucursalId = mesaService.obtenerSucursalIdDeMesa(sesion.getMesaId());
-
-        PedidoDto dto = tenantFilterActivator.ejecutarConTenant(tenantId, () ->
-                ejecutarConSucursal(sucursalId, () -> {
+        // Mismo bug y mismo fix que obtenerCarta (ver comentario ahi arriba):
+        // la sucursal se resuelve DENTRO de ejecutarConTenant.
+        PedidoDto dto = tenantFilterActivator.ejecutarConTenant(tenantId, () -> {
+            Long sucursalId = mesaService.obtenerSucursalIdDeMesa(sesion.getMesaId());
+            return ejecutarConSucursal(sucursalId, () -> {
                     Pedido pedido = pedidoService.crearPedido(
                             sesion.getMesaId(), request.claveIdempotencia(), request.items(),
                             request.notas(), request.comensal());
@@ -137,7 +150,8 @@ public class MenuPublicoController {
                             .map(PedidoItemDto::desde)
                             .toList();
                     return PedidoDto.desde(pedido, items);
-                }));
+            });
+        });
 
         return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }
