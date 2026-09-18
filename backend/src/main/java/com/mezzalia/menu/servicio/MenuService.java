@@ -146,6 +146,35 @@ public class MenuService {
     }
 
     /**
+     * 2026-09-11: separado de actualizarItem() a propósito, mismo patrón
+     * que actualizarImagen()/cambiarDisponibilidad(): asignar el modelo 3D
+     * es una operación propia, no un campo más del formulario general de
+     * editar item -- y mantener la firma de actualizarItem() sin tocar
+     * evita romper los tests existentes de este servicio, que ya la
+     * invocan por posición (ver MenuServiceTest).
+     *
+     * Ambas URLs se aceptan o se rechazan juntas: un modelo 3D sin la
+     * contraparte de iOS (usdz) o de Android (glb) no sirve para nada (ver
+     * el javadoc de ItemMenu.modeloGlbUrl) -- dejar cargar una sola
+     * confirmaría en la carta pública un botón "Ver en 3D" que solo
+     * funciona en un sistema operativo. null+null (quitarle el modelo 3D
+     * al item) SÍ está permitido.
+     */
+    @Transactional
+    public ItemMenu actualizarModelo3d(Long itemId, String modeloGlbUrl, String modeloUsdzUrl) {
+        boolean ningunaUrl = modeloGlbUrl == null && modeloUsdzUrl == null;
+        boolean ambasUrls = modeloGlbUrl != null && modeloUsdzUrl != null;
+        if (!ningunaUrl && !ambasUrls) {
+            throw new MenuExceptions.Modelo3dIncompletoException();
+        }
+
+        ItemMenu item = obtenerItem(itemId);
+        item.setModeloGlbUrl(modeloGlbUrl);
+        item.setModeloUsdzUrl(modeloUsdzUrl);
+        return itemMenuRepository.save(item);
+    }
+
+    /**
      * 2026-09-10: copia todas las categorias e items activos de
      * sucursalOrigenId hacia la sucursal actualmente seleccionada
      * (sucursalActual()) -- mitiga el costo de que cada sucursal nueva
@@ -169,7 +198,9 @@ public class MenuService {
      * La imagen de cada item se copia por referencia (mismo imagenUrl) --
      * es la misma foto del plato, no un archivo distinto; si el admin
      * quiere una foto diferente para la sucursal nueva, la reemplaza
-     * despues con actualizarImagen().
+     * despues con actualizarImagen(). 2026-09-11: mismo criterio para
+     * modeloGlbUrl/modeloUsdzUrl -- es el mismo plato físico, el modelo 3D
+     * no cambia porque cambie la sucursal que lo sirve.
      */
     @Transactional
     public List<CategoriaMenu> duplicarMenuDesdeSucursal(Long sucursalOrigenId) {
@@ -205,6 +236,8 @@ public class MenuService {
                 copiaItem.setDescripcion(itemOriginal.getDescripcion());
                 copiaItem.setPrecio(itemOriginal.getPrecio());
                 copiaItem.setImagenUrl(itemOriginal.getImagenUrl());
+                copiaItem.setModeloGlbUrl(itemOriginal.getModeloGlbUrl());
+                copiaItem.setModeloUsdzUrl(itemOriginal.getModeloUsdzUrl());
                 copiaItem.setDisponible(itemOriginal.isDisponible());
                 itemMenuRepository.save(copiaItem);
             }

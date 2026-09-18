@@ -3,6 +3,7 @@ package com.mezzalia.menu.controlador;
 import com.mezzalia.menu.CategoriaMenu;
 import com.mezzalia.menu.ItemMenu;
 import com.mezzalia.menu.dto.ActualizarItemRequest;
+import com.mezzalia.menu.dto.ActualizarModelo3dRequest;
 import com.mezzalia.menu.dto.CategoriaMenuDto;
 import com.mezzalia.menu.dto.CrearCategoriaRequest;
 import com.mezzalia.menu.dto.CrearItemRequest;
@@ -100,6 +101,22 @@ public class MenuAdminController {
     @PreAuthorize("hasRole('ADMIN_RESTAURANTE')")
     public ResponseEntity<ItemMenuDto> subirImagen(@PathVariable Long id, @RequestParam("archivo") MultipartFile archivo) {
         ItemMenu item = menuService.actualizarImagen(id, archivo);
+        return ResponseEntity.ok(ItemMenuDto.desde(item));
+    }
+
+    /**
+     * 2026-09-11: NO es un endpoint de subida -- recibe URLs de un modelo
+     * 3D ya alojado externamente (ver el javadoc de
+     * ItemMenu.modeloGlbUrl/modeloUsdzUrl para por qué todavía no hay
+     * upload real). Separado de actualizarItem() a propósito, mismo patrón
+     * que subirImagen()/cambiarDisponibilidad(): una responsabilidad por
+     * endpoint. Body con ambas URLs, o ambas en null para quitarle el
+     * modelo 3D al item -- MenuService.actualizarModelo3d rechaza una sola.
+     */
+    @PatchMapping("/items/{id}/modelo3d")
+    @PreAuthorize("hasRole('ADMIN_RESTAURANTE')")
+    public ResponseEntity<ItemMenuDto> actualizarModelo3d(@PathVariable Long id, @RequestBody ActualizarModelo3dRequest request) {
+        ItemMenu item = menuService.actualizarModelo3d(id, request.modeloGlbUrl(), request.modeloUsdzUrl());
         return ResponseEntity.ok(ItemMenuDto.desde(item));
     }
 

@@ -92,4 +92,18 @@ public final class MenuExceptions {
             super("La sucursal destino ya tiene una carta activa; no se puede duplicar encima de una carta existente");
         }
     }
+
+    /**
+     * 2026-09-11: MenuService.actualizarModelo3d. Un modelo 3D solo con la
+     * URL de Android (glb) o solo con la de iOS (usdz) no sirve para nada
+     * -- confirmaría en la carta pública un botón "Ver en 3D" que solo
+     * funciona en un sistema operativo. Se exigen las dos juntas, o
+     * ninguna (para poder quitarle el modelo 3D al item).
+     */
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public static class Modelo3dIncompletoException extends RuntimeException {
+        public Modelo3dIncompletoException() {
+            super("Un modelo 3D requiere modeloGlbUrl y modeloUsdzUrl juntos (o ninguno de los dos)");
+        }
+    }
 }
