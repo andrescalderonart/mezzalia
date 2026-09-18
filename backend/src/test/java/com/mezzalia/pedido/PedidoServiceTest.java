@@ -475,9 +475,10 @@ class PedidoServiceTest {
     }
 
     private MenuService nuevoMenuService() {
-        // AlmacenamientoImagenService en null a proposito, igual que en
-        // MenuServiceTest: ningun test de esta clase sube imagenes.
-        return new MenuService(categoriaMenuRepository, itemMenuRepository, historialPrecioItemRepository, null);
+        // AlmacenamientoImagenService y AlmacenamientoModelo3dService en
+        // null a proposito, igual que en MenuServiceTest: ningun test de
+        // esta clase sube imagenes ni modelos 3D.
+        return new MenuService(categoriaMenuRepository, itemMenuRepository, historialPrecioItemRepository, null, null);
     }
 
     private Escenario prepararEscenario(String nombreTenant) {

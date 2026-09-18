@@ -120,6 +120,25 @@ public class MenuAdminController {
         return ResponseEntity.ok(ItemMenuDto.desde(item));
     }
 
+    /**
+     * 2026-09-18: endpoint real de subida -- distinto de actualizarModelo3d()
+     * de arriba, que sigue existiendo para el caso "ya tengo las URLs de un
+     * modelo alojado externamente". Este recibe los DOS archivos
+     * (.glb + .usdz) directamente del disco del admin, mismo patrón que
+     * subirImagen(): multipart, valida y guarda en
+     * AlmacenamientoModelo3dService, delega la persistencia en
+     * MenuService.actualizarModelo3dArchivos().
+     */
+    @PostMapping(value = "/items/{id}/modelo3d/archivos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN_RESTAURANTE')")
+    public ResponseEntity<ItemMenuDto> subirArchivosModelo3d(
+            @PathVariable Long id,
+            @RequestParam("glb") MultipartFile glb,
+            @RequestParam("usdz") MultipartFile usdz) {
+        ItemMenu item = menuService.actualizarModelo3dArchivos(id, glb, usdz);
+        return ResponseEntity.ok(ItemMenuDto.desde(item));
+    }
+
     @DeleteMapping("/items/{id}")
     @PreAuthorize("hasRole('ADMIN_RESTAURANTE')")
     public ResponseEntity<Void> eliminarItem(@PathVariable Long id) {

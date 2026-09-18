@@ -7,6 +7,15 @@ const formatoPrecio = new Intl.NumberFormat('es-CO', {
   maximumFractionDigits: 0,
 })
 
+async function verificarRespuestaFormData(resp) {
+  const texto = await resp.text()
+  const datos = texto ? JSON.parse(texto) : null
+  if (!resp.ok) {
+    throw new Error(datos?.mensaje || `Error ${resp.status}`)
+  }
+  return datos
+}
+
 export default function MenuPage() {
   const { usuario } = useAuth()
   const apiJson = useApiJson()
@@ -88,7 +97,7 @@ export default function MenuPage() {
     }
   }
 
-  async function onGuardarItem({ nombre, descripcion, precio, archivo, itemExistente }) {
+  async function onGuardarItem({ nombre, descripcion, precio, archivo, modeloGlb, modeloUsdz, itemExistente }) {
     setError('')
     try {
       let item
@@ -111,9 +120,22 @@ export default function MenuPage() {
           method: 'POST',
           body: formData,
         })
-        if (resp.ok) {
-          item = await resp.json()
-        }
+        item = await verificarRespuestaFormData(resp)
+      }
+
+      // ModalItem ya exige los dos juntos o ninguno antes de llegar aca
+      // (ver su validarModelo3d) -- este chequeo es solo defensivo, mismo
+      // criterio que MenuService.actualizarModelo3d en el backend: nunca
+      // mandar uno solo.
+      if (modeloGlb && modeloUsdz) {
+        const formData = new FormData()
+        formData.append('glb', modeloGlb)
+        formData.append('usdz', modeloUsdz)
+        const resp = await apiFetch(`/api/admin/menu/items/${item.id}/modelo3d/archivos`, {
+          method: 'POST',
+          body: formData,
+        })
+        item = await verificarRespuestaFormData(resp)
       }
 
       setModal(null)
@@ -133,6 +155,20 @@ export default function MenuPage() {
       setItems((prev) =>
         prev.map((i) => (i.id === item.id ? { ...i, disponible: !i.disponible } : i)),
       )
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
+  async function onQuitarModelo3d(item) {
+    if (!window.confirm(`¿Quitar el modelo 3D de "${item.nombre}"? El plato se sigue mostrando normalmente, solo deja de tener vista en realidad aumentada.`)) return
+    setError('')
+    try {
+      const actualizado = await apiJson(`/api/admin/menu/items/${item.id}/modelo3d`, {
+        method: 'PATCH',
+        body: { modeloGlbUrl: null, modeloUsdzUrl: null },
+      })
+      setItems((prev) => prev.map((i) => (i.id === item.id ? actualizado : i)))
     } catch (e) {
       setError(e.message)
     }
@@ -264,17 +300,27 @@ export default function MenuPage() {
                     )}
 
                     <div className="mt-3 space-y-2">
-                      <button
-                        onClick={() => puedeEditar && onCambiarDisponibilidad(item)}
-                        disabled={!puedeEditar}
-                        className={`text-[11px] px-2 py-1 rounded-full border transition-colors duration-150 ${
-                          item.disponible
-                            ? 'border-green-800 text-green-300 bg-green-950/40'
-                            : 'border-carbon-600 text-crema/40 bg-carbon-800'
-                        } ${puedeEditar ? 'cursor-pointer hover:brightness-110' : 'cursor-default'}`}
-                      >
-                        {item.disponible ? 'Disponible' : 'Agotado'}
-                      </button>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          onClick={() => puedeEditar && onCambiarDisponibilidad(item)}
+                          disabled={!puedeEditar}
+                          className={`text-[11px] px-2 py-1 rounded-full border transition-colors duration-150 ${
+                            item.disponible
+                              ? 'border-green-800 text-green-300 bg-green-950/40'
+                              : 'border-carbon-600 text-crema/40 bg-carbon-800'
+                          } ${puedeEditar ? 'cursor-pointer hover:brightness-110' : 'cursor-default'}`}
+                        >
+                          {item.disponible ? 'Disponible' : 'Agotado'}
+                        </button>
+                        {item.modeloGlbUrl && (
+                          <span
+                            className="text-[11px] px-2 py-1 rounded-full border border-dorado/50 text-dorado bg-dorado/10"
+                            title="Este plato tiene modelo 3D para ver en realidad aumentada"
+                          >
+                            AR
+                          </span>
+                        )}
+                      </div>
 
                       {puedeEditar && (
                         <div className="flex gap-2">
@@ -288,6 +334,15 @@ export default function MenuPage() {
                             Eliminar
                           </button>
                         </div>
+                      )}
+
+                      {puedeEditar && item.modeloGlbUrl && (
+                        <button
+                          onClick={() => onQuitarModelo3d(item)}
+                          className="text-[11px] text-crema/40 hover:text-red-300 underline underline-offset-2"
+                        >
+                          Quitar modelo 3D
+                        </button>
                       )}
                     </div>
                   </div>
@@ -316,21 +371,53 @@ export default function MenuPage() {
   )
 }
 
+// 60MB por archivo -- mismo tope que AlmacenamientoModelo3dService.TAMANO_MAXIMO_BYTES
+// en el backend. Validar aca de una vez evita que el usuario espere a que
+// suba varias decenas de MB por una conexion movil lenta solo para que el
+// backend lo rechace al final.
+const TAMANO_MAXIMO_MODELO_3D = 60 * 1024 * 1024
+
 function ModalItem({ modo, item, onCancelar, onGuardar }) {
   const [nombre, setNombre] = useState(item?.nombre || '')
   const [descripcion, setDescripcion] = useState(item?.descripcion || '')
   const [precio, setPrecio] = useState(item?.precio ?? '')
   const [archivo, setArchivo] = useState(null)
+  const [modeloGlb, setModeloGlb] = useState(null)
+  const [modeloUsdz, setModeloUsdz] = useState(null)
+  const [errorModelo3d, setErrorModelo3d] = useState('')
   const [guardando, setGuardando] = useState(false)
+
+  const yaTieneModelo3d = Boolean(item?.modeloGlbUrl)
+
+  function validarModelo3d(glb, usdz) {
+    // La regla de negocio (ver MenuService.actualizarModelo3d /
+    // AlmacenamientoModelo3dService) es "las dos juntas o ninguna" --
+    // replicada aca para no dejar que el usuario dispare una subida que el
+    // backend va a rechazar de todos modos, y para decirle exactamente que
+    // falta en vez de un error generico despues del POST.
+    if (Boolean(glb) !== Boolean(usdz)) {
+      setErrorModelo3d('Sube los dos archivos juntos (.glb y .usdz) -- no se puede subir uno solo.')
+      return false
+    }
+    if ((glb && glb.size > TAMANO_MAXIMO_MODELO_3D) || (usdz && usdz.size > TAMANO_MAXIMO_MODELO_3D)) {
+      setErrorModelo3d('Cada archivo debe pesar 60MB o menos.')
+      return false
+    }
+    setErrorModelo3d('')
+    return true
+  }
 
   async function onSubmit(e) {
     e.preventDefault()
+    if (!validarModelo3d(modeloGlb, modeloUsdz)) return
     setGuardando(true)
     await onGuardar({
       nombre,
       descripcion: descripcion || null,
       precio: Number(precio),
       archivo,
+      modeloGlb,
+      modeloUsdz,
       itemExistente: modo === 'editar' ? item : null,
     })
     setGuardando(false)
@@ -379,6 +466,51 @@ function ModalItem({ modo, item, onCancelar, onGuardar }) {
               onChange={(e) => setArchivo(e.target.files[0] || null)}
               className="text-xs text-crema/60"
             />
+          </div>
+
+          <div className="pt-2 border-t border-carbon-700">
+            <label className="label-carbon">
+              Modelo 3D para realidad aumentada (opcional)
+              {yaTieneModelo3d && (
+                <span className="ml-2 text-[11px] text-dorado normal-case">ya tiene uno cargado</span>
+              )}
+            </label>
+            <p className="text-[11px] text-crema/40 mb-2">
+              {yaTieneModelo3d
+                ? 'Sube los dos archivos de nuevo solo si quieres reemplazar el modelo actual.'
+                : 'Sube los dos archivos ya capturados (ej. exportados desde Polycam) -- .glb para Android y .usdz para iPhone. Los dos son obligatorios juntos, máx. 60MB cada uno.'}
+            </p>
+            <div className="space-y-2">
+              <div>
+                <span className="text-[11px] text-crema/50 block mb-1">Archivo .glb (Android)</span>
+                <input
+                  type="file"
+                  accept=".glb"
+                  onChange={(e) => {
+                    const nuevo = e.target.files[0] || null
+                    setModeloGlb(nuevo)
+                    validarModelo3d(nuevo, modeloUsdz)
+                  }}
+                  className="text-xs text-crema/60"
+                />
+              </div>
+              <div>
+                <span className="text-[11px] text-crema/50 block mb-1">Archivo .usdz (iPhone)</span>
+                <input
+                  type="file"
+                  accept=".usdz"
+                  onChange={(e) => {
+                    const nuevo = e.target.files[0] || null
+                    setModeloUsdz(nuevo)
+                    validarModelo3d(modeloGlb, nuevo)
+                  }}
+                  className="text-xs text-crema/60"
+                />
+              </div>
+            </div>
+            {errorModelo3d && (
+              <p className="text-[11px] text-red-300 mt-2">{errorModelo3d}</p>
+            )}
           </div>
 
           <div className="flex gap-2 pt-2">

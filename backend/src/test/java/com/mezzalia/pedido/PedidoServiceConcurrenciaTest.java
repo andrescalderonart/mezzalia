@@ -6,6 +6,7 @@ import com.mezzalia.menu.HistorialPrecioItemRepository;
 import com.mezzalia.menu.ItemMenu;
 import com.mezzalia.menu.ItemMenuRepository;
 import com.mezzalia.menu.servicio.AlmacenamientoImagenService;
+import com.mezzalia.menu.servicio.AlmacenamientoModelo3dService;
 import com.mezzalia.menu.servicio.MenuService;
 import com.mezzalia.mesa.Mesa;
 import com.mezzalia.mesa.MesaRepository;
@@ -111,6 +112,9 @@ class PedidoServiceConcurrenciaTest {
 
     @MockBean
     private AlmacenamientoImagenService almacenamientoImagenService; // no se usa en este flujo, solo satisface el constructor de MenuService
+
+    @MockBean
+    private AlmacenamientoModelo3dService almacenamientoModelo3dService; // idem, ningun test de concurrencia de pedidos sube modelos 3D
 
     @AfterEach
     void limpiarContexto() {

@@ -379,9 +379,11 @@ class MenuServiceTest {
     }
 
     private MenuService nuevoMenuService() {
-        // AlmacenamientoImagenService en null a propósito: ningún test de
-        // esta clase ejerce subida de imágenes.
-        return new MenuService(categoriaMenuRepository, itemMenuRepository, historialPrecioItemRepository, null);
+        // AlmacenamientoImagenService y AlmacenamientoModelo3dService en
+        // null a propósito: ningún test de esta clase ejerce subida de
+        // imágenes ni de modelos 3D (esos flujos se prueban por separado,
+        // sin @DataJpaTest -- ver AlmacenamientoModelo3dServiceTest).
+        return new MenuService(categoriaMenuRepository, itemMenuRepository, historialPrecioItemRepository, null, null);
     }
 
     private void autenticarComo(String username) {

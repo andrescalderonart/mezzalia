@@ -29,6 +29,16 @@ public class AlmacenamientoImagenService {
 
     private static final Set<String> TIPOS_PERMITIDOS = Set.of("image/jpeg", "image/png", "image/webp");
 
+    /**
+     * 2026-09-18: tope EXPLICITO, no solo el limite global de Spring
+     * (application.yml) -- ese limite global tuvo que subirse a 65MB/130MB
+     * para acomodar la subida de modelos 3D (ver
+     * AlmacenamientoModelo3dService), asi que ya no alcanza por si solo para
+     * seguir protegiendo esta subida de imagenes: sin este chequeo propio,
+     * una foto de 60MB pasaria el limite global sin problema.
+     */
+    private static final long TAMANO_MAXIMO_BYTES = 5L * 1024 * 1024;
+
     private final Path directorioBase;
 
     public AlmacenamientoImagenService(@Value("${app.uploads.dir}") String directorioBase) {
@@ -49,6 +59,10 @@ public class AlmacenamientoImagenService {
         if (tipo == null || !TIPOS_PERMITIDOS.contains(tipo)) {
             throw new MenuExceptions.ArchivoInvalidoException(
                     "Tipo de archivo no permitido (" + tipo + "). Solo se aceptan JPEG, PNG o WEBP");
+        }
+        if (archivo.getSize() > TAMANO_MAXIMO_BYTES) {
+            throw new MenuExceptions.ArchivoInvalidoException(
+                    "La imagen supera el tamaño máximo permitido (" + (TAMANO_MAXIMO_BYTES / (1024 * 1024)) + "MB)");
         }
 
         String extension = switch (tipo) {

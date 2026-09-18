@@ -28,6 +28,7 @@ public class MenuService {
     private final ItemMenuRepository itemMenuRepository;
     private final HistorialPrecioItemRepository historialPrecioItemRepository;
     private final AlmacenamientoImagenService almacenamientoImagenService;
+    private final AlmacenamientoModelo3dService almacenamientoModelo3dService;
 
     /**
      * Defensa explicita, mismo criterio que crearCategoria()/obtenerItem():
@@ -172,6 +173,25 @@ public class MenuService {
         item.setModeloGlbUrl(modeloGlbUrl);
         item.setModeloUsdzUrl(modeloUsdzUrl);
         return itemMenuRepository.save(item);
+    }
+
+    /**
+     * 2026-09-18: contraparte de actualizarModelo3d() para el caso real de
+     * uso -- el admin no tiene las URLs de un modelo ya alojado externamente
+     * (ese caso seguia sin tener UI, ver el javadoc viejo de
+     * ItemMenu.modeloGlbUrl), sube los DOS archivos .glb/.usdz directamente
+     * desde su disco. AlmacenamientoModelo3dService.guardarPar() valida y
+     * escribe ambos archivos a disco ANTES de llegar aca; una vez que
+     * devuelve las dos URLs, se delega en actualizarModelo3d() para no
+     * duplicar la regla de negocio "ambas URLs juntas o ninguna" ni la
+     * lógica de persistencia -- esta es la única puerta de entrada para el
+     * caso "subir archivos nuevos", pero el guardado en sí sigue siendo el
+     * mismo método de siempre.
+     */
+    @Transactional
+    public ItemMenu actualizarModelo3dArchivos(Long itemId, MultipartFile glb, MultipartFile usdz) {
+        String[] urls = almacenamientoModelo3dService.guardarPar(glb, usdz);
+        return actualizarModelo3d(itemId, urls[0], urls[1]);
     }
 
     /**

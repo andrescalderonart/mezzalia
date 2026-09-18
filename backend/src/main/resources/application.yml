@@ -6,10 +6,15 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
   servlet:
     multipart:
-      # Limite generoso mas alto que un celular tipico produce en una foto de plato;
-      # evita subidas gigantes que llenen el disco (ver AlmacenamientoImagenService).
-      max-file-size: 5MB
-      max-request-size: 5MB
+      # 2026-09-18: subido de 5MB a 65MB/130MB para acomodar la subida de
+      # modelos 3D (.glb + .usdz juntos, ver AlmacenamientoModelo3dService --
+      # tope de 60MB POR ARCHIVO, mas margen). Esto relaja el limite global
+      # de Spring para TODOS los endpoints multipart, no solo modelos 3D --
+      # por eso AlmacenamientoImagenService ahora valida su propio tope de
+      # 5MB de forma explicita: sin eso, esta subida global habria relajado
+      # en silencio el limite que protegia la subida de imagenes tambien.
+      max-file-size: 65MB
+      max-request-size: 130MB
   jpa:
     hibernate:
       ddl-auto: validate
