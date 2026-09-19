@@ -15,6 +15,20 @@ spring:
       # en silencio el limite que protegia la subida de imagenes tambien.
       max-file-size: 65MB
       max-request-size: 130MB
+  mvc:
+    contentnegotiation:
+      # 2026-09-18: sin esto, Tomcat/Spring sirven .glb/.usdz bajo /uploads/**
+      # (ver WebConfig) como application/octet-stream -- el genérico que usan
+      # para cualquier extensión que no reconocen. Para .usdz esto rompe AR
+      # Quick Look en Safari/iOS: Apple exige el Content-Type exacto
+      # model/vnd.usdz+zip para que un <a rel="ar">/<model-viewer ios-src>
+      # abra el visor AR en vez de descargar el archivo a secas. .glb no lo
+      # exige con el mismo rigor (Scene Viewer en Android es más tolerante),
+      # pero model/gltf-binary es el tipo correcto según Khronos y no cuesta
+      # nada declararlo bien.
+      media-types:
+        usdz: model/vnd.usdz+zip
+        glb: model/gltf-binary
   jpa:
     hibernate:
       ddl-auto: validate

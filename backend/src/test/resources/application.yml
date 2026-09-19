@@ -21,6 +21,19 @@ spring:
     open-in-view: true
   flyway:
     enabled: false
+  mvc:
+    contentnegotiation:
+      # Duplicado a proposito, no heredado de src/main/resources/application.yml:
+      # Spring Boot resuelve "classpath:application.yml" a UN solo recurso (el
+      # primero que encuentra en el classloader), y en tests target/test-classes
+      # va antes que target/classes -- este archivo REEMPLAZA por completo al de
+      # main durante los tests, no se mergean. Sin este duplicado,
+      # WebConfigMimeTypesTest pasaria por razones equivocadas (heredando algo
+      # que en realidad no esta ahi) o fallaria por una razon que no es la que
+      # dice probar.
+      media-types:
+        usdz: model/vnd.usdz+zip
+        glb: model/gltf-binary
 
 app:
   uploads:
