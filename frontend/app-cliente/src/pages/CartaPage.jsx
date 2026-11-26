@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { crearPedido, obtenerCarta } from '../api/publico.js'
+import { crearPedido, llamarDesdeMesa, obtenerCarta } from '../api/publico.js'
+import { guardarUltimaRonda, leerUltimaRonda, resumenRonda, rondaComoCarrito } from './ronda.js'
 
 const formatoPrecio = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -40,6 +41,15 @@ export default function CartaPage() {
   const [comensalTelefono, setComensalTelefono] = useState('')
   const [comensalConsentimiento, setComensalConsentimiento] = useState(false)
   const [envio, setEnvio] = useState({ estado: 'idle', error: '', pedido: null }) // idle|enviando|exito|error
+
+  // Enfoque en bares (2026-11-26): lo ultimo que pidio ESTE celular en esta
+  // mesa, para "otra ronda" con un toque (ver ronda.js).
+  const [ultimaRonda, setUltimaRonda] = useState(() => leerUltimaRonda(token))
+  // Estado de cada boton de llamado: idle | enviando | avisado.
+  const [llamados, setLlamados] = useState({ MESERO: 'idle', CUENTA: 'idle' })
+  // Mensaje corto arriba de la pantalla ("Avisamos al mesero").
+  const [aviso, setAviso] = useState(null) // { texto, tipo: 'ok' | 'error' }
+  const avisoTimerRef = useRef(null)
 
   // Misma clave de idempotencia (RF-04) mientras el comensal no haya
   // enviado el pedido con exito -- si el POST falla por red y reintenta
@@ -172,10 +182,54 @@ export default function CartaPage() {
       }
       const pedido = await crearPedido(token, payload)
       setEnvio({ estado: 'exito', error: '', pedido })
+      guardarUltimaRonda(token, payload.items)
+      setUltimaRonda(payload.items)
       setCarrito({})
       claveIdempotenciaRef.current = generarClaveIdempotencia()
     } catch (e) {
       setEnvio({ estado: 'error', error: e.message, pedido: null })
+    }
+  }
+
+  function mostrarAviso(texto, tipo = 'ok') {
+    clearTimeout(avisoTimerRef.current)
+    setAviso({ texto, tipo })
+    avisoTimerRef.current = setTimeout(() => setAviso(null), 3500)
+  }
+
+  useEffect(() => () => clearTimeout(avisoTimerRef.current), [])
+
+  /**
+   * "Otra ronda": carga la ultima ronda en el carrito y abre el resumen para
+   * que el comensal confirme (no se envia sola: un toque accidental no debe
+   * pedir 6 cervezas). Lo agotado se descarta y se avisa.
+   */
+  function onOtraRonda() {
+    const { carrito: nuevo, descartados } = rondaComoCarrito(ultimaRonda, itemsPorId)
+    if (Object.keys(nuevo).length === 0) {
+      mostrarAviso('Lo de tu última ronda ya no está disponible.', 'error')
+      return
+    }
+    setCarrito(nuevo)
+    if (descartados.length > 0) {
+      mostrarAviso(`Agotado, no lo incluimos: ${descartados.join(', ')}`, 'error')
+    }
+    setModalAbierto(true)
+  }
+
+  async function onLlamar(tipo) {
+    if (llamados[tipo] === 'enviando') return
+    setLlamados((prev) => ({ ...prev, [tipo]: 'enviando' }))
+    try {
+      await llamarDesdeMesa(token, tipo)
+      setLlamados((prev) => ({ ...prev, [tipo]: 'avisado' }))
+      mostrarAviso(tipo === 'CUENTA' ? 'Listo, ya te traen la cuenta.' : 'Listo, avisamos al mesero.')
+      // Despues de un rato se puede volver a llamar (el backend no duplica
+      // mientras el aviso anterior siga sin atender).
+      setTimeout(() => setLlamados((prev) => ({ ...prev, [tipo]: 'idle' })), 60000)
+    } catch (e) {
+      setLlamados((prev) => ({ ...prev, [tipo]: 'idle' }))
+      mostrarAviso(e.message, 'error')
     }
   }
 
@@ -233,6 +287,12 @@ export default function CartaPage() {
           </div>
         </div>
 
+        {/* Enfoque en bares: pedirle cosas al personal sin levantar la mano. */}
+        <div className="flex gap-2 px-4 sm:px-6 pb-3">
+          <BotonLlamado tipo="MESERO" estado={llamados.MESERO} onLlamar={onLlamar} />
+          <BotonLlamado tipo="CUENTA" estado={llamados.CUENTA} onLlamar={onLlamar} />
+        </div>
+
         <nav ref={navRef} className="flex gap-2 overflow-x-auto px-4 sm:px-6 pb-3 -mt-1">
           {carta.categorias.map((cat) => (
             <button
@@ -253,7 +313,7 @@ export default function CartaPage() {
 
       <main
         className={`px-4 sm:px-6 py-6 max-w-3xl mx-auto ${
-          cantidadTotalCarrito > 0 ? 'pb-28' : 'pb-[max(1.5rem,env(safe-area-inset-bottom))]'
+          cantidadTotalCarrito > 0 || ultimaRonda.length > 0 ? 'pb-28' : 'pb-[max(1.5rem,env(safe-area-inset-bottom))]'
         }`}
       >
         {carta.categorias.length === 0 && (
@@ -336,6 +396,46 @@ export default function CartaPage() {
         </button>
       )}
 
+      {/* "Otra ronda": solo cuando el carrito esta vacio (si no, manda la
+          barra del carrito) y este celular ya pidio algo en esta mesa. */}
+      {cantidadTotalCarrito === 0 && ultimaRonda.length > 0 && !modalAbierto && (
+        <button
+          type="button"
+          onClick={onOtraRonda}
+          aria-label={`Pedir otra ronda: ${resumenRonda(ultimaRonda, itemsPorId)}`}
+          className="fixed bottom-0 inset-x-0 z-30 flex items-center gap-3 px-4 sm:px-6 py-3.5 text-white animate-fadeInUp shadow-[0_-4px_20px_rgba(0,0,0,0.15)]"
+          style={{
+            backgroundColor: 'var(--color-acento)',
+            paddingBottom: 'max(0.875rem, env(safe-area-inset-bottom))',
+          }}
+        >
+          <span className="text-xl leading-none" aria-hidden="true">🍻</span>
+          <span className="min-w-0 text-left">
+            <span className="block text-sm font-semibold">Otra ronda</span>
+            <span className="block text-xs text-white/80 truncate">{resumenRonda(ultimaRonda, itemsPorId)}</span>
+          </span>
+        </button>
+      )}
+
+      {/* El centrado va en el contenedor y la animacion en el hijo: si
+          estuvieran en el mismo elemento, el transform de fadeInUp pisaria
+          el -translate-x de centrado y el aviso saldria corrido. */}
+      {aviso && (
+        <div
+          className="fixed inset-x-0 z-50 flex justify-center px-4 pointer-events-none"
+          style={{ top: 'calc(0.75rem + env(safe-area-inset-top))' }}
+        >
+          <div
+            role="status"
+            className={`max-w-md px-4 py-2.5 rounded-full text-sm font-medium text-center shadow-lg animate-fadeInUp ${
+              aviso.tipo === 'error' ? 'bg-red-700 text-white' : 'bg-carbon-950 text-white'
+            }`}
+          >
+            {aviso.texto}
+          </div>
+        </div>
+      )}
+
       <ModalCheckout
         abierto={modalAbierto}
         onCerrar={onCerrarModal}
@@ -353,6 +453,32 @@ export default function CartaPage() {
         onEnviar={onEnviarPedido}
       />
     </div>
+  )
+}
+
+const TEXTO_LLAMADO = {
+  MESERO: { idle: 'Llamar al mesero', enviando: 'Avisando…', avisado: 'Mesero avisado ✓', icono: '🙋' },
+  CUENTA: { idle: 'Pedir la cuenta', enviando: 'Avisando…', avisado: 'Cuenta pedida ✓', icono: '🧾' },
+}
+
+function BotonLlamado({ tipo, estado, onLlamar }) {
+  const t = TEXTO_LLAMADO[tipo]
+  const avisado = estado === 'avisado'
+  return (
+    <button
+      type="button"
+      onClick={() => onLlamar(tipo)}
+      disabled={estado === 'enviando'}
+      className="flex-1 flex items-center justify-center gap-1.5 rounded-full border text-sm font-medium py-2 transition-colors duration-150 disabled:opacity-60"
+      style={
+        avisado
+          ? { borderColor: 'transparent', backgroundColor: 'rgba(21,128,61,0.12)', color: 'rgb(21,128,61)' }
+          : { borderColor: 'rgba(13,12,11,0.15)', color: 'rgba(13,12,11,0.75)' }
+      }
+    >
+      <span aria-hidden="true">{t.icono}</span>
+      {t[estado]}
+    </button>
   )
 }
 

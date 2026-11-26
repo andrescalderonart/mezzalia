@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useApiJson, useAuth } from '../context/AuthContext.jsx'
+import LlamadosPendientes from '../components/LlamadosPendientes.jsx'
 
 const formatoPrecio = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -177,6 +178,8 @@ export default function PedidosPage() {
           </p>
         </div>
       </div>
+
+      <LlamadosPendientes nombreMesa={nombreMesa} />
 
       <div className="flex gap-2 mb-5">
         <button

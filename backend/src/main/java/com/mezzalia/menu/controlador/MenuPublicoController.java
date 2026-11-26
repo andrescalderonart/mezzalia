@@ -1,5 +1,8 @@
 package com.mezzalia.menu.controlador;
 
+import com.mezzalia.llamado.dto.CrearLlamadoRequest;
+import com.mezzalia.llamado.dto.LlamadoDto;
+import com.mezzalia.llamado.servicio.LlamadoService;
 import com.mezzalia.mesa.SesionMesa;
 import com.mezzalia.mesa.excepcion.MesaExceptions;
 import com.mezzalia.mesa.servicio.MesaService;
@@ -42,6 +45,7 @@ public class MenuPublicoController {
     private final TenantService tenantService;
     private final TenantFilterActivator tenantFilterActivator;
     private final PedidoService pedidoService;
+    private final LlamadoService llamadoService;
 
     /**
      * RF-01/RF-02: el comensal ve la carta vigente -- incluidos los ítems
@@ -145,6 +149,26 @@ public class MenuPublicoController {
                 }));
 
         return ResponseEntity.status(HttpStatus.CREATED).body(dto);
+    }
+
+    /**
+     * "Llamar al mesero" / "pedir la cuenta" desde el QR (enfoque en bares,
+     * 2026-11-26). Mismo patron de resolucion publica que crearPedido: el
+     * token es la unica credencial y el tenant se activa a mano. No necesita
+     * sucursal (el llamado se liga a la mesa, que ya tiene la suya).
+     * Repetir el mismo llamado mientras siga pendiente devuelve el mismo
+     * (ver LlamadoService.llamar), asi que 200 y no 201.
+     */
+    @PostMapping("/{token}/llamados")
+    public ResponseEntity<LlamadoDto> llamar(@PathVariable String token, @Valid @RequestBody CrearLlamadoRequest request) {
+        SesionMesa sesion = mesaService.resolverSesionValida(token);
+        Tenant tenant = tenantService.obtenerPorId(sesion.getTenantId());
+        if (tenant.estaSuspendido()) {
+            throw new MesaExceptions.RestauranteNoDisponibleException();
+        }
+        LlamadoDto dto = tenantFilterActivator.ejecutarConTenant(sesion.getTenantId(), () ->
+                LlamadoDto.desde(llamadoService.llamar(sesion.getMesaId(), request.tipo())));
+        return ResponseEntity.ok(dto);
     }
 
     /**
