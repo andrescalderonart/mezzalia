@@ -7,6 +7,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Rate limiting del login (documentacion-tecnica.md §10: "no negociable").
@@ -24,9 +25,15 @@ public class LoginAttemptService {
 
     private static final int MAX_INTENTOS_FALLIDOS = 5;
     private static final Duration VENTANA_BLOQUEO = Duration.ofMinutes(15);
+    // Cada cuantos fallos registrados se barre el mapa buscando entradas
+    // vencidas. Barrer en cada fallo seria O(n) por intento; cada 64 lo
+    // amortiza y aun asi acota el mapa a "lo que fallo en los ultimos 15
+    // min + a lo sumo 64 entradas viejas".
+    private static final int PURGAR_CADA_N_FALLOS = 64;
 
     private final ConcurrentHashMap<String, EstadoIntentos> intentosPorUsuario = new ConcurrentHashMap<>();
     private final Clock reloj;
+    private final AtomicLong fallosRegistrados = new AtomicLong();
 
     public LoginAttemptService() {
         this(Clock.systemUTC());
@@ -57,15 +64,39 @@ public class LoginAttemptService {
             // contador seguia en 5+ y el PRIMER error de tipeo despues de
             // esperar los 15 minutos volvia a bloquear la cuenta otros 15
             // (en la practica, el usuario nunca recuperaba los 5 intentos).
-            boolean bloqueoVencido = estadoActual != null && estadoActual.bloqueadoHasta != null
-                    && !estadoActual.bloqueadoHasta.isAfter(ahora);
-            EstadoIntentos estado = (estadoActual == null || bloqueoVencido) ? new EstadoIntentos() : estadoActual;
+            // Lo mismo si lleva 15 min sin fallos: esos intentos viejos ya no
+            // cuentan (y la purga de abajo los borraria de todos modos; asi
+            // el resultado no depende de si la purga ya paso o no).
+            EstadoIntentos estado = (estadoActual == null || estadoActual.vencido(ahora))
+                    ? new EstadoIntentos() : estadoActual;
             estado.fallos++;
+            estado.ultimoFallo = ahora;
             if (estado.fallos >= MAX_INTENTOS_FALLIDOS) {
                 estado.bloqueadoHasta = ahora.plus(VENTANA_BLOQUEO);
             }
             return estado;
         });
+        if (fallosRegistrados.incrementAndGet() % PURGAR_CADA_N_FALLOS == 0) {
+            purgarVencidas();
+        }
+    }
+
+    /**
+     * Borra las entradas cuyo bloqueo ya vencio o que llevan 15 min sin
+     * fallos. Sin esto el mapa crecia sin limite: cada username probado
+     * (incluidos los inventados por un bot) quedaba guardado para siempre.
+     */
+    void purgarVencidas() {
+        Instant ahora = reloj.instant();
+        // removeIf sobre la vista de entradas de ConcurrentHashMap es seguro
+        // con escrituras concurrentes; una entrada que se actualiza justo
+        // ahora puede sobrevivir hasta la proxima purga, lo cual no importa.
+        intentosPorUsuario.entrySet().removeIf(e -> e.getValue().vencido(ahora));
+    }
+
+    // Solo para tests.
+    int entradasEnMemoria() {
+        return intentosPorUsuario.size();
     }
 
     public void registrarExito(String username) {
@@ -81,6 +112,15 @@ public class LoginAttemptService {
 
     private static final class EstadoIntentos {
         private int fallos = 0;
+        private volatile Instant ultimoFallo;
         private volatile Instant bloqueadoHasta;
+
+        /** Bloqueo vencido, o sin bloqueo y 15 min sin fallos. */
+        boolean vencido(Instant ahora) {
+            if (bloqueadoHasta != null) {
+                return !bloqueadoHasta.isAfter(ahora);
+            }
+            return ultimoFallo != null && !ultimoFallo.plus(VENTANA_BLOQUEO).isAfter(ahora);
+        }
     }
 }

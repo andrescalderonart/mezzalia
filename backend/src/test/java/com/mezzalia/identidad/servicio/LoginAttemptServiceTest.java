@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -101,5 +102,46 @@ class LoginAttemptServiceTest {
             servicio.registrarFallo(null);
             servicio.verificarNoBloqueado(null);
         }).doesNotThrowAnyException();
+    }
+
+    @Test
+    void laPurgaBorraBloqueosVencidosYFallosViejosPeroNoLosVigentes() {
+        fallar("bloqueo.viejo", 5);            // bloqueado hasta T+15
+        fallar("fallo.viejo", 2);              // sin bloqueo, ultimo fallo en T
+        reloj.avanzar(Duration.ofMinutes(10));
+        fallar("bloqueo.vigente", 5);          // bloqueado hasta T+25
+        fallar("fallo.reciente", 1);           // ultimo fallo en T+10
+        reloj.avanzar(Duration.ofMinutes(5));  // ahora T+15
+
+        servicio.purgarVencidas();
+
+        assertThat(servicio.entradasEnMemoria()).isEqualTo(2);
+        assertThatThrownBy(() -> servicio.verificarNoBloqueado("bloqueo.vigente"))
+                .isInstanceOf(AuthExceptions.DemasiadosIntentosException.class);
+        // El fallo reciente sigue contando: 4 mas lo bloquean.
+        fallar("fallo.reciente", 4);
+        assertThatThrownBy(() -> servicio.verificarNoBloqueado("fallo.reciente"))
+                .isInstanceOf(AuthExceptions.DemasiadosIntentosException.class);
+    }
+
+    @Test
+    void elMapaNoCreceSinLimiteConUsernamesInventados() {
+        // Un bot probando usernames distintos: con la purga automatica cada
+        // 64 fallos, las entradas viejas no se acumulan.
+        for (int i = 0; i < 1000; i++) {
+            servicio.registrarFallo("bot." + i);
+            reloj.avanzar(Duration.ofMinutes(1));
+        }
+        // Solo sobreviven los de los ultimos 15 min (+ a lo sumo 64 desde la
+        // ultima purga).
+        assertThat(servicio.entradasEnMemoria()).isLessThanOrEqualTo(15 + 64);
+    }
+
+    @Test
+    void fallosDeHaceMasDeQuinceMinutosNoSumanAunqueLaPurgaNoHayaPasado() {
+        fallar("mesero.ana", 4);
+        reloj.avanzar(Duration.ofMinutes(15));
+        fallar("mesero.ana", 4);
+        assertThatCode(() -> servicio.verificarNoBloqueado("mesero.ana")).doesNotThrowAnyException();
     }
 }
