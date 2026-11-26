@@ -54,6 +54,18 @@ const ETIQUETA_ACCION = {
 // valor de partida razonable.
 const INTERVALO_POLLING_MS = 6000
 
+// Antes cada polling traia TODO el historial de pedidos del tenant (con sus
+// items y comensal, N+1 en el backend): con meses de operacion eso crece
+// sin limite cada 6s. Ahora cada vista pide al backend solo los estados que
+// muestra (?estado=..., el mismo filtro que ya usa la vista de cocina), y
+// solo "Activos" hace polling: el historial no cambia solo (un pedido pasa
+// a ENTREGADO/CANCELADO por una accion en esta misma pantalla), asi que se
+// pide una vez al abrir esa pestaña.
+const ESTADOS_POR_VISTA = {
+  activos: ['RECIBIDO', 'EN_PREPARACION', 'LISTO'],
+  historial: ['ENTREGADO', 'CANCELADO'],
+}
+
 export default function PedidosPage() {
   const apiJson = useApiJson()
   const { usuario } = useAuth()
@@ -76,13 +88,15 @@ export default function PedidosPage() {
   const peticionIdRef = useRef(0)
 
   const cargarPedidos = useCallback(
-    async (mostrarSpinner) => {
+    async (vistaACargar, mostrarSpinner) => {
       const idPeticion = ++peticionIdRef.current
       if (mostrarSpinner) setCargando(true)
       try {
-        const datos = await apiJson('/api/admin/pedidos')
+        const porEstado = await Promise.all(
+          ESTADOS_POR_VISTA[vistaACargar].map((estado) => apiJson(`/api/admin/pedidos?estado=${estado}`)),
+        )
         if (idPeticion !== peticionIdRef.current) return
-        setPedidos(datos)
+        setPedidos(porEstado.flat())
         setError('')
       } catch (e) {
         if (idPeticion !== peticionIdRef.current) return
@@ -108,10 +122,14 @@ export default function PedidosPage() {
   }, [])
 
   useEffect(() => {
-    cargarPedidos(true)
-    const intervalo = setInterval(() => cargarPedidos(false), INTERVALO_POLLING_MS)
+    // Al cambiar de pestaña se vacia la lista para no mostrar un instante
+    // los pedidos de la otra vista mientras llega la respuesta.
+    setPedidos([])
+    cargarPedidos(vista, true)
+    if (vista !== 'activos') return undefined
+    const intervalo = setInterval(() => cargarPedidos('activos', false), INTERVALO_POLLING_MS)
     return () => clearInterval(intervalo)
-  }, [cargarPedidos])
+  }, [cargarPedidos, vista])
 
   async function onCambiarEstado(pedido, nuevoEstado) {
     if (nuevoEstado === 'CANCELADO' && !window.confirm(`¿Cancelar el pedido de ${nombreMesa(pedido.mesaId)}?`)) {
@@ -157,11 +175,10 @@ export default function PedidosPage() {
   }
 
   const pedidosVisibles = pedidos
-    .filter((p) =>
-      vista === 'activos'
-        ? ['RECIBIDO', 'EN_PREPARACION', 'LISTO'].includes(p.estado)
-        : ['ENTREGADO', 'CANCELADO'].includes(p.estado),
-    )
+    // El backend ya filtra por estado; este filtro sigue haciendo falta para
+    // que un pedido que se acaba de marcar ENTREGADO/CANCELADO desaparezca
+    // de "Activos" al instante, sin esperar al siguiente polling.
+    .filter((p) => ESTADOS_POR_VISTA[vista].includes(p.estado))
     // Los mas nuevos primero en "activos" (hay que atenderlos ya), los mas
     // recientes primero tambien en "historial" (lo ultimo que paso es lo
     // mas relevante para revisar).
@@ -173,7 +190,9 @@ export default function PedidosPage() {
         <div>
           <h1 className="font-display text-2xl text-crema">Pedidos</h1>
           <p className="text-sm text-crema/40">
-            Se actualiza solo cada {Math.round(INTERVALO_POLLING_MS / 1000)}s. Los pedidos nuevos aparecen arriba.
+            {vista === 'activos'
+              ? `Se actualiza solo cada ${Math.round(INTERVALO_POLLING_MS / 1000)}s. Los pedidos nuevos aparecen arriba.`
+              : 'Pedidos entregados y cancelados.'}
           </p>
         </div>
       </div>
