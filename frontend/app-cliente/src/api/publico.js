@@ -33,3 +33,21 @@ export async function crearPedido(token, payload) {
   }
   return datos
 }
+
+/**
+ * "Llamar al mesero" (tipo MESERO) o "pedir la cuenta" (tipo CUENTA) desde
+ * la mesa. Tocarlo varias veces no duplica el aviso: el backend devuelve el
+ * mismo llamado mientras siga pendiente (ver LlamadoService.llamar).
+ */
+export async function llamarDesdeMesa(token, tipo) {
+  const resp = await fetch(`/api/publico/mesas/${encodeURIComponent(token)}/llamados`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tipo }),
+  })
+  const datos = await resp.json().catch(() => null)
+  if (!resp.ok) {
+    throw new Error(datos?.mensaje || 'No pudimos avisar al personal. Intenta de nuevo.')
+  }
+  return datos
+}
