@@ -75,10 +75,14 @@ public class MenuPublicoController {
             throw new MesaExceptions.RestauranteNoDisponibleException();
         }
 
-        Long sucursalId = mesaService.obtenerSucursalIdDeMesa(sesion.getMesaId());
-
+        // La sucursal de la mesa se resuelve DENTRO de ejecutarConTenant, no
+        // antes: obtenerSucursalIdDeMesa() compara la mesa contra
+        // TenantContext, que en este request anonimo solo existe una vez que
+        // ejecutarConTenant lo puebla. Llamarlo afuera devolvia siempre null
+        // y rompia la carta entera (409 SUCURSAL_NO_SELECCIONADA) -- regresion
+        // de 427d8d5, ver CartaPublicaEndToEndTest.
         CartaPublicaDto carta = tenantFilterActivator.ejecutarConTenant(tenantId, () ->
-                ejecutarConSucursal(sucursalId, () -> {
+                ejecutarConSucursal(mesaService.obtenerSucursalIdDeMesa(sesion.getMesaId()), () -> {
                     var categorias = menuService.listarCategorias().stream()
                             .map(categoria -> {
                                 var items = menuService.listarItemsDeCategoria(categoria.getId()).stream()
@@ -126,10 +130,11 @@ public class MenuPublicoController {
             throw new MesaExceptions.RestauranteNoDisponibleException();
         }
 
-        Long sucursalId = mesaService.obtenerSucursalIdDeMesa(sesion.getMesaId());
-
+        // Mismo motivo que en obtenerCarta: la sucursal se resuelve dentro
+        // del contexto de tenant (antes daba null y el pedido fallaba con
+        // "Item de carta no encontrado").
         PedidoDto dto = tenantFilterActivator.ejecutarConTenant(tenantId, () ->
-                ejecutarConSucursal(sucursalId, () -> {
+                ejecutarConSucursal(mesaService.obtenerSucursalIdDeMesa(sesion.getMesaId()), () -> {
                     Pedido pedido = pedidoService.crearPedido(
                             sesion.getMesaId(), request.claveIdempotencia(), request.items(),
                             request.notas(), request.comensal());
@@ -153,6 +158,13 @@ public class MenuPublicoController {
      * el camino autenticado de staff, ver SucursalContext).
      */
     private <T> T ejecutarConSucursal(Long sucursalId, Supplier<T> accion) {
+        if (sucursalId == null) {
+            // No deberia pasar nunca (Mesa.sucursal_id es NOT NULL): si pasa,
+            // es un bug de orden de contexto como el de 427d8d5, y es mejor
+            // un error explicito en el log que un 409 de "seleccione
+            // sucursal" que no tiene sentido para un comensal anonimo.
+            throw new IllegalStateException("No se pudo resolver la sucursal de la mesa (¿TenantContext vacio?)");
+        }
         SucursalContext.establecerSucursalId(sucursalId);
         try {
             return accion.get();
