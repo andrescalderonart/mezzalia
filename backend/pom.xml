@@ -40,7 +40,7 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
         <!-- Health check para el hosting/orquestador (auditoria 2026-09-08 §2.2,
-             roadmap §11). Solo se expone /actuator/health, ver application.yml. -->
+             roadmap §11). Solo se expone /actuator/health, ver actuator.yml. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
