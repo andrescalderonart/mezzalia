@@ -322,7 +322,13 @@ export default function CartaPage() {
           de iPhone/Android. */}
       {cantidadTotalCarrito > 0 && (
         <button
+          type="button"
           onClick={() => setModalAbierto(true)}
+          // Un lector de pantalla leia solo los dos <span> sueltos
+          // ("3 ítems", "Ver pedido · $…"); el aria-label lo dice en una
+          // frase y aria-haspopup avisa que abre el modal del pedido.
+          aria-label={`Ver pedido: ${cantidadTotalCarrito} ${cantidadTotalCarrito === 1 ? 'ítem' : 'ítems'}, total ${formatoPrecio.format(totalCarrito)}`}
+          aria-haspopup="dialog"
           className="fixed bottom-0 inset-x-0 z-30 flex items-center justify-between gap-3 px-4 sm:px-6 py-3.5 text-white animate-fadeInUp shadow-[0_-4px_20px_rgba(0,0,0,0.15)]"
           style={{
             backgroundColor: 'var(--color-acento)',
@@ -685,6 +691,9 @@ function ModalCheckout({
         aria-hidden="true"
       />
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Tu pedido"
         className="relative w-full sm:max-w-md sm:mx-4 bg-papel-100 rounded-t-3xl sm:rounded-2xl max-h-[90dvh] overflow-y-auto animate-fadeInUp"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
