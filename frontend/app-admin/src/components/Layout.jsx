@@ -105,6 +105,12 @@ export default function Layout() {
                 Pedidos
               </NavLink>
               <NavLink
+                to="/cocina"
+                className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150 text-crema/70 hover:bg-carbon-800 hover:text-crema"
+              >
+                Cocina
+              </NavLink>
+              <NavLink
                 to="/menu"
                 className={({ isActive }) =>
                   `flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150 ${

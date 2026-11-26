@@ -12,6 +12,7 @@ import RutaConRol from './components/RutaConRol.jsx'
 import RequiereSucursal from './components/RequiereSucursal.jsx'
 import InicioRedirect from './components/InicioRedirect.jsx'
 import SeleccionarSucursalPage from './pages/SeleccionarSucursalPage.jsx'
+import CocinaPage from './pages/cocina/CocinaPage.jsx'
 const ROLES_RESTAURANTE = ['ADMIN_RESTAURANTE', 'MESERO']
 
 export default function App() {
@@ -25,6 +26,15 @@ export default function App() {
             va DENTRO de ProtectedRoute) pero todavia no un sucursalId, asi
             que no puede ir dentro de RequiereSucursal (seria un loop). */}
         <Route path="/seleccionar-sucursal" element={<SeleccionarSucursalPage />} />
+
+        {/* Vista de cocina (auditoria §3.1): pantalla completa para una
+            tablet en la cocina, por eso fuera de <Layout>. Mismos guardias
+            que /pedidos: roles del restaurante y, para MESERO, sucursal. */}
+        <Route element={<RutaConRol permitidos={ROLES_RESTAURANTE} />}>
+          <Route element={<RequiereSucursal />}>
+            <Route path="/cocina" element={<CocinaPage />} />
+          </Route>
+        </Route>
 
         <Route element={<Layout />}>
           <Route element={<RutaConRol permitidos={ROLES_RESTAURANTE} />}>
