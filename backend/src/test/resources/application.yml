@@ -21,6 +21,10 @@ spring:
     open-in-view: true
   flyway:
     enabled: false
+  # Misma config de Actuator que produccion (no una copia): HealthCheckTest
+  # tiene que romperse si alguien expone mas endpoints en actuator.yml.
+  config:
+    import: classpath:actuator.yml
 
 app:
   uploads:

@@ -81,6 +81,11 @@ public class SecurityConfig {
                 .requestMatchers("/test.html").permitAll()
                 // Fotos de platos: publicas porque el comensal las ve en la carta sin login (RF-01)
                 .requestMatchers("/uploads/**").permitAll()
+                // Health check del hosting/orquestador: sin login (el balanceador no
+                // tiene token). Solo health esta expuesto (ver management.* en
+                // application.yml); cualquier otro /actuator/** cae en
+                // anyRequest().authenticated() y ademas no esta publicado.
+                .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                 // Gestión de tenants: exclusivo del equipo Mezzalia (SUPER_ADMIN)
                 .requestMatchers("/api/admin/tenants/**").hasRole("SUPER_ADMIN")
                 .requestMatchers("/api/superadmin/**").hasRole("SUPER_ADMIN")
