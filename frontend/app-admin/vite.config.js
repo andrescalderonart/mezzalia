@@ -17,4 +17,12 @@ export default defineConfig({
       '/uploads': { target: 'http://localhost:8080', changeOrigin: true },
     },
   },
+  // Auditoria 2026-09-08 §2.1 / paso 6: app-admin no tenia ningun test, y esa
+  // fue la causa raiz del bug de PR #19 (seleccion de sucursal rota un PR
+  // entero sin que nada lo detectara). jsdom para poder montar componentes.
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.js'],
+    restoreMocks: true,
+  },
 })
