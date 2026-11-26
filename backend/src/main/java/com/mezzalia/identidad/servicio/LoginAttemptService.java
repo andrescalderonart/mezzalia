@@ -3,6 +3,7 @@ package com.mezzalia.identidad.servicio;
 import com.mezzalia.identidad.excepcion.AuthExceptions;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,13 +26,24 @@ public class LoginAttemptService {
     private static final Duration VENTANA_BLOQUEO = Duration.ofMinutes(15);
 
     private final ConcurrentHashMap<String, EstadoIntentos> intentosPorUsuario = new ConcurrentHashMap<>();
+    private final Clock reloj;
+
+    public LoginAttemptService() {
+        this(Clock.systemUTC());
+    }
+
+    // Solo para tests (LoginAttemptServiceTest): permite avanzar el tiempo
+    // para probar el vencimiento del bloqueo sin dormir 15 minutos.
+    LoginAttemptService(Clock reloj) {
+        this.reloj = reloj;
+    }
 
     public void verificarNoBloqueado(String username) {
         EstadoIntentos estado = intentosPorUsuario.get(normalizar(username));
         if (estado == null || estado.bloqueadoHasta == null) {
             return;
         }
-        Instant ahora = Instant.now();
+        Instant ahora = reloj.instant();
         if (estado.bloqueadoHasta.isAfter(ahora)) {
             long segundosRestantes = Duration.between(ahora, estado.bloqueadoHasta).getSeconds();
             throw new AuthExceptions.DemasiadosIntentosException(Math.max(segundosRestantes, 1));
@@ -40,10 +52,17 @@ public class LoginAttemptService {
 
     public void registrarFallo(String username) {
         intentosPorUsuario.compute(normalizar(username), (clave, estadoActual) -> {
-            EstadoIntentos estado = estadoActual == null ? new EstadoIntentos() : estadoActual;
+            Instant ahora = reloj.instant();
+            // Un bloqueo ya vencido es borrón y cuenta nueva: sin esto, el
+            // contador seguia en 5+ y el PRIMER error de tipeo despues de
+            // esperar los 15 minutos volvia a bloquear la cuenta otros 15
+            // (en la practica, el usuario nunca recuperaba los 5 intentos).
+            boolean bloqueoVencido = estadoActual != null && estadoActual.bloqueadoHasta != null
+                    && !estadoActual.bloqueadoHasta.isAfter(ahora);
+            EstadoIntentos estado = (estadoActual == null || bloqueoVencido) ? new EstadoIntentos() : estadoActual;
             estado.fallos++;
             if (estado.fallos >= MAX_INTENTOS_FALLIDOS) {
-                estado.bloqueadoHasta = Instant.now().plus(VENTANA_BLOQUEO);
+                estado.bloqueadoHasta = ahora.plus(VENTANA_BLOQUEO);
             }
             return estado;
         });
