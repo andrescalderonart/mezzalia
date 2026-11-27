@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useApiJson, useAuth } from '../context/AuthContext.jsx'
 import LlamadosPendientes from '../components/LlamadosPendientes.jsx'
+import MesasPorConfirmar from '../components/MesasPorConfirmar.jsx'
 
 const formatoPrecio = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -17,6 +18,7 @@ const formatoHora = new Intl.DateTimeFormat('es-CO', { hour: '2-digit', minute: 
 // vez queda desactualizado respecto al backend, el peor caso es un boton
 // que aparece pero el servidor rechaza con un 409 claro, nunca al reves.
 const TRANSICIONES = {
+  POR_CONFIRMAR: ['RECIBIDO', 'CANCELADO'],
   RECIBIDO: ['EN_PREPARACION', 'CANCELADO'],
   EN_PREPARACION: ['LISTO', 'CANCELADO'],
   LISTO: ['ENTREGADO', 'CANCELADO'],
@@ -25,6 +27,7 @@ const TRANSICIONES = {
 }
 
 const ESTILO_ESTADO = {
+  POR_CONFIRMAR: 'bg-dorado/15 text-dorado border-dorado/30',
   RECIBIDO: 'bg-dorado/15 text-dorado border-dorado/30',
   EN_PREPARACION: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
   LISTO: 'bg-green-500/15 text-green-300 border-green-500/30',
@@ -33,6 +36,7 @@ const ESTILO_ESTADO = {
 }
 
 const ETIQUETA_ESTADO = {
+  POR_CONFIRMAR: 'Por confirmar',
   RECIBIDO: 'Recibido',
   EN_PREPARACION: 'En preparación',
   LISTO: 'Listo',
@@ -199,6 +203,7 @@ export default function PedidosPage() {
       </div>
 
       <LlamadosPendientes nombreMesa={nombreMesa} />
+      {vista === 'activos' && <MesasPorConfirmar nombreMesa={nombreMesa} onConfirmada={() => cargarPedidos('activos', false)} />}
 
       <div className="flex gap-2 mb-5">
         <button
@@ -270,7 +275,10 @@ function TarjetaPedido({
     <div className="card p-4 animate-fadeInUp flex flex-col">
       <div className="flex items-start justify-between gap-2 mb-2">
         <div>
-          <h3 className="font-medium text-crema">{nombreMesa}</h3>
+          <h3 className="font-medium text-crema">
+            {nombreMesa}
+            {pedido.apodo && <span className="text-crema/60 font-normal"> · para {pedido.apodo}</span>}
+          </h3>
           <p className="text-[11px] text-crema/40">
             #{pedido.id} · {formatoHora.format(new Date(pedido.creadoEn))}
           </p>

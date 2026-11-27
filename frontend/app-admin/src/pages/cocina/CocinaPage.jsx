@@ -229,7 +229,11 @@ function TarjetaCocina({ pedido, nombreMesa, minutos, accion, estiloBoton, actua
   return (
     <article className={`rounded-2xl bg-carbon-900 border-2 ${BORDE_URGENCIA[nivel]} p-4`} data-urgencia={nivel}>
       <div className="flex items-baseline justify-between gap-3 mb-3">
-        <h3 className="text-2xl font-semibold">{nombreMesa}</h3>
+        <h3 className="text-2xl font-semibold">
+          {nombreMesa}
+          {/* "Pedido de la mesa": a quién va el plato. */}
+          {pedido.apodo && <span className="block text-base font-normal text-crema/70">para {pedido.apodo}</span>}
+        </h3>
         <span className={`text-lg ${ESTILO_URGENCIA[nivel]}`}>{minutos === 0 ? 'ahora' : `hace ${minutos} min`}</span>
       </div>
 

@@ -4,6 +4,7 @@ import { crearPedido, llamarDesdeMesa, obtenerCarta } from '../api/publico.js'
 import { guardarUltimaRonda, leerUltimaRonda, resumenRonda, rondaComoCarrito } from './ronda.js'
 import { claveDe, nombresQuitados, parsearClave, textoSin } from './carrito.js'
 import VistaIngredientes from './VistaIngredientes.jsx'
+import PedidoDeMesa from './PedidoDeMesa.jsx'
 
 const formatoPrecio = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -54,6 +55,17 @@ export default function CartaPage() {
   const avisoTimerRef = useRef(null)
   // Plato abierto en la vista "desarmada" de ingredientes (o null).
   const [platoIngredientes, setPlatoIngredientes] = useState(null)
+  // "Pedido de la mesa" (2026-11-27): apodo opcional de quien pide desde ESTE
+  // celular (se recuerda por QR para las siguientes rondas) y la vista con
+  // lo que pidió toda la mesa.
+  const [apodo, setApodo] = useState(() => {
+    try {
+      return localStorage.getItem(`mezzalia.apodo.${token}`) || ''
+    } catch {
+      return ''
+    }
+  })
+  const [verMesa, setVerMesa] = useState(false)
 
   // Misma clave de idempotencia (RF-04) mientras el comensal no haya
   // enviado el pedido con exito -- si el POST falla por red y reintenta
@@ -182,6 +194,7 @@ export default function CartaPage() {
           ...(sinIds.length > 0 ? { sinIngredientes: sinIds } : {}),
         })),
         notas: notas.trim() || undefined,
+        apodo: apodo.trim() || undefined,
         // Sin consentimiento explicito, no se manda absolutamente ningun
         // dato del comensal -- ni siquiera un objeto vacio (ver
         // PedidoService.crearComensalSiAplica en el backend, que hace la
@@ -198,6 +211,11 @@ export default function CartaPage() {
       const pedido = await crearPedido(token, payload)
       setEnvio({ estado: 'exito', error: '', pedido })
       guardarUltimaRonda(token, payload.items)
+      try {
+        localStorage.setItem(`mezzalia.apodo.${token}`, apodo.trim())
+      } catch {
+        // sin almacenamiento: se vuelve a preguntar la próxima vez
+      }
       setUltimaRonda(payload.items)
       setCarrito({})
       claveIdempotenciaRef.current = generarClaveIdempotencia()
@@ -306,10 +324,18 @@ export default function CartaPage() {
           {carta.branding?.logoUrl && (
             <img src={carta.branding.logoUrl} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
           )}
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="font-display text-xl text-carbon-950 truncate">{carta.nombreRestaurante}</h1>
             <p className="text-xs text-carbon-900/40">Carta digital</p>
           </div>
+          <button
+            type="button"
+            onClick={() => setVerMesa(true)}
+            className="shrink-0 text-xs font-semibold rounded-full px-3 py-1.5 border"
+            style={{ borderColor: 'var(--color-acento)', color: 'var(--color-acento)' }}
+          >
+            🍽️ Pedido de la mesa
+          </button>
         </div>
 
         {/* Enfoque en bares: pedirle cosas al personal sin levantar la mano. */}
@@ -468,6 +494,19 @@ export default function CartaPage() {
         </div>
       )}
 
+      {verMesa && (
+        <PedidoDeMesa
+          token={token}
+          miApodo={apodo.trim()}
+          sinEnviar={cantidadTotalCarrito}
+          onVerMiPedido={() => {
+            setVerMesa(false)
+            setModalAbierto(true)
+          }}
+          onCerrar={() => setVerMesa(false)}
+        />
+      )}
+
       {platoIngredientes && (
         <VistaIngredientes
           item={platoIngredientes}
@@ -491,6 +530,8 @@ export default function CartaPage() {
         setComensalConsentimiento={setComensalConsentimiento}
         envio={envio}
         onEnviar={onEnviarPedido}
+        apodo={apodo}
+        setApodo={setApodo}
         onAgregarLinea={agregarUnidad}
         onQuitarLinea={quitarUnidad}
       />
@@ -871,6 +912,8 @@ function ModalCheckout({
   onEnviar,
   onAgregarLinea,
   onQuitarLinea,
+  apodo,
+  setApodo,
 }) {
   if (!abierto) return null
 
@@ -948,6 +991,20 @@ function ModalCheckout({
               <span className="text-carbon-950">Total</span>
               <span style={{ color: 'var(--color-acento)' }}>{formatoPrecio.format(total)}</span>
             </div>
+
+            <label htmlFor="apodo-pedido" className="block text-xs uppercase tracking-wide text-carbon-900/40 mb-1.5">
+              ¿A nombre de quién? (opcional)
+            </label>
+            <input
+              id="apodo-pedido"
+              value={apodo}
+              onChange={(e) => setApodo(e.target.value)}
+              placeholder="Tu nombre o apodo"
+              maxLength={40}
+              autoComplete="given-name"
+              className="w-full rounded-xl border border-carbon-950/10 bg-white px-3 py-2 text-sm mb-1 focus:outline-none focus:ring-2 focus:ring-carbon-950/15"
+            />
+            <p className="text-[11px] text-carbon-900/40 mb-4">Así el mesero sabe a quién darle cada plato.</p>
 
             <label className="block text-xs uppercase tracking-wide text-carbon-900/40 mb-1.5">
               Notas para cocina (opcional)
@@ -1034,8 +1091,8 @@ function ConfirmacionPedido({ pedido, onCerrar }) {
       </div>
       <h2 className="font-display text-xl text-carbon-950 mb-1">¡Pedido enviado!</h2>
       <p className="text-sm text-carbon-900/50 mb-6">
-        {pedido?.id ? `Tu pedido #${pedido.id} fue recibido.` : 'Tu pedido fue recibido.'} El mesero lo confirmará
-        en un momento.
+        {pedido?.id ? `Tu pedido #${pedido.id} quedó en el pedido de la mesa.` : 'Tu pedido quedó en el pedido de la mesa.'} El
+        mesero pasará a confirmarlo antes de mandarlo a la cocina.
       </p>
       <button
         onClick={onCerrar}
