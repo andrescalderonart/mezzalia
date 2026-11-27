@@ -322,7 +322,7 @@ export default function CartaPage() {
       >
         <div className="px-4 sm:px-6 pt-4 pb-3 flex items-center gap-3">
           {carta.branding?.logoUrl && (
-            <img src={carta.branding.logoUrl} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
+            <img src={carta.branding.logoUrl} alt="" width={40} height={40} className="w-10 h-10 rounded-full object-cover shrink-0" />
           )}
           <div className="min-w-0 flex-1">
             <h1 className="font-display text-xl text-carbon-950 truncate">{carta.nombreRestaurante}</h1>
@@ -349,6 +349,7 @@ export default function CartaPage() {
             <button
               key={cat.id}
               onClick={() => irACategoria(cat.id)}
+              aria-current={categoriaActiva === cat.id ? 'true' : undefined}
               className="chip-categoria"
               style={
                 categoriaActiva === cat.id
@@ -588,7 +589,7 @@ function ItemFila({ item, expandido, onAlternarExpandido, cantidadEnCarrito, onA
         className="w-full text-left py-3.5 group"
       >
         <div className="flex items-baseline gap-2">
-          <span className="font-medium text-carbon-950 text-[15px] shrink-0">{item.nombre}</span>
+          <span className="font-medium text-carbon-950 text-[15px] min-w-0 break-words">{item.nombre}</span>
           {/* Línea punteada "de relleno" entre el nombre y el precio -- el
               detalle clásico de carta impresa. flex-1 + overflow-hidden en
               vez de border-dotted directo en un elemento de ancho fijo,
@@ -888,7 +889,7 @@ function FotoZoomable({ src, alt, apagada }) {
       />
       {transform.escala === 1 && (
         <span className="absolute bottom-2 right-2 text-[10px] bg-carbon-950/60 text-white px-2 py-1 rounded-full pointer-events-none">
-          Pellizcá o doble-toque para acercar
+          Pellizca o toca dos veces para acercar
         </span>
       )}
     </div>
@@ -928,7 +929,7 @@ function ModalCheckout({
         role="dialog"
         aria-modal="true"
         aria-label="Tu pedido"
-        className="relative w-full sm:max-w-md sm:mx-4 bg-papel-100 rounded-t-3xl sm:rounded-2xl max-h-[90dvh] overflow-y-auto animate-fadeInUp"
+        className="relative w-full sm:max-w-md sm:mx-4 bg-papel-100 rounded-t-3xl sm:rounded-2xl max-h-[90dvh] overflow-y-auto overscroll-contain animate-fadeInUp"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {envio.estado === 'exito' ? (
@@ -999,23 +1000,27 @@ function ModalCheckout({
               id="apodo-pedido"
               value={apodo}
               onChange={(e) => setApodo(e.target.value)}
-              placeholder="Tu nombre o apodo"
+              name="apodo"
+              placeholder="Tu nombre o apodo…"
               maxLength={40}
               autoComplete="given-name"
-              className="w-full rounded-xl border border-carbon-950/10 bg-white px-3 py-2 text-sm mb-1 focus:outline-none focus:ring-2 focus:ring-carbon-950/15"
+              className="w-full rounded-xl border border-carbon-950/10 bg-white px-3 py-2 text-sm mb-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-carbon-950/40"
             />
             <p className="text-[11px] text-carbon-900/40 mb-4">Así el mesero sabe a quién darle cada plato.</p>
 
-            <label className="block text-xs uppercase tracking-wide text-carbon-900/40 mb-1.5">
+            <label htmlFor="notas-pedido" className="block text-xs uppercase tracking-wide text-carbon-900/40 mb-1.5">
               Notas para cocina (opcional)
             </label>
             <textarea
+              id="notas-pedido"
+              name="notas"
+              autoComplete="off"
               value={notas}
               onChange={(e) => setNotas(e.target.value)}
               placeholder="Ej. sin cebolla, término de la carne, alergias…"
               rows={2}
               maxLength={500}
-              className="w-full rounded-xl border border-carbon-950/10 bg-white px-3 py-2 text-sm mb-5 focus:outline-none focus:ring-2 focus:ring-carbon-950/15"
+              className="w-full rounded-xl border border-carbon-950/10 bg-white px-3 py-2 text-sm mb-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-carbon-950/40"
             />
 
             <div className="rounded-xl border border-carbon-950/10 bg-white p-4 mb-5">
@@ -1044,24 +1049,31 @@ function ModalCheckout({
                   <input
                     value={comensalNombre}
                     onChange={(e) => setComensalNombre(e.target.value)}
-                    placeholder="Tu nombre (opcional)"
+                    name="nombre"
+                    autoComplete="name"
+                    aria-label="Tu nombre"
+                    placeholder="Tu nombre (opcional)…"
                     maxLength={150}
-                    className="rounded-lg border border-carbon-950/10 bg-papel-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-carbon-950/15"
+                    className="rounded-lg border border-carbon-950/10 bg-papel-50 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-carbon-950/40"
                   />
                   <input
                     value={comensalTelefono}
                     onChange={(e) => setComensalTelefono(e.target.value)}
-                    placeholder="Tu teléfono (opcional)"
+                    name="telefono"
+                    type="tel"
+                    autoComplete="tel"
+                    aria-label="Tu teléfono"
+                    placeholder="Tu teléfono (opcional)…"
                     inputMode="tel"
                     maxLength={30}
-                    className="rounded-lg border border-carbon-950/10 bg-papel-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-carbon-950/15"
+                    className="rounded-lg border border-carbon-950/10 bg-papel-50 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-carbon-950/40"
                   />
                 </div>
               )}
             </div>
 
             {envio.estado === 'error' && (
-              <div className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <div role="alert" className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 {envio.error}
               </div>
             )}

@@ -165,7 +165,7 @@ export default function VistaIngredientes({ item, onCerrar, onAgregar }) {
         </button>
       </header>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-4">
         {apilado ? (
           <ul className="relative max-w-sm mx-auto flex flex-col items-center" style={{ gap: SEPARACION }}>
             {ingredientes.map((ing, i) => {
