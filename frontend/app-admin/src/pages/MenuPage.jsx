@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth, useApi, useApiJson } from '../context/AuthContext.jsx'
 import EditorIngredientes from '../components/EditorIngredientes.jsx'
+import { prepararFotoPlato } from '../fotos/prepararFoto.js'
 
 const formatoPrecio = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -108,7 +109,9 @@ export default function MenuPage() {
 
       if (archivo) {
         const formData = new FormData()
-        formData.append('archivo', archivo)
+        // Foto principal: se reduce antes de subirla si es pesada (fotos de
+        // celular de 4-8 MB tardan mucho en datos móviles).
+        formData.append('archivo', await prepararFotoPlato(archivo))
         const resp = await apiFetch(`/api/admin/menu/items/${item.id}/imagen`, {
           method: 'POST',
           body: formData,

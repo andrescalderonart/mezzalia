@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useApi, useApiJson } from '../context/AuthContext.jsx'
+import SeparadorCapas from '../fotos/SeparadorCapas.jsx'
+import { prepararCapa, prepararTarjeta } from '../fotos/prepararFoto.js'
 
 /**
  * Editor de ingredientes de un plato (2026-11-26): las capas que el comensal
@@ -23,6 +25,9 @@ export default function EditorIngredientes({ item, onCerrar, onPresentacionCambi
   const [ocupadoId, setOcupadoId] = useState(null)
 
   const base = `/api/admin/menu/items/${item.id}`
+  // "Fotos fáciles": imagen del plato desarmado a separar en capas (o null).
+  const [archivoSeparador, setArchivoSeparador] = useState(null)
+  const [progreso, setProgreso] = useState('')
 
   useEffect(() => {
     apiJson(`${base}/ingredientes`)
@@ -88,16 +93,54 @@ export default function EditorIngredientes({ item, onCerrar, onPresentacionCambi
     })
   }
 
+  async function subirImagenDe(ingredienteId, archivo) {
+    const formData = new FormData()
+    formData.append('archivo', archivo)
+    const resp = await apiFetch(`/api/admin/menu/ingredientes/${ingredienteId}/imagen`, { method: 'POST', body: formData })
+    const datos = await resp.json().catch(() => null)
+    if (!resp.ok) throw new Error(datos?.mensaje || 'No se pudo subir la foto')
+    return datos
+  }
+
   function subirFoto(ing, archivo) {
     if (!archivo) return
     ejecutar(ing.id, async () => {
-      const formData = new FormData()
-      formData.append('archivo', archivo)
-      const resp = await apiFetch(`/api/admin/menu/ingredientes/${ing.id}/imagen`, { method: 'POST', body: formData })
-      const datos = await resp.json().catch(() => null)
-      if (!resp.ok) throw new Error(datos?.mensaje || 'No se pudo subir la foto')
+      // Antes de subirla: sin fondo para una capa apilada, recortada sobre
+      // blanco para una tarjeta esparcida; y aligerada en ambos casos.
+      const lista = presentacion === 'APILADO' ? await prepararCapa(archivo) : await prepararTarjeta(archivo)
+      const datos = await subirImagenDe(ing.id, lista)
       setIngredientes((prev) => prev.map((i) => (i.id === ing.id ? datos : i)))
     })
+  }
+
+  /** Desde el separador: crea las capas en orden (y opcionalmente borra las de antes). */
+  async function crearCapasDesdeFoto(capas, reemplazar) {
+    setError('')
+    try {
+      if (reemplazar) {
+        for (const ing of ingredientes) {
+          setProgreso(`Quitando capas anteriores…`)
+          await apiJson(`/api/admin/menu/ingredientes/${ing.id}`, { method: 'DELETE' })
+        }
+      }
+      const creadas = []
+      for (let i = 0; i < capas.length; i++) {
+        setProgreso(`Subiendo capa ${i + 1} de ${capas.length}…`)
+        const creada = await apiJson(`${base}/ingredientes`, {
+          method: 'POST',
+          body: { nombre: capas[i].nombre, removible: capas[i].removible },
+        })
+        creadas.push(await subirImagenDe(creada.id, capas[i].archivo))
+      }
+      setIngredientes(reemplazar ? creadas : await apiJson(`${base}/ingredientes`))
+      setArchivoSeparador(null)
+    } catch (e) {
+      setError(e.message)
+      setArchivoSeparador(null)
+      setIngredientes(await apiJson(`${base}/ingredientes`).catch(() => ingredientes))
+    } finally {
+      setProgreso('')
+    }
   }
 
   function cambiarPresentacion(valor) {
@@ -145,6 +188,40 @@ export default function EditorIngredientes({ item, onCerrar, onPresentacionCambi
             ))}
           </div>
         </fieldset>
+
+        {presentacion === 'APILADO' && (
+          <div className="mb-5 rounded-xl border border-dashed border-dorado/40 bg-dorado/5 p-3">
+            <label className="flex items-center justify-between gap-3 cursor-pointer">
+              <span>
+                <span className="block text-sm text-crema">📸 Crear capas desde una foto</span>
+                <span className="block text-[11px] text-crema/50">
+                  Sube una imagen del plato desarmado (fondo liso) y separamos las capas solas.
+                </span>
+              </span>
+              <span className="btn-secundario text-xs py-1.5 px-3 whitespace-nowrap">Elegir foto</span>
+              <input
+                type="file"
+                accept="image/png,image/webp,image/jpeg"
+                className="sr-only"
+                aria-label="Foto del plato desarmado"
+                onChange={(e) => {
+                  setArchivoSeparador(e.target.files[0] || null)
+                  e.target.value = ''
+                }}
+              />
+            </label>
+            {progreso && <p className="text-xs text-dorado mt-2" role="status">{progreso}</p>}
+          </div>
+        )}
+
+        {archivoSeparador && (
+          <SeparadorCapas
+            archivo={archivoSeparador}
+            capasActuales={ingredientes.length}
+            onCancelar={() => setArchivoSeparador(null)}
+            onCrear={crearCapasDesdeFoto}
+          />
+        )}
 
         {error && (
           <div className="mb-4 text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2">{error}</div>
