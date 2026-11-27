@@ -193,7 +193,7 @@ export default function PedidosPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="font-display text-2xl text-crema">Pedidos</h1>
+          <h1 className="font-display font-semibold text-2xl text-crema">Pedidos</h1>
           <p className="text-sm text-crema/40">
             {vista === 'activos'
               ? `Se actualiza solo cada ${Math.round(INTERVALO_POLLING_MS / 1000)}s. Los pedidos nuevos aparecen arriba.`
@@ -295,7 +295,7 @@ function TarjetaPedido({
               {item.cantidad}× {item.nombreItem}
               {/* "Sin cebolla" (2026-11-26): lo que el comensal quito, bien visible. */}
               {item.sinIngredientes?.length > 0 && (
-                <span className="block text-xs font-semibold text-red-300 uppercase tracking-wide">
+                <span className="mt-1 block w-fit pastilla-sin">
                   Sin {item.sinIngredientes.join(', ').toLowerCase()}
                 </span>
               )}

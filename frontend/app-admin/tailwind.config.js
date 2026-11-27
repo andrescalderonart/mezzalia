@@ -3,33 +3,38 @@ export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
+      // 2026-11-27, rediseño "startup": neutros oscuros (zinc) y un solo
+      // acento naranja derivado de la marca. Se conservan los nombres
+      // carbon/crema/dorado/terracota para no tocar cada clase del panel.
       colors: {
-        // Paleta derivada del logo de Mezzalia (circulo terracota/dorado
-        // sobre negro). "carbon" = fondo casi negro, nunca gris puro frio.
         carbon: {
-          950: '#0d0c0b',
-          900: '#141311',
-          800: '#1d1b18',
-          700: '#2a2723',
-          600: '#3d3933',
+          950: '#09090b',
+          900: '#111113',
+          800: '#18181b',
+          700: '#27272a',
+          600: '#3f3f46',
         },
-        crema: '#f3ecdf',
+        crema: '#fafafa',
         terracota: {
-          DEFAULT: '#c1502e',
-          light: '#d97a52',
-          dark: '#8f3a20',
+          DEFAULT: '#f97316',
+          light: '#fb923c',
+          dark: '#c2410c',
         },
         dorado: {
-          DEFAULT: '#d4a24c',
-          light: '#e6c17a',
+          DEFAULT: '#fb923c',
+          light: '#fdba74',
+        },
+        sin: {
+          DEFAULT: '#f87171',
+          fondo: 'rgba(248,113,113,0.12)',
         },
       },
       fontFamily: {
-        display: ['"Playfair Display"', 'serif'],
-        sans: ['Sora', 'system-ui', 'sans-serif'],
+        display: ['Geist', 'system-ui', 'sans-serif'],
+        sans: ['Geist', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        glow: '0 0 0 1px rgba(212,162,76,0.25), 0 8px 24px -8px rgba(193,80,46,0.35)',
+        glow: '0 1px 2px rgba(0,0,0,0.4)',
       },
       keyframes: {
         fadeInUp: {

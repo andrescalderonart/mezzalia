@@ -154,7 +154,7 @@ export default function MesasPage() {
     <div>
       <div className="flex items-center justify-between mb-6 print:hidden">
         <div>
-          <h1 className="font-display text-2xl text-crema">Mesas</h1>
+          <h1 className="font-display font-semibold text-2xl text-crema">Mesas</h1>
           <p className="text-sm text-crema/40">
             Genera el código QR que cada mesa usa para ver la carta sin iniciar sesión.
           </p>
@@ -188,7 +188,7 @@ export default function MesasPage() {
               value={sucursalId}
               onChange={(e) => setSucursalId(e.target.value)}
             >
-              <option value="">Elegí una sucursal…</option>
+              <option value="">Elige una sucursal…</option>
               {sucursales.map((s) => (
                 <option key={s.id} value={s.id}>{s.nombre}</option>
               ))}

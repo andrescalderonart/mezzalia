@@ -122,10 +122,10 @@ export default function SucursalesPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="font-display text-2xl text-crema">Sucursales</h1>
+        <h1 className="font-display font-semibold text-2xl text-crema">Sucursales</h1>
         <p className="text-sm text-crema/40">
-          La mayoría de restaurantes opera con una sola sucursal. Agregá más solo si de verdad
-          tenés más de un local.
+          La mayoría de restaurantes opera con una sola sucursal. Agrega más solo si de verdad
+          tienes más de un local.
         </p>
       </div>
 
@@ -267,7 +267,7 @@ function MeserosAsignadosModal({ sucursal, onCerrar }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={onCerrar}>
       <div className="card w-full max-w-sm p-6 animate-fadeInUp" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4">
-          <h2 className="font-display text-lg text-crema">Meseros en {sucursal.nombre}</h2>
+          <h2 className="font-display font-semibold text-lg text-crema">Meseros en {sucursal.nombre}</h2>
           <p className="text-[11px] text-crema/40 mt-1">
             Quitar a alguien de acá no borra su cuenta, solo hace que ya no pueda elegir esta
             sucursal para trabajar.

@@ -33,7 +33,7 @@ export default function Login() {
       <div className={`card w-full max-w-sm p-8 animate-fadeInUp ${sacudir ? 'animate-shake' : ''}`}>
         <div className="flex flex-col items-center mb-8">
           <LogoMark className="w-14 h-14 mb-3" />
-          <h1 className="font-display text-2xl text-crema">Mezzalia</h1>
+          <h1 className="font-display font-semibold text-2xl text-crema">Mezzalia</h1>
           <p className="text-xs text-crema/40 mt-1">Panel del restaurante</p>
         </div>
 

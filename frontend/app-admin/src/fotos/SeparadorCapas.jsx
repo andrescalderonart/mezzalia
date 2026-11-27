@@ -143,7 +143,7 @@ export default function SeparadorCapas({ archivo, capasActuales = 0, onCancelar,
         aria-label="Separar capas desde una foto"
       >
         <div className="flex items-start justify-between gap-3 mb-1">
-          <h2 className="font-display text-xl text-crema">Separar capas de la foto</h2>
+          <h2 className="font-display font-semibold text-xl text-crema">Separar capas de la foto</h2>
           <button onClick={onCancelar} disabled={creando} className="text-crema/50 hover:text-crema text-sm" aria-label="Cerrar">
             ✕
           </button>

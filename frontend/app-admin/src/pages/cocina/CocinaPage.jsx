@@ -164,7 +164,7 @@ export default function CocinaPage() {
           <Link to="/pedidos" className="text-sm text-crema/50 hover:text-crema">
             ← Panel
           </Link>
-          <h1 className="font-display text-3xl">Cocina</h1>
+          <h1 className="font-display font-semibold text-3xl">Cocina</h1>
         </div>
         <button
           onClick={alternarSonido}
@@ -247,7 +247,7 @@ function TarjetaCocina({ pedido, nombreMesa, minutos, accion, estiloBoton, actua
                 mergee feature/ingredientes-quitables el campo no existe y esto
                 no muestra nada. */}
             {item.sinIngredientes?.length > 0 && (
-              <span className="block text-base font-bold uppercase tracking-wide text-red-300">
+              <span className="mt-1.5 block w-fit rounded-lg bg-sin-fondo px-2.5 py-1 text-base font-bold text-sin first-letter:uppercase">
                 Sin {item.sinIngredientes.join(', ').toLowerCase()}
               </span>
             )}

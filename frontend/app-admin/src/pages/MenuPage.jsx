@@ -158,7 +158,7 @@ export default function MenuPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="font-display text-2xl text-crema">Carta</h1>
+          <h1 className="font-display font-semibold text-2xl text-crema">Carta</h1>
           <p className="text-sm text-crema/40">Categorías y platos de tu restaurante</p>
         </div>
       </div>
@@ -366,7 +366,7 @@ function ModalItem({ modo, item, onCancelar, onGuardar }) {
           libres) y este formulario tiene 4 campos + 2 botones -- sin esto
           el botón "Guardar" queda fuera de pantalla e inalcanzable. */}
       <div className="card w-full max-w-md p-6 max-h-[90dvh] overflow-y-auto">
-        <h2 className="font-display text-xl text-crema mb-4">
+        <h2 className="font-display font-semibold text-xl text-crema mb-4">
           {modo === 'crear' ? 'Nuevo plato' : 'Editar plato'}
         </h2>
 
@@ -378,7 +378,7 @@ function ModalItem({ modo, item, onCancelar, onGuardar }) {
           <div>
             <label className="label-carbon">Descripción</label>
             <textarea
-              className="input-carbon"
+              className="input-carbon h-auto py-2"
               rows={2}
               value={descripcion}
               onChange={(e) => setDescripcion(e.target.value)}
