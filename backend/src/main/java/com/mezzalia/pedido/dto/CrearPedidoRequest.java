@@ -23,5 +23,12 @@ public record CrearPedidoRequest(
         @NotBlank @Size(max = 36) String claveIdempotencia,
         @NotEmpty @Size(max = 30) @Valid List<ItemSolicitadoRequest> items,
         @Size(max = 500) String notas,
-        @Valid ComensalRequest comensal
-) {}
+        @Valid ComensalRequest comensal,
+        // "Pedido de la mesa": apodo opcional de quien pide (ver V24).
+        @Size(max = 40) String apodo
+) {
+    /** Sin apodo (la forma que ya usaba todo el codigo). */
+    public CrearPedidoRequest(String claveIdempotencia, List<ItemSolicitadoRequest> items, String notas, ComensalRequest comensal) {
+        this(claveIdempotencia, items, notas, comensal, null);
+    }
+}

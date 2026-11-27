@@ -19,12 +19,14 @@ public interface PedidoItemRepository extends JpaRepository<PedidoItem, Long> {
      */
     @Query("SELECT pi FROM PedidoItem pi WHERE pi.tenantId = :tenantId AND pi.pedidoId IN "
             + "(SELECT p.id FROM Pedido p WHERE p.tenantId = :tenantId AND p.creadoEn >= :desde "
-            + "AND p.estado <> com.mezzalia.pedido.EstadoPedido.CANCELADO)")
+            + "AND p.estado <> com.mezzalia.pedido.EstadoPedido.CANCELADO "
+            + "AND p.estado <> com.mezzalia.pedido.EstadoPedido.POR_CONFIRMAR)")
     List<PedidoItem> lineasDesde(@Param("tenantId") Long tenantId, @Param("desde") LocalDateTime desde);
 
     @Query("SELECT pi FROM PedidoItem pi WHERE pi.tenantId = :tenantId AND pi.pedidoId IN "
             + "(SELECT p.id FROM Pedido p WHERE p.tenantId = :tenantId AND p.creadoEn >= :desde "
-            + "AND p.estado <> com.mezzalia.pedido.EstadoPedido.CANCELADO AND p.mesaId IN "
+            + "AND p.estado <> com.mezzalia.pedido.EstadoPedido.CANCELADO "
+            + "AND p.estado <> com.mezzalia.pedido.EstadoPedido.POR_CONFIRMAR AND p.mesaId IN "
             + "(SELECT m.id FROM Mesa m WHERE m.tenantId = :tenantId AND m.sucursalId = :sucursalId))")
     List<PedidoItem> lineasDesdeEnSucursal(@Param("tenantId") Long tenantId, @Param("desde") LocalDateTime desde,
                                            @Param("sucursalId") Long sucursalId);

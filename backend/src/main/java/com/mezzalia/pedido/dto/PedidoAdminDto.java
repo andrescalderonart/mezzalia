@@ -18,7 +18,8 @@ public record PedidoAdminDto(
         List<PedidoItemDto> items,
         ComensalDto comensal,
         LocalDateTime creadoEn,
-        LocalDateTime actualizadoEn
+        LocalDateTime actualizadoEn,
+        String apodo
 ) {
     /**
      * `telefonoCompleto` viaja explícito desde el controlador (que es
@@ -31,6 +32,6 @@ public record PedidoAdminDto(
         ComensalDto comensalDto = comensal != null ? ComensalDto.desde(comensal, telefonoCompleto) : null;
         return new PedidoAdminDto(
                 pedido.getId(), pedido.getMesaId(), pedido.getEstado(), pedido.getTotal(), pedido.getNotas(),
-                itemsDto, comensalDto, pedido.getCreadoEn(), pedido.getActualizadoEn());
+                itemsDto, comensalDto, pedido.getCreadoEn(), pedido.getActualizadoEn(), pedido.getApodo());
     }
 }

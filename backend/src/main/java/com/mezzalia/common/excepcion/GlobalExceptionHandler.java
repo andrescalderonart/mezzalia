@@ -76,6 +76,24 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 2026-11-27 (encontrado con el test del apodo de mas de 40 caracteres):
+     * un @RequestBody que no pasa @Valid (nombre vacio, notas de mas de 500
+     * caracteres, cantidad 0, apodo largo...) lanza
+     * MethodArgumentNotValidException, que NO tenia handler y caia en el
+     * catch-all: toda la API respondia 500 "Error interno" a un error del
+     * cliente. Ahora es 400 con el primer campo invalido, sin detalle interno
+     * (solo nombre del campo y el mensaje de la restriccion).
+     */
+    @ExceptionHandler(org.springframework.web.bind.MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, Object>> handleValidacion(org.springframework.web.bind.MethodArgumentNotValidException ex) {
+        var error = ex.getBindingResult().getFieldError();
+        String mensaje = error != null
+                ? "Dato invalido en '" + error.getField() + "': " + error.getDefaultMessage()
+                : "Hay datos invalidos en la solicitud";
+        return respuesta(HttpStatus.BAD_REQUEST, mensaje);
+    }
+
+    /**
      * Auditoria 2026-09-08 (encontrado corriendo por primera vez el nuevo
      * AutorizacionAdminTest en CI, no a mano): Spring Security 6 lanza
      * AuthorizationDeniedException desde el interceptor de metodo de

@@ -272,18 +272,19 @@ class PedidoServiceTest {
         testEntityManager.flush();
         testEntityManager.clear();
 
-        // RECIBIDO -> ENTREGADO se salta EN_PREPARACION y LISTO: invalida.
+        // POR_CONFIRMAR -> ENTREGADO se salta la confirmacion y la cocina: invalida.
         assertThatThrownBy(() -> pedidoService.cambiarEstado(pedido.getId(), EstadoPedido.ENTREGADO))
                 .isInstanceOf(PedidoExceptions.TransicionEstadoInvalidaException.class);
 
         Pedido recargado = pedidoRepository.findById(pedido.getId()).orElseThrow();
-        assertThat(recargado.getEstado()).isEqualTo(EstadoPedido.RECIBIDO);
+        assertThat(recargado.getEstado()).isEqualTo(EstadoPedido.POR_CONFIRMAR);
         assertThat(historialRepository.findByPedidoIdOrderByCreadoEnAsc(pedido.getId())).hasSize(1); // solo el alta
     }
 
     /**
-     * RF-06 completo: las 25 combinaciones posibles de (origen, destino)
-     * sobre los 5 valores de EstadoPedido. La lista de "validas" se
+     * RF-06 completo: las 36 combinaciones posibles de (origen, destino)
+     * sobre los 6 valores de EstadoPedido (POR_CONFIRMAR desde el "pedido de
+     * la mesa", 2026-11-27). La lista de "validas" se
      * hardcodea aca a mano, a proposito, en vez de leerla de
      * PedidoService.TRANSICIONES_VALIDAS (que es privado, ademas) -- un
      * test que compara el mapa contra si mismo nunca puede fallar. Esto
@@ -304,7 +305,7 @@ class PedidoServiceTest {
         testEntityManager.flush();
 
         // Llevar el pedido hasta `origen` pasando por las transiciones
-        // validas intermedias (todas parten de RECIBIDO al crear).
+        // validas intermedias (todas parten de POR_CONFIRMAR al crear).
         for (EstadoPedido paso : caminoValidoHasta(origen)) {
             pedidoService.cambiarEstado(pedido.getId(), paso);
         }
@@ -322,6 +323,7 @@ class PedidoServiceTest {
 
     static Stream<Arguments> todasLasCombinacionesDeEstados() {
         Map<EstadoPedido, Set<EstadoPedido>> validasSegunRf06 = new EnumMap<>(EstadoPedido.class);
+        validasSegunRf06.put(EstadoPedido.POR_CONFIRMAR, EnumSet.of(EstadoPedido.RECIBIDO, EstadoPedido.CANCELADO));
         validasSegunRf06.put(EstadoPedido.RECIBIDO, EnumSet.of(EstadoPedido.EN_PREPARACION, EstadoPedido.CANCELADO));
         validasSegunRf06.put(EstadoPedido.EN_PREPARACION, EnumSet.of(EstadoPedido.LISTO, EstadoPedido.CANCELADO));
         validasSegunRf06.put(EstadoPedido.LISTO, EnumSet.of(EstadoPedido.ENTREGADO, EstadoPedido.CANCELADO));
@@ -333,15 +335,16 @@ class PedidoServiceTest {
                         Arguments.of(origen, destino, validasSegunRf06.get(origen).contains(destino))));
     }
 
-    /** Camino valido minimo desde RECIBIDO (estado inicial real de todo
+    /** Camino valido minimo desde POR_CONFIRMAR (estado inicial real de todo
      * pedido creado) hasta `origen`, para poder ejercer la transicion bajo
      * prueba desde ese estado real. */
     private List<EstadoPedido> caminoValidoHasta(EstadoPedido origen) {
         return switch (origen) {
-            case RECIBIDO -> List.of();
-            case EN_PREPARACION -> List.of(EstadoPedido.EN_PREPARACION);
-            case LISTO -> List.of(EstadoPedido.EN_PREPARACION, EstadoPedido.LISTO);
-            case ENTREGADO -> List.of(EstadoPedido.EN_PREPARACION, EstadoPedido.LISTO, EstadoPedido.ENTREGADO);
+            case POR_CONFIRMAR -> List.of();
+            case RECIBIDO -> List.of(EstadoPedido.RECIBIDO);
+            case EN_PREPARACION -> List.of(EstadoPedido.RECIBIDO, EstadoPedido.EN_PREPARACION);
+            case LISTO -> List.of(EstadoPedido.RECIBIDO, EstadoPedido.EN_PREPARACION, EstadoPedido.LISTO);
+            case ENTREGADO -> List.of(EstadoPedido.RECIBIDO, EstadoPedido.EN_PREPARACION, EstadoPedido.LISTO, EstadoPedido.ENTREGADO);
             case CANCELADO -> List.of(EstadoPedido.CANCELADO);
         };
     }

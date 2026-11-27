@@ -70,6 +70,10 @@ public class Pedido extends EntidadConTenant {
     @Column(length = 500)
     private String notas;
 
+    /** Nombre o apodo opcional de quien pidio ("para Andres"). Ver V24. */
+    @Column(length = 40)
+    private String apodo;
+
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal total;
 

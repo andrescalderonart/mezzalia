@@ -77,6 +77,20 @@ public class PedidoAdminController {
         return ResponseEntity.ok(dtos);
     }
 
+    /**
+     * "Pedido de la mesa": el mesero confirma de una vez lo que la mesa pidio
+     * (POR_CONFIRMAR -> RECIBIDO); desde ahi la cocina lo ve. Sin
+     * @PreAuthorize: confirmar es trabajo diario del mesero.
+     */
+    @PatchMapping("/mesa/{mesaId}/confirmar")
+    public ResponseEntity<List<PedidoAdminDto>> confirmarMesa(@PathVariable Long mesaId) {
+        boolean telefonoCompleto = telefonoCompleto();
+        return ResponseEntity.ok(pedidoService.confirmarMesa(mesaId).stream()
+                .map(p -> PedidoAdminDto.desde(p, pedidoService.listarItems(p.getId()),
+                        pedidoService.obtenerComensal(p.getComensalId()), telefonoCompleto))
+                .toList());
+    }
+
     @PatchMapping("/{id}/estado")
     public ResponseEntity<PedidoAdminDto> cambiarEstado(@PathVariable Long id, @Valid @RequestBody CambiarEstadoRequest request) {
         Pedido pedido = pedidoService.cambiarEstado(id, request.estado());

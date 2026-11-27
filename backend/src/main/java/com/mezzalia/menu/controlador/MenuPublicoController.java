@@ -156,7 +156,7 @@ public class MenuPublicoController {
                 ejecutarConSucursal(mesaService.obtenerSucursalIdDeMesa(sesion.getMesaId()), () -> {
                     Pedido pedido = pedidoService.crearPedido(
                             sesion.getMesaId(), request.claveIdempotencia(), request.items(),
-                            request.notas(), request.comensal());
+                            request.notas(), request.comensal(), request.apodo());
                     List<PedidoItemDto> items = pedidoService.listarItems(pedido.getId()).stream()
                             .map(PedidoItemDto::desde)
                             .toList();
@@ -164,6 +164,28 @@ public class MenuPublicoController {
                 }));
 
         return ResponseEntity.status(HttpStatus.CREATED).body(dto);
+    }
+
+    /**
+     * "Pedido de la mesa" (2026-11-27): todo lo pedido en esta mesa desde que
+     * se abrio su QR actual, desde cualquier celular, con el apodo de quien
+     * pidio y el estado (por confirmar, en cocina, listo...). Sin datos del
+     * comensal (PedidoDto no los trae). Un QR nuevo = una cuenta nueva: los
+     * pedidos de la mesa anterior no aparecen.
+     */
+    @GetMapping("/{token}/pedidos")
+    public ResponseEntity<List<PedidoDto>> pedidosDeLaMesa(@PathVariable String token) {
+        SesionMesa sesion = mesaService.resolverSesionValida(token);
+        Tenant tenant = tenantService.obtenerPorId(sesion.getTenantId());
+        if (tenant.estaSuspendido()) {
+            throw new MesaExceptions.RestauranteNoDisponibleException();
+        }
+        List<PedidoDto> pedidos = tenantFilterActivator.ejecutarConTenant(sesion.getTenantId(), () ->
+                pedidoService.pedidosDeLaMesaDesde(sesion.getMesaId(), sesion.getCreadaEn()).stream()
+                        .map(p -> PedidoDto.desde(p, pedidoService.listarItems(p.getId()).stream()
+                                .map(PedidoItemDto::desde).toList()))
+                        .toList());
+        return ResponseEntity.ok(pedidos);
     }
 
     /**
