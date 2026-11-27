@@ -619,6 +619,20 @@ function ItemFila({ item, expandido, onAlternarExpandido, cantidadEnCarrito, onA
  */
 function DetalleExpandido({ item, cantidadEnCarrito, onAgregar, onQuitar, onVerIngredientes }) {
   const [vista, setVista] = useState('foto') // 'foto' | 'modelo3d'
+
+  // Al abrir el plato, precarga en segundo plano las fotos de sus capas: si
+  // el cliente toca "Ver ingredientes", la animación arranca con todo listo
+  // en vez de ir apareciendo capa por capa en datos móviles. Solo de ESTE
+  // plato, para no gastar datos en platos que nadie abre.
+  useEffect(() => {
+    for (const ing of item.ingredientes || []) {
+      if (ing.imagenUrl) {
+        const img = new Image()
+        img.decoding = 'async'
+        img.src = ing.imagenUrl
+      }
+    }
+  }, [item])
   const tieneModelo3d = Boolean(item.modeloGlbUrl && item.modeloUsdzUrl)
 
   function verModelo3d() {

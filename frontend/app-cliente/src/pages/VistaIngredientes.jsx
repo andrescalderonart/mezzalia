@@ -336,6 +336,7 @@ function Capa({ ing, quitado, sacudiendo, onTocar, apilado = false, sinMovimient
             src={ing.imagenUrl}
             alt=""
             draggable="false"
+            decoding="async"
             className={apilado ? 'object-contain select-none' : 'w-full aspect-[4/3] object-contain select-none'}
             style={
               apilado
