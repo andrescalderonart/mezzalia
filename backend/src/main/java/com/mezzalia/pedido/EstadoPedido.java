@@ -7,6 +7,13 @@ package com.mezzalia.pedido;
  * que sus valores pueden sucederse.
  */
 public enum EstadoPedido {
+    /**
+     * "Pedido de la mesa" (2026-11-27): todo pedido hecho desde el QR nace
+     * aqui y la cocina NO lo ve hasta que el mesero lo confirma (pasa a
+     * RECIBIDO). Asi el mesero verifica la mesa, junta lo de todos y filtra
+     * pedidos falsos hechos con la foto del QR.
+     */
+    POR_CONFIRMAR,
     RECIBIDO,
     EN_PREPARACION,
     LISTO,

@@ -23,11 +23,12 @@ public record PedidoDto(
         BigDecimal total,
         String notas,
         List<PedidoItemDto> items,
-        LocalDateTime creadoEn
+        LocalDateTime creadoEn,
+        String apodo
 ) {
     public static PedidoDto desde(Pedido pedido, List<PedidoItemDto> items) {
         return new PedidoDto(
                 pedido.getId(), pedido.getMesaId(), pedido.getEstado(), pedido.getTotal(),
-                pedido.getNotas(), items, pedido.getCreadoEn());
+                pedido.getNotas(), items, pedido.getCreadoEn(), pedido.getApodo());
     }
 }

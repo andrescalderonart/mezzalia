@@ -41,6 +41,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -66,6 +67,8 @@ class IngredientesEndToEndTest {
     private Long sucursalId;
     private String admin;
     private String qr;
+    /** Mesa del QR principal (para confirmarla o abrirle un QR nuevo). */
+    private Long mesaId;
     private long hamburguesa;
     private long limonada;
     /** Ids en orden: pan arriba, lechuga, cebolla, carne, pan abajo. */
@@ -168,6 +171,13 @@ class IngredientesEndToEndTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.imagenUrl").value(org.hamcrest.Matchers.startsWith("/uploads/")));
 
+        // ASVS V5.2.2: un HTML disfrazado de PNG (Content-Type falso) se rechaza.
+        mvc.perform(multipart("/api/admin/menu/ingredientes/{id}/imagen", capas.get(2))
+                        .file(new MockMultipartFile("archivo", "foto.png", "image/png",
+                                "<html><script>alert(1)</script></html>".getBytes()))
+                        .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isBadRequest());
+
         // Reordenar con un id de mas, de menos o ajeno se rechaza.
         conAdmin(put("/api/admin/menu/items/{id}/ingredientes/orden", hamburguesa), "{\"ids\":" + capas.subList(0, 3) + "}")
                 .andExpect(status().isNotFound());
@@ -223,6 +233,7 @@ class IngredientesEndToEndTest {
         // Un pedido cancelado no cuenta.
         long cancelado = idDe(pedir("[{\"itemMenuId\":" + hamburguesa + ",\"cantidad\":5,\"sinIngredientes\":[" + lechuga + "]}]"));
         conAdmin(patch("/api/admin/pedidos/{id}/estado", cancelado), "{\"estado\":\"CANCELADO\"}").andExpect(status().isOk());
+        conAdmin(patch("/api/admin/pedidos/mesa/{id}/confirmar", mesaId), null).andExpect(status().isOk());
 
         mvc.perform(get("/api/admin/reportes/ingredientes-quitados").param("dias", "30").header("Authorization", "Bearer " + admin))
                 .andExpect(status().isOk())
@@ -241,6 +252,13 @@ class IngredientesEndToEndTest {
                 .andExpect(jsonPath("$.platos[0].ingredientes[1].porcentaje").value(12.5))
                 .andExpect(jsonPath("$.masQuitados[0].nombre").value("Cebolla"))
                 .andExpect(jsonPath("$.masQuitados[0].plato").value("Hamburguesa clásica"));
+    }
+
+    @Test
+    void elReporteNoCuentaLoQueElMeseroTodaviaNoConfirma() throws Exception {
+        pedir("[{\"itemMenuId\":" + hamburguesa + ",\"cantidad\":2,\"sinIngredientes\":[" + capas.get(2) + "]}]");
+        mvc.perform(get("/api/admin/reportes/ingredientes-quitados").header("Authorization", "Bearer " + admin))
+                .andExpect(jsonPath("$.unidadesVendidas").value(0));
     }
 
     @Test
@@ -267,7 +285,102 @@ class IngredientesEndToEndTest {
                 .andExpect(jsonPath("$.dias").value(365));
     }
 
+    // --- pedido de la mesa (2026-11-27) -----------------------------------
+
+    @Test
+    void todoPedidoNaceSinConfirmarYLaCocinaNoLoVeHastaQueElMeseroConfirma() throws Exception {
+        pedirComo("Andrés", "[{\"itemMenuId\":" + hamburguesa + ",\"cantidad\":1,\"sinIngredientes\":[" + capas.get(2) + "]}]")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.estado").value("POR_CONFIRMAR"))
+                .andExpect(jsonPath("$.apodo").value("Andrés"));
+        pedirComo(null, "[{\"itemMenuId\":" + limonada + ",\"cantidad\":2}]");
+
+        // Lo que mira la cocina (RECIBIDO) esta vacio...
+        mvc.perform(get("/api/admin/pedidos").param("estado", "RECIBIDO").header("Authorization", "Bearer " + admin))
+                .andExpect(jsonPath("$", hasSize(0)));
+        mvc.perform(get("/api/admin/pedidos").param("estado", "POR_CONFIRMAR").header("Authorization", "Bearer " + admin))
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].apodo").value("Andrés"));
+
+        // ...hasta que el mesero confirma la mesa: ahi pasan los dos juntos.
+        conAdmin(patch("/api/admin/pedidos/mesa/{id}/confirmar", mesaId), null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].estado").value("RECIBIDO"));
+        mvc.perform(get("/api/admin/pedidos").param("estado", "RECIBIDO").header("Authorization", "Bearer " + admin))
+                .andExpect(jsonPath("$", hasSize(2)));
+        // Confirmar de nuevo no hace nada.
+        conAdmin(patch("/api/admin/pedidos/mesa/{id}/confirmar", mesaId), null).andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void elPedidoDeLaMesaMuestraLoDeTodosLosCelularesSinDatosPersonales() throws Exception {
+        pedirComo("Andrés", "[{\"itemMenuId\":" + hamburguesa + ",\"cantidad\":1,\"sinIngredientes\":[" + capas.get(2) + "]}]");
+        // Otro celular, sin apodo y CON datos de contacto (con consentimiento).
+        mvc.perform(post("/api/publico/mesas/{t}/pedidos", qr).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"claveIdempotencia\":\"" + UUID.randomUUID() + "\",\"items\":[{\"itemMenuId\":" + limonada
+                        + ",\"cantidad\":1}],\"comensal\":{\"nombre\":\"Laura\",\"telefono\":\"3001234567\",\"consentimiento\":true}}"))
+                .andExpect(status().isCreated());
+
+        mvc.perform(get("/api/publico/mesas/{t}/pedidos", qr))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].apodo").value("Andrés"))
+                .andExpect(jsonPath("$[0].estado").value("POR_CONFIRMAR"))
+                .andExpect(jsonPath("$[0].items[0].sinIngredientes[0]").value("Cebolla"))
+                .andExpect(jsonPath("$[1].apodo").doesNotExist())
+                // El telefono y el nombre del comensal nunca salen por aca.
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("300"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Laura"))));
+    }
+
+    @Test
+    void unQrNuevoParaLaMesaEsUnaCuentaNueva() throws Exception {
+        pedirComo("Andrés", "[{\"itemMenuId\":" + limonada + ",\"cantidad\":1}]");
+        Thread.sleep(5); // el QR nuevo debe abrirse DESPUES del pedido anterior
+        String qrNuevo = nuevaSesion(mesaId);
+        mvc.perform(get("/api/publico/mesas/{t}/pedidos", qrNuevo)).andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void unMeseroDeOtraSucursalNoPuedeConfirmarLaMesa() throws Exception {
+        pedirComo(null, "[{\"itemMenuId\":" + limonada + ",\"cantidad\":1}]");
+        String meseroOtra = token(tenantId, RolUsuario.MESERO, sucursal(tenantId));
+        mvc.perform(patch("/api/admin/pedidos/mesa/{id}/confirmar", mesaId).header("Authorization", "Bearer " + meseroOtra))
+                .andExpect(status().isNotFound());
+        String meseroPropio = token(tenantId, RolUsuario.MESERO, sucursalId);
+        mvc.perform(patch("/api/admin/pedidos/mesa/{id}/confirmar", mesaId).header("Authorization", "Bearer " + meseroPropio))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)));
+    }
+
+    @Test
+    void unApodoDeMasDe40CaracteresSeRechaza() throws Exception {
+        pedirComo("x".repeat(41), "[{\"itemMenuId\":" + limonada + ",\"cantidad\":1}]")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensaje").value(org.hamcrest.Matchers.containsString("apodo")));
+        // Mismo arreglo para cualquier validacion del cuerpo (antes: 500).
+        pedir("[{\"itemMenuId\":" + limonada + ",\"cantidad\":0}]").andExpect(status().isBadRequest());
+    }
+
     // --- ayudantes --------------------------------------------------------
+
+    private ResultActions pedirComo(String apodo, String items) throws Exception {
+        return mvc.perform(post("/api/publico/mesas/{t}/pedidos", qr)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"claveIdempotencia\":\"" + UUID.randomUUID() + "\",\"items\":" + items
+                        + (apodo == null ? "" : ",\"apodo\":\"" + apodo + "\"") + "}"));
+    }
+
+    private String nuevaSesion(Long mesa) {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("admin.test", null, List.of()));
+        TenantContext.establecerTenantId(tenantId);
+        try {
+            return mesaService.generarSesion(mesa).getToken();
+        } finally {
+            limpiar();
+        }
+    }
 
     private ResultActions conAdmin(MockHttpServletRequestBuilder req, String cuerpo) throws Exception {
         req.header("Authorization", "Bearer " + admin);
@@ -312,6 +425,9 @@ class IngredientesEndToEndTest {
         m.setSucursalId(sucursal);
         m.setCodigo("M-" + UUID.randomUUID());
         m = mesaRepository.save(m);
+        if (tenant.equals(tenantId) && sucursal.equals(sucursalId) && mesaId == null) {
+            mesaId = m.getId();
+        }
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("admin.test", null, List.of()));
         TenantContext.establecerTenantId(tenant);
         try {

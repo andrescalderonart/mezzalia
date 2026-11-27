@@ -51,3 +51,16 @@ export async function llamarDesdeMesa(token, tipo) {
   }
   return datos
 }
+
+/**
+ * "Pedido de la mesa": todo lo pedido en esta mesa desde que se abrió su QR,
+ * desde cualquier celular, con el apodo de quien pidió y su estado.
+ */
+export async function obtenerPedidosDeMesa(token) {
+  const resp = await fetch(`/api/publico/mesas/${encodeURIComponent(token)}/pedidos`)
+  const datos = await resp.json().catch(() => null)
+  if (!resp.ok) {
+    throw new Error(datos?.mensaje || 'No se pudo cargar el pedido de la mesa.')
+  }
+  return datos
+}

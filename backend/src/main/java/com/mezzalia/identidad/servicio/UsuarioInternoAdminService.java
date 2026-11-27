@@ -1,5 +1,8 @@
 package com.mezzalia.identidad.servicio;
 
+import com.mezzalia.common.seguridad.EventosSeguridad;
+import com.mezzalia.common.seguridad.PoliticaPassword;
+
 import com.mezzalia.identidad.RolUsuario;
 import com.mezzalia.identidad.UsuarioInterno;
 import com.mezzalia.identidad.UsuarioInternoRepository;
@@ -68,6 +71,7 @@ public class UsuarioInternoAdminService {
         if (rol == RolUsuario.SUPER_ADMIN) {
             throw new UsuarioInternoExceptions.RolNoPermitidoException(rol);
         }
+        exigirPasswordSegura(passwordEnTextoPlano, username);
         if (usuarioInternoRepository.existsByUsername(username)) {
             throw new UsuarioInternoExceptions.UsuarioYaExisteException(username);
         }
@@ -134,6 +138,7 @@ public class UsuarioInternoAdminService {
     @Transactional
     public UsuarioInterno crearAdminInicial(Long tenantId, String username, String passwordEnTextoPlano) {
         tenantService.obtenerParaAdministracion(tenantId);
+        exigirPasswordSegura(passwordEnTextoPlano, username);
         if (usuarioInternoRepository.existsByUsername(username)) {
             throw new UsuarioInternoExceptions.UsuarioYaExisteException(username);
         }
@@ -186,8 +191,10 @@ public class UsuarioInternoAdminService {
     @Transactional
     public void resetearPassword(Long usuarioId, String passwordNuevaEnTextoPlano) {
         UsuarioInterno usuario = obtenerUsuarioDelTenant(usuarioId);
+        exigirPasswordSegura(passwordNuevaEnTextoPlano, usuario.getUsername());
         usuario.setPasswordHash(passwordEncoder.encode(passwordNuevaEnTextoPlano));
         usuarioInternoRepository.save(usuario);
+        EventosSeguridad.passwordCambiada(usuario.getId());
     }
 
     /**
@@ -217,5 +224,13 @@ public class UsuarioInternoAdminService {
             throw new UsuarioInternoExceptions.SinTenantEnContextoException();
         }
         return tenantId;
+    }
+
+    /** OWASP ASVS 5.0 V6.2 -- ver common.seguridad.PoliticaPassword. */
+    private static void exigirPasswordSegura(String password, String username) {
+        String problema = PoliticaPassword.problema(password, username);
+        if (problema != null) {
+            throw new UsuarioInternoExceptions.PasswordInseguraException(problema);
+        }
     }
 }

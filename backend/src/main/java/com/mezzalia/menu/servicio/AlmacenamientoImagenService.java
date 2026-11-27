@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.mezzalia.common.seguridad.EventosSeguridad;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -51,6 +52,15 @@ public class AlmacenamientoImagenService {
                     "Tipo de archivo no permitido (" + tipo + "). Solo se aceptan JPEG, PNG o WEBP");
         }
 
+        // OWASP ASVS 5.0 V5.2.2: el Content-Type lo declara el cliente y se
+        // puede falsificar. Se verifica la firma real del archivo (sus
+        // primeros bytes): un HTML o un ejecutable renombrado a .png no pasa.
+        if (!firmaCoincide(archivo, tipo)) {
+            EventosSeguridad.archivoRechazado("firma no coincide con " + tipo);
+            throw new MenuExceptions.ArchivoInvalidoException(
+                    "El archivo no es una imagen " + tipo.substring("image/".length()).toUpperCase() + " válida");
+        }
+
         String extension = switch (tipo) {
             case "image/png" -> ".png";
             case "image/webp" -> ".webp";
@@ -69,5 +79,27 @@ public class AlmacenamientoImagenService {
         }
 
         return "/uploads/" + nombreArchivo;
+    }
+
+    /** Firmas ("magic numbers") de JPEG, PNG y WEBP. */
+    static boolean firmaCoincide(MultipartFile archivo, String tipo) {
+        byte[] cabecera = new byte[12];
+        int leidos;
+        try (var entrada = archivo.getInputStream()) {
+            leidos = entrada.readNBytes(cabecera, 0, cabecera.length);
+        } catch (IOException e) {
+            return false;
+        }
+        return switch (tipo) {
+            case "image/jpeg" -> leidos >= 3 && (cabecera[0] & 0xFF) == 0xFF && (cabecera[1] & 0xFF) == 0xD8
+                    && (cabecera[2] & 0xFF) == 0xFF;
+            case "image/png" -> leidos >= 8 && (cabecera[0] & 0xFF) == 0x89 && cabecera[1] == 'P' && cabecera[2] == 'N'
+                    && cabecera[3] == 'G' && cabecera[4] == 0x0D && cabecera[5] == 0x0A && cabecera[6] == 0x1A
+                    && cabecera[7] == 0x0A;
+            case "image/webp" -> leidos >= 12 && cabecera[0] == 'R' && cabecera[1] == 'I' && cabecera[2] == 'F'
+                    && cabecera[3] == 'F' && cabecera[8] == 'W' && cabecera[9] == 'E' && cabecera[10] == 'B'
+                    && cabecera[11] == 'P';
+            default -> false;
+        };
     }
 }

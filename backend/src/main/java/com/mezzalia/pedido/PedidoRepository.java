@@ -40,6 +40,13 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
      * usado por PedidoService.listarPedidos. */
     List<Pedido> findByTenantIdOrderByCreadoEnAsc(Long tenantId);
 
+    /** "Pedido de la mesa": lo que se ha pedido en esta mesa desde que se abrio su QR. */
+    List<Pedido> findByTenantIdAndMesaIdAndCreadoEnGreaterThanEqualOrderByCreadoEnAsc(
+            Long tenantId, Long mesaId, java.time.LocalDateTime desde);
+
+    /** Para que el mesero confirme de una vez todo lo pendiente de una mesa. */
+    List<Pedido> findByTenantIdAndMesaIdAndEstadoOrderByCreadoEnAsc(Long tenantId, Long mesaId, EstadoPedido estado);
+
     /** RF-10 PR4: reemplazo tenant-scoped de findByEstadoOrderByCreadoEnAsc(),
      * usado por PedidoService.listarPedidos. */
     List<Pedido> findByTenantIdAndEstadoOrderByCreadoEnAsc(Long tenantId, EstadoPedido estado);

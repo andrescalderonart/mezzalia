@@ -73,6 +73,11 @@ public class IdentidadExceptionHandler {
         return respuesta(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
+    @ExceptionHandler(UsuarioInternoExceptions.PasswordInseguraException.class)
+    public ResponseEntity<Map<String, Object>> handlePasswordInsegura(UsuarioInternoExceptions.PasswordInseguraException ex) {
+        return respuesta(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
     @ExceptionHandler(UsuarioInternoExceptions.RolNoPermitidoException.class)
     public ResponseEntity<Map<String, Object>> handleRolNoPermitido(UsuarioInternoExceptions.RolNoPermitidoException ex) {
         return respuesta(HttpStatus.BAD_REQUEST, ex.getMessage());

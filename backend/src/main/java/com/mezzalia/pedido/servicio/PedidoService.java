@@ -64,6 +64,9 @@ public class PedidoService {
 
     private static Map<EstadoPedido, Set<EstadoPedido>> crearTransicionesValidas() {
         Map<EstadoPedido, Set<EstadoPedido>> mapa = new EnumMap<>(EstadoPedido.class);
+        // "Pedido de la mesa": el mesero confirma (-> RECIBIDO, la cocina lo
+        // ve) o descarta (-> CANCELADO) lo que llega del QR.
+        mapa.put(EstadoPedido.POR_CONFIRMAR, EnumSet.of(EstadoPedido.RECIBIDO, EstadoPedido.CANCELADO));
         mapa.put(EstadoPedido.RECIBIDO, EnumSet.of(EstadoPedido.EN_PREPARACION, EstadoPedido.CANCELADO));
         mapa.put(EstadoPedido.EN_PREPARACION, EnumSet.of(EstadoPedido.LISTO, EstadoPedido.CANCELADO));
         mapa.put(EstadoPedido.LISTO, EnumSet.of(EstadoPedido.ENTREGADO, EstadoPedido.CANCELADO));
@@ -114,6 +117,13 @@ public class PedidoService {
     @Transactional
     public Pedido crearPedido(Long mesaId, String claveIdempotencia, List<ItemSolicitadoRequest> itemsSolicitados,
                                String notas, ComensalRequest comensalRequest) {
+        return crearPedido(mesaId, claveIdempotencia, itemsSolicitados, notas, comensalRequest, null);
+    }
+
+    /** Igual, con el apodo opcional de quien pide ("pedido de la mesa"). */
+    @Transactional
+    public Pedido crearPedido(Long mesaId, String claveIdempotencia, List<ItemSolicitadoRequest> itemsSolicitados,
+                               String notas, ComensalRequest comensalRequest, String apodo) {
         Long tenantId = tenantActual();
 
         Pedido existente = pedidoRepository.findByTenantIdAndClaveIdempotencia(tenantId, claveIdempotencia)
@@ -141,7 +151,8 @@ public class PedidoService {
         pedido.setTenantId(tenantId);
         pedido.setMesaId(mesaId);
         pedido.setComensalId(comensalId);
-        pedido.setEstado(EstadoPedido.RECIBIDO);
+        pedido.setEstado(EstadoPedido.POR_CONFIRMAR);
+        pedido.setApodo(apodo == null || apodo.isBlank() ? null : apodo.trim());
         pedido.setClaveIdempotencia(claveIdempotencia);
         pedido.setNotas(notas);
 
@@ -196,7 +207,7 @@ public class PedidoService {
         }
         pedidoItemRepository.saveAll(items);
 
-        registrarCambioEstado(pedido, null, EstadoPedido.RECIBIDO, "comensal");
+        registrarCambioEstado(pedido, null, EstadoPedido.POR_CONFIRMAR, "comensal");
 
         return pedido;
     }
@@ -296,6 +307,40 @@ public class PedidoService {
 
     private String blankANull(String valor) {
         return (valor == null || valor.isBlank()) ? null : valor.trim();
+    }
+
+    /**
+     * "Pedido de la mesa": el mesero confirma de una vez todo lo que la mesa
+     * pidio y sigue pendiente; desde ahi la cocina lo ve. Misma defensa de
+     * tenant/sucursal que el resto: una mesa de otra sucursal es "no
+     * encontrada". Devuelve los pedidos confirmados (puede ser lista vacia).
+     */
+    @Transactional
+    public List<Pedido> confirmarMesa(Long mesaId) {
+        Long tenantId = tenantActual();
+        Long sucursalId = sucursalActual();
+        Long sucursalDeLaMesa = mesaService.obtenerSucursalIdDeMesa(mesaId);
+        if (sucursalDeLaMesa == null || (sucursalId != null && !sucursalId.equals(sucursalDeLaMesa))) {
+            throw new PedidoExceptions.PedidoNoEncontradoException(mesaId);
+        }
+        List<Pedido> pendientes = pedidoRepository.findByTenantIdAndMesaIdAndEstadoOrderByCreadoEnAsc(
+                tenantId, mesaId, EstadoPedido.POR_CONFIRMAR);
+        String usuario = usuarioActual();
+        for (Pedido pedido : pendientes) {
+            pedido.setEstado(EstadoPedido.RECIBIDO);
+            registrarCambioEstado(pedido, EstadoPedido.POR_CONFIRMAR, EstadoPedido.RECIBIDO, usuario);
+        }
+        return pedidoRepository.saveAll(pendientes);
+    }
+
+    /**
+     * "Pedido de la mesa" visto por los comensales: todo lo pedido en esta
+     * mesa desde `desde` (cuando se abrio su QR actual), de cualquier
+     * celular. Corre en el camino publico, dentro de ejecutarConTenant.
+     */
+    @Transactional(readOnly = true)
+    public List<Pedido> pedidosDeLaMesaDesde(Long mesaId, java.time.LocalDateTime desde) {
+        return pedidoRepository.findByTenantIdAndMesaIdAndCreadoEnGreaterThanEqualOrderByCreadoEnAsc(tenantActual(), mesaId, desde);
     }
 
     private void registrarCambioEstado(Pedido pedido, EstadoPedido anterior, EstadoPedido nuevo, String usuario) {

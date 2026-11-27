@@ -78,7 +78,7 @@ Ambos tokens viven en `localStorage` (`client.js`), no en cookies `httpOnly`. Es
 - **`frontend/app-admin` no tiene ningún test ni test runner** (`package.json` sin Vitest/Jest). Es la causa raíz documentada del bug de PR #19. Mientras esto siga así, cualquier regresión de UI (no solo de sucursales) puede volver a pasar desapercibida hasta que un usuario real la encuentre.
 - **RF-13/14 (datos del comensal) sigue con el mismo hueco legal que `documentacion-tecnica.md §15.2` marca como pendiente desde agosto**: el mecanismo técnico de cifrado ya está, y desde el 2026-09-10 también el registro explícito del consentimiento (migración V19) — lo que falta es el texto real de aviso de privacidad revisado legalmente y una política de retención confirmada (hay un borrador de partida agregado en `documentacion-tecnica.md §15.3`, explícitamente no apto para publicar sin revisión de un abogado) y el endpoint de borrado real a solicitud del titular (existe en una rama local sin pushear). Esto no es deuda técnica, es exposición legal activa (Habeas Data, Ley 1581) desde el primer comensal real que capturaron.
 - **Backend sin Maven/JDK verificable en este entorno de trabajo remoto** (ya documentado): toda la rama de turno/sucursal (4 commits) sigue sin correr contra Maven real ni MySQL real por quien la escribió. **Actualización 2026-09-10**: sí se corrió contra Maven/JDK 21 real y MySQL fue reemplazado por H2 (perfil `dev,h2`) en otra sesión, después de mergear esos commits a `main` — arrancó limpio tras resolver un desajuste de versión de JDK en el `PATH` del equipo y un conflicto de esquema en una base H2 vieja. Sigue sin correrse contra MySQL real (Flyway deshabilitado en el perfil usado) — antes de producción, correr igual contra `docker compose up -d mysql` + perfil `dev` sin `h2`.
-- **Cobertura de tests con puntos ciegos específicos**: nada cubre `JwtService`, `AuthService`, `LoginAttemptService`, ni `TurnoService` (el feature más nuevo). El resto del dominio (pedido, mesa, tenant, sucursal, aislamiento de tenant) tiene cobertura sólida y hasta tests de concurrencia — la asimetría llama la atención.
+- ~~**Cobertura de tests con puntos ciegos específicos**~~ ✅ Resuelto 2026-11-25 (rama `test/identidad-turno-cobertura`, 39 tests): `JwtServiceTest`, `LoginAttemptServiceTest`, `AuthServiceTest`, `TurnoServiceTest`. Encontró un bug real en `LoginAttemptService` (el contador no se reiniciaba al vencer el bloqueo). Texto original: nada cubre `JwtService`, `AuthService`, `LoginAttemptService`, ni `TurnoService` (el feature más nuevo). El resto del dominio (pedido, mesa, tenant, sucursal, aislamiento de tenant) tiene cobertura sólida y hasta tests de concurrencia — la asimetría llama la atención.
 
 ### 2.2 Mejoras que no son "features nuevas" sino terminar lo empezado
 
@@ -87,7 +87,7 @@ Ambos tokens viven en `localStorage` (`client.js`), no en cookies `httpOnly`. Es
 - ~~Tests de autorización por rol (§1.1).~~ Resuelto.
 - Agregar una CSP básica (§1.5) — sigue sin hacer, es el único hallazgo de seguridad de este informe sin ningún avance.
 - Cerrar el gap de sucursales inactivas en la UI (decisión de Sebas, pero técnicamente barato: reusar `obtenerSucursalDelTenantActualSinImportarEstado` para una vista de "sucursales inactivas con asignaciones" en `SucursalesPage.jsx`, y hacer que `GestionSucursalesModal` incluya las sucursales ya asignadas aunque estén inactivas en su lista de opciones, no solo en el conteo).
-- Health check (`/actuator/health`) — mencionado en el roadmap propio (§11) y no implementado todavía; es prácticamente gratis con `spring-boot-starter-actuator` y cualquier hosting lo va a pedir para reiniciar instancias caídas.
+- ~~Health check (`/actuator/health`)~~ ✅ Resuelto 2026-11-25 (rama `feature/actuator-health`): solo `health` expuesto, sin detalles, público; `HealthCheckTest` falla si se publica otro endpoint de Actuator. Texto original: mencionado en el roadmap propio (§11) y no implementado todavía; es prácticamente gratis con `spring-boot-starter-actuator` y cualquier hosting lo va a pedir para reiniciar instancias caídas.
 - Backups de MySQL automatizados y probados — sigue sin mención en el repo (no es código, es infraestructura, pero es exactamente el tipo de cosa que "nadie prioriza hasta que ya es tarde", como dice su propio documento).
 
 ---
@@ -121,14 +121,14 @@ Ordenado por lo que bloquea o expone más, no por lo más entretenido de constru
 1. ~~Loggear el catch-all de excepciones (§1.2).~~ ✅ Hecho.
 2. ~~Excluir `test.html` de producción (§1.3).~~ ✅ Hecho.
 3. Decidir y documentar explícitamente el trade-off de revocación de sucursal (§1.4). ✅ Hecho.
-4. Agregar una CSP básica (§1.5). ❌ Sigue pendiente.
+4. ~~Agregar una CSP básica (§1.5).~~ ✅ Hecho (verificado 2026-11-25: `SecurityConfig` ya manda `Content-Security-Policy`; falta replicarla en el servidor que sirva las SPA en producción).
 5. ~~Escribir tests de autorización por rol para los controladores admin (§1.1).~~ ✅ Hecho — y encontró 2 bugs reales.
 
 **Paso 3 — Cerrar el hueco legal de RF-13/14 (no técnico, pero bloqueante).** Parcialmente avanzado: consentimiento explícito ya se registra (V19) y hay un borrador de aviso de privacidad/retención agregado a `documentacion-tecnica.md §15.3` para que la revisión legal tenga de dónde partir. Sigue sin revisión legal real y sin el endpoint de borrado pusheado.
 
 **Paso 4 — Cerrar el gap de sucursales inactivas en la UI.** ❌ Sigue pendiente, decisión de Sebas.
 
-**Paso 5 — Observabilidad mínima antes de tener el primer cliente real dependiendo del sistema.** ❌ `/actuator/health` y backups de MySQL siguen sin implementar.
+**Paso 5 — Observabilidad mínima antes de tener el primer cliente real dependiendo del sistema.** 🟡 `/actuator/health` hecho (2026-11-25, más `/liveness` y `/readiness`); backups de MySQL siguen sin implementar.
 
 **Paso 6 — Frontend: agregar un test runner** (Vitest). ❌ Sigue pendiente.
 

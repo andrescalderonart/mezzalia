@@ -1,0 +1,19 @@
+# Health check (auditoria 2026-09-08 §2.2 / roadmap §11): cualquier hosting lo
+# pide para reiniciar instancias caidas. Se expone SOLO /actuator/health y sin
+# detalles: env, beans, mappings, heapdump, etc. filtrarian configuracion
+# interna (y secretos via /env) a cualquiera. El indicador de base de datos
+# viene incluido, asi que el health da DOWN si MySQL no responde -- que es
+# justo lo que tiene que detectar el orquestador. Los grupos liveness/readiness
+# quedan en /actuator/health/liveness y /actuator/health/readiness para
+# hostings tipo Kubernetes/Cloud Run.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+      probes:
+        enabled: true
