@@ -255,6 +255,8 @@ class AutorizacionAdminTest {
                 Arguments.of("PATCH", "/api/admin/menu/items/1/presentacion", "{\"presentacion\":\"APILADO\"}"),
                 Arguments.of("PUT", "/api/admin/menu/ingredientes/1", "{\"nombre\":\"Cebolla\",\"removible\":true}"),
                 Arguments.of("DELETE", "/api/admin/menu/ingredientes/1", null),
+                // Reportes del negocio (2026-11-27)
+                Arguments.of("GET", "/api/admin/reportes/ingredientes-quitados", null),
 
                 // MesaAdminController: idem, solo escritura.
                 Arguments.of("POST", "/api/admin/mesas", "{\"codigo\":\"M1\",\"sucursalId\":1}"),

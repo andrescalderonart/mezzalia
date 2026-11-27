@@ -6,6 +6,7 @@ import PedidosPage from './pages/PedidosPage.jsx'
 import TenantsPage from './pages/TenantsPage.jsx'
 import SucursalesPage from './pages/SucursalesPage.jsx'
 import UsuariosPage from './pages/UsuariosPage.jsx'
+import ReportesPage from './pages/ReportesPage.jsx'
 import Layout from './components/Layout.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import RutaConRol from './components/RutaConRol.jsx'
@@ -45,6 +46,7 @@ export default function App() {
               desactivar otras cuentas del restaurante. */}
           <Route element={<RutaConRol permitidos={['ADMIN_RESTAURANTE']} />}>
             <Route path="/usuarios" element={<UsuariosPage />} />
+            <Route path="/reportes" element={<ReportesPage />} />
           </Route>
 
           <Route element={<RutaConRol permitidos={['SUPER_ADMIN']} />}>
