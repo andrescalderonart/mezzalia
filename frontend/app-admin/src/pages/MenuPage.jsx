@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth, useApi, useApiJson } from '../context/AuthContext.jsx'
+import EditorIngredientes from '../components/EditorIngredientes.jsx'
 
 const formatoPrecio = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -24,6 +25,7 @@ export default function MenuPage() {
   const [creandoCategoria, setCreandoCategoria] = useState(false)
 
   const [modal, setModal] = useState(null) // { modo: 'crear' | 'editar', item?: {...} }
+  const [itemIngredientes, setItemIngredientes] = useState(null)
 
   async function cargarCategorias() {
     setCargandoCategorias(true)
@@ -289,6 +291,14 @@ export default function MenuPage() {
                           </button>
                         </div>
                       )}
+                      {puedeEditar && (
+                        <button
+                          onClick={() => setItemIngredientes(item)}
+                          className="btn-secundario w-full text-xs py-2 mt-2"
+                        >
+                          Ingredientes
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -303,6 +313,16 @@ export default function MenuPage() {
           )}
         </div>
       </div>
+
+      {itemIngredientes && (
+        <EditorIngredientes
+          item={itemIngredientes}
+          onCerrar={() => setItemIngredientes(null)}
+          onPresentacionCambiada={(actualizado) =>
+            setItems((prev) => prev.map((i) => (i.id === actualizado.id ? { ...i, ...actualizado } : i)))
+          }
+        />
+      )}
 
       {modal && (
         <ModalItem
