@@ -36,6 +36,12 @@ export default function VistaIngredientes({ item, onCerrar, onAgregar }) {
   const [mensaje, setMensaje] = useState('')
   const cerrarRef = useRef(null)
   const mensajeTimerRef = useRef(null)
+  // Ancho natural de cada foto de capa (se conoce al cargar). Las capas de un
+  // plato se exportan a la MISMA escala, asi que mostrarlas proporcionales a
+  // la mas ancha respeta los tamanos reales (el alioli no sale del tamano
+  // del pan). Mientras cargan se usa el alto fijo de antes.
+  const [anchos, setAnchos] = useState({})
+  const anchoMax = Math.max(0, ...Object.values(anchos))
 
   // Abre con animacion despues del primer pintado (si no, no hay transicion).
   useEffect(() => {
@@ -122,7 +128,17 @@ export default function VistaIngredientes({ item, onCerrar, onAgregar }) {
                     position: 'relative',
                   }}
                 >
-                  <Capa ing={ing} quitado={quitado} sacudiendo={sacudiendoId === ing.id} onTocar={() => tocar(ing)} apilado sinMovimiento={sinMovimiento} informativo={!hayQuitables} />
+                  <Capa
+                    ing={ing}
+                    quitado={quitado}
+                    sacudiendo={sacudiendoId === ing.id}
+                    onTocar={() => tocar(ing)}
+                    apilado
+                    sinMovimiento={sinMovimiento}
+                    informativo={!hayQuitables}
+                    anchoRelativo={anchos[ing.id] && anchoMax ? anchos[ing.id] / anchoMax : null}
+                    onCargarFoto={(ancho) => setAnchos((prev) => (prev[ing.id] === ancho ? prev : { ...prev, [ing.id]: ancho }))}
+                  />
                 </li>
               )
             })}
@@ -194,7 +210,7 @@ export default function VistaIngredientes({ item, onCerrar, onAgregar }) {
   )
 }
 
-function Capa({ ing, quitado, sacudiendo, onTocar, apilado = false, sinMovimiento, informativo = false }) {
+function Capa({ ing, quitado, sacudiendo, onTocar, apilado = false, sinMovimiento, informativo = false, anchoRelativo = null, onCargarFoto }) {
   const conFoto = Boolean(ing.imagenUrl)
   // Con foto, la etiqueta nombra el ingrediente. Sin foto el nombre ya va en
   // la pastilla, asi que la etiqueta solo dice el estado (o no aparece).
@@ -222,11 +238,13 @@ function Capa({ ing, quitado, sacudiendo, onTocar, apilado = false, sinMovimient
       }
       tabIndex={informativo ? -1 : undefined}
       className={`relative w-full flex items-center justify-center rounded-2xl outline-offset-2 ${informativo ? 'cursor-default' : ''} ${sacudiendo ? 'animate-sacudir' : ''} ${
-        apilado ? '' : `flex-col bg-white/60 border border-carbon-950/5 p-3 ${conFoto ? 'aspect-square' : 'min-h-[5.5rem]'}`
+        apilado ? '' : `flex-col border border-carbon-950/5 p-3 ${conFoto ? 'bg-white' : 'bg-white/60 min-h-[5.5rem]'}`
       }`}
     >
+      {/* En apilado, la capa se centra en el 74% izquierdo para dejar la
+          columna derecha a la etiqueta (si no, nombres largos tapan la foto). */}
       <span
-        className="flex items-center justify-center w-full"
+        className={`flex items-center justify-center w-full ${apilado ? 'pr-[26%]' : ''}`}
         style={{
           opacity: quitado ? 0.22 : 1,
           filter: quitado ? 'grayscale(1)' : 'none',
@@ -239,8 +257,15 @@ function Capa({ ing, quitado, sacudiendo, onTocar, apilado = false, sinMovimient
             src={ing.imagenUrl}
             alt=""
             draggable="false"
-            className={apilado ? 'w-auto max-w-[78%] object-contain select-none' : 'w-full h-[70%] object-contain select-none'}
-            style={apilado ? { height: ALTO_CAPA } : undefined}
+            className={apilado ? 'object-contain select-none' : 'w-full aspect-[4/3] object-contain select-none'}
+            style={
+              apilado
+                ? anchoRelativo
+                  ? { width: `${Math.round(anchoRelativo * 100)}%`, height: 'auto', maxHeight: 'clamp(48px, 13vh, 150px)' }
+                  : { height: ALTO_CAPA, width: 'auto', maxWidth: '100%' }
+                : undefined
+            }
+            onLoad={(e) => onCargarFoto?.(e.currentTarget.naturalWidth)}
           />
         ) : (
           <span className={`rounded-full bg-carbon-950/5 text-carbon-950 font-medium ${apilado ? 'px-5 py-3 text-base' : 'px-3 py-2 text-sm'}`}>
