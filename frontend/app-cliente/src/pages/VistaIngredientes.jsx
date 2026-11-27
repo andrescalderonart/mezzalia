@@ -20,6 +20,10 @@ const formatoPrecio = new Intl.NumberFormat('es-CO', { style: 'currency', curren
 // capa se corre hacia el centro un 80% de esa distancia: arrancan casi
 // encimadas, como el plato armado, y se separan.
 const ALTO_CAPA = 'clamp(40px, 7vh, 96px)'
+// "Asi te llega": cuanto se encima cada capa sobre la anterior al rearmar el
+// plato (0.5 = la mitad de su alto). Las fotos de capa traen aire arriba y
+// abajo, asi que con la mitad el plato se ve armado sin aplastarse.
+const SOLAPE_ARMADO = 0.5
 const SEPARACION = 'clamp(10px, 2.4vh, 26px)'
 
 function prefiereMenosMovimiento() {
@@ -41,6 +45,14 @@ export default function VistaIngredientes({ item, onCerrar, onAgregar }) {
   // la mas ancha respeta los tamanos reales (el alioli no sale del tamano
   // del pan). Mientras cargan se usa el alto fijo de antes.
   const [anchos, setAnchos] = useState({})
+  // "Asi te llega" (2026-11-27): el plato se vuelve a armar SIN lo que el
+  // cliente quito, para que vea su plato final. `armado` guarda los
+  // desplazamientos en px de cada capa que queda ({id: dy}), o null si esta
+  // desarmado. Se calculan midiendo las capas reales (sus alturas dependen de
+  // cada foto), no con un alto fijo.
+  const [armado, setArmado] = useState(null)
+  const capasRef = useRef({})
+  const scrollRef = useRef(null)
   const anchoMax = Math.max(0, ...Object.values(anchos))
 
   // Abre con animacion despues del primer pintado (si no, no hay transicion).
@@ -67,7 +79,45 @@ export default function VistaIngredientes({ item, onCerrar, onAgregar }) {
   const hayQuitables = ingredientes.some((i) => i.removible)
   const sin = textoSin(nombresQuitados(item, quitados))
 
+  function alternarArmado() {
+    if (armado) {
+      setArmado(null)
+      return
+    }
+    const quedan = ingredientes.filter((i) => !quitados.includes(i.id))
+    const medidas = quedan
+      .map((i) => capasRef.current[i.id])
+      .filter(Boolean)
+      .map((el) => ({ top: el.offsetTop, alto: el.offsetHeight }))
+    if (medidas.length === 0) return
+    // Pila encimada, centrada en el mismo espacio que ocupaban esas capas.
+    const tops = []
+    let y = 0
+    medidas.forEach((m, k) => {
+      tops.push(y)
+      y += k === medidas.length - 1 ? m.alto : m.alto * (1 - SOLAPE_ARMADO)
+    })
+    const inicio = medidas[0].top
+    const fin = medidas[medidas.length - 1].top + medidas[medidas.length - 1].alto
+    const base = inicio + (fin - inicio - y) / 2
+    const desplazamientos = {}
+    quedan.forEach((ing, k) => {
+      if (medidas[k]) desplazamientos[ing.id] = base + tops[k] - medidas[k].top
+    })
+    setArmado(desplazamientos)
+    // Que el plato armado quede a la vista.
+    const contenedor = scrollRef.current
+    if (contenedor) {
+      contenedor.scrollTo({ top: Math.max(0, base + y / 2 - contenedor.clientHeight / 2), behavior: sinMovimiento ? 'auto' : 'smooth' })
+    }
+  }
+
   function tocar(ing) {
+    // Con el plato armado, tocar lo vuelve a desarmar (para seguir editando).
+    if (armado) {
+      setArmado(null)
+      return
+    }
     // Plato informativo (nada se puede quitar, p. ej. un sancocho): tocar no
     // hace nada; la vista solo muestra lo que trae.
     if (!hayQuitables) return
@@ -97,7 +147,11 @@ export default function VistaIngredientes({ item, onCerrar, onAgregar }) {
         <div className="min-w-0">
           <h2 className="font-display text-2xl text-carbon-950 truncate">{item.nombre}</h2>
           <p className="text-xs text-carbon-900/50">
-            {hayQuitables ? 'Toca un ingrediente para quitarlo de tu plato.' : 'Así viene este plato.'}
+            {armado
+              ? 'Así te llega tu plato.'
+              : hayQuitables
+                ? 'Toca un ingrediente para quitarlo de tu plato.'
+                : 'Así viene este plato.'}
           </p>
         </div>
         <button
@@ -111,19 +165,32 @@ export default function VistaIngredientes({ item, onCerrar, onAgregar }) {
         </button>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
         {apilado ? (
-          <ul className="max-w-sm mx-auto flex flex-col items-center" style={{ gap: SEPARACION }}>
+          <ul className="relative max-w-sm mx-auto flex flex-col items-center" style={{ gap: SEPARACION }}>
             {ingredientes.map((ing, i) => {
               const quitado = quitados.includes(ing.id)
               const pasos = abierto ? 0 : (centro - i) * 0.8
+              let transform = `translateY(calc(${pasos} * (${ALTO_CAPA} + ${SEPARACION})))`
+              let opacidad = 1
+              if (armado) {
+                // Lo quitado sale volando hacia un lado; lo demas se apila.
+                transform = quitado ? 'translateX(130%) rotate(12deg)' : `translateY(${armado[ing.id] ?? 0}px)`
+                opacidad = quitado ? 0 : 1
+              }
               return (
                 <li
                   key={ing.id}
+                  ref={(el) => {
+                    capasRef.current[ing.id] = el
+                  }}
                   className="w-full"
                   style={{
-                    transform: `translateY(calc(${pasos} * (${ALTO_CAPA} + ${SEPARACION})))`,
-                    transition: sinMovimiento ? 'none' : `transform 700ms cubic-bezier(.2,.8,.2,1) ${i * 45}ms`,
+                    transform,
+                    opacity: opacidad,
+                    transition: sinMovimiento
+                      ? 'none'
+                      : `transform 650ms cubic-bezier(.2,.8,.2,1) ${i * 45}ms, opacity 400ms ease ${i * 45}ms`,
                     zIndex: ingredientes.length - i,
                     position: 'relative',
                   }}
@@ -136,6 +203,7 @@ export default function VistaIngredientes({ item, onCerrar, onAgregar }) {
                     apilado
                     sinMovimiento={sinMovimiento}
                     informativo={!hayQuitables}
+                    ocultarEtiqueta={Boolean(armado)}
                     anchoRelativo={anchos[ing.id] && anchoMax ? anchos[ing.id] / anchoMax : null}
                     onCargarFoto={(ancho) => setAnchos((prev) => (prev[ing.id] === ancho ? prev : { ...prev, [ing.id]: ancho }))}
                   />
@@ -193,6 +261,17 @@ export default function VistaIngredientes({ item, onCerrar, onAgregar }) {
             <span className="text-carbon-900/40">Con todos sus ingredientes</span>
           )}
         </p>
+        {apilado && ingredientes.length > 1 && (
+          <button
+            type="button"
+            onClick={alternarArmado}
+            aria-pressed={Boolean(armado)}
+            className="w-full rounded-xl py-2.5 mb-2 text-sm font-semibold border"
+            style={{ borderColor: 'var(--color-acento)', color: 'var(--color-acento)' }}
+          >
+            {armado ? 'Volver a desarmar' : '👀 Ver cómo te llega'}
+          </button>
+        )}
         {item.disponible ? (
           <button
             type="button"
@@ -210,7 +289,7 @@ export default function VistaIngredientes({ item, onCerrar, onAgregar }) {
   )
 }
 
-function Capa({ ing, quitado, sacudiendo, onTocar, apilado = false, sinMovimiento, informativo = false, anchoRelativo = null, onCargarFoto }) {
+function Capa({ ing, quitado, sacudiendo, onTocar, apilado = false, sinMovimiento, informativo = false, ocultarEtiqueta = false, anchoRelativo = null, onCargarFoto }) {
   const conFoto = Boolean(ing.imagenUrl)
   // Con foto, la etiqueta nombra el ingrediente. Sin foto el nombre ya va en
   // la pastilla, asi que la etiqueta solo dice el estado (o no aparece).
@@ -244,12 +323,12 @@ function Capa({ ing, quitado, sacudiendo, onTocar, apilado = false, sinMovimient
       {/* En apilado, la capa se centra en el 74% izquierdo para dejar la
           columna derecha a la etiqueta (si no, nombres largos tapan la foto). */}
       <span
-        className={`flex items-center justify-center w-full ${apilado ? 'pr-[26%]' : ''}`}
+        className={`flex items-center justify-center w-full ${apilado && !ocultarEtiqueta ? 'pr-[26%]' : ''}`}
         style={{
           opacity: quitado ? 0.22 : 1,
           filter: quitado ? 'grayscale(1)' : 'none',
           transform: quitado ? (apilado ? 'translateX(18%) scale(.9)' : 'scale(.85)') : 'none',
-          transition: sinMovimiento ? 'none' : 'opacity 300ms ease, transform 350ms cubic-bezier(.2,.8,.2,1), filter 300ms ease',
+          transition: sinMovimiento ? 'none' : 'opacity 300ms ease, transform 350ms cubic-bezier(.2,.8,.2,1), filter 300ms ease, padding 450ms ease',
         }}
       >
         {ing.imagenUrl ? (
@@ -277,6 +356,7 @@ function Capa({ ing, quitado, sacudiendo, onTocar, apilado = false, sinMovimient
       {/* Etiqueta del ingrediente: a la derecha en apilado, debajo en esparcido. */}
       {etiqueta && (
       <span
+        style={{ opacity: ocultarEtiqueta ? 0 : 1, transition: 'opacity 250ms ease' }}
         className={`text-[11px] font-semibold rounded-full px-2 py-0.5 whitespace-nowrap ${
           apilado ? 'absolute right-0 top-1/2 -translate-y-1/2' : 'mt-1.5'
         } ${quitado ? 'bg-red-700 text-white' : ing.removible ? 'bg-white/95 text-carbon-900/75 shadow-sm' : 'bg-white/80 text-carbon-900/45'}`}
