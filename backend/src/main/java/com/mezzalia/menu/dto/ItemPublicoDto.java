@@ -23,12 +23,18 @@ public record ItemPublicoDto(
         String imagenUrl,
         String modeloGlbUrl,
         String modeloUsdzUrl,
-        boolean disponible
+        boolean disponible,
+        com.mezzalia.menu.PresentacionIngredientes presentacionIngredientes,
+        java.util.List<IngredientePublicoDto> ingredientes
 ) {
     public static ItemPublicoDto desde(ItemMenu item) {
+        return desde(item, java.util.List.of());
+    }
+
+    public static ItemPublicoDto desde(ItemMenu item, java.util.List<IngredientePublicoDto> ingredientes) {
         return new ItemPublicoDto(
                 item.getId(), item.getNombre(), item.getDescripcion(),
                 item.getPrecio(), item.getImagenUrl(), item.getModeloGlbUrl(), item.getModeloUsdzUrl(),
-                item.isDisponible());
+                item.isDisponible(), item.getPresentacionIngredientes(), ingredientes);
     }
 }

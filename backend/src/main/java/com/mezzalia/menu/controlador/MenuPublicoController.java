@@ -14,7 +14,9 @@ import com.mezzalia.pedido.dto.PedidoItemDto;
 import com.mezzalia.pedido.servicio.PedidoService;
 
 import com.mezzalia.menu.dto.CategoriaPublicaDto;
+import com.mezzalia.menu.dto.IngredientePublicoDto;
 import com.mezzalia.menu.dto.ItemPublicoDto;
+import com.mezzalia.menu.IngredienteItemRepository;
 import com.mezzalia.menu.servicio.MenuService;
 import com.mezzalia.sucursal.SucursalContext;
 import com.mezzalia.tenant.Tenant;
@@ -46,6 +48,7 @@ public class MenuPublicoController {
     private final TenantFilterActivator tenantFilterActivator;
     private final PedidoService pedidoService;
     private final LlamadoService llamadoService;
+    private final IngredienteItemRepository ingredienteItemRepository;
 
     /**
      * RF-01/RF-02: el comensal ve la carta vigente -- incluidos los ítems
@@ -87,13 +90,25 @@ public class MenuPublicoController {
         // de 427d8d5, ver CartaPublicaEndToEndTest.
         CartaPublicaDto carta = tenantFilterActivator.ejecutarConTenant(tenantId, () ->
                 ejecutarConSucursal(mesaService.obtenerSucursalIdDeMesa(sesion.getMesaId()), () -> {
-                    var categorias = menuService.listarCategorias().stream()
-                            .map(categoria -> {
-                                var items = menuService.listarItemsDeCategoria(categoria.getId()).stream()
-                                        .map(ItemPublicoDto::desde)
-                                        .toList();
-                                return CategoriaPublicaDto.desde(categoria, items);
-                            })
+                    var itemsPorCategoria = new java.util.LinkedHashMap<com.mezzalia.menu.CategoriaMenu, List<com.mezzalia.menu.ItemMenu>>();
+                    for (var categoria : menuService.listarCategorias()) {
+                        itemsPorCategoria.put(categoria, menuService.listarItemsDeCategoria(categoria.getId()));
+                    }
+                    // Ingredientes de TODA la carta en una sola consulta
+                    // (ver IngredienteItemRepository), no una por plato.
+                    var idsItems = itemsPorCategoria.values().stream().flatMap(List::stream)
+                            .map(com.mezzalia.menu.ItemMenu::getId).toList();
+                    var ingredientesPorItem = idsItems.isEmpty()
+                            ? java.util.Map.<Long, List<IngredientePublicoDto>>of()
+                            : ingredienteItemRepository.findByItemMenuIdInOrderByOrdenAscIdAsc(idsItems).stream()
+                                    .collect(java.util.stream.Collectors.groupingBy(
+                                            com.mezzalia.menu.IngredienteItem::getItemMenuId,
+                                            java.util.stream.Collectors.mapping(IngredientePublicoDto::desde,
+                                                    java.util.stream.Collectors.toList())));
+                    var categorias = itemsPorCategoria.entrySet().stream()
+                            .map(e -> CategoriaPublicaDto.desde(e.getKey(), e.getValue().stream()
+                                    .map(item -> ItemPublicoDto.desde(item, ingredientesPorItem.getOrDefault(item.getId(), List.of())))
+                                    .toList()))
                             .toList();
 
                     BrandingDto branding = new BrandingDto(

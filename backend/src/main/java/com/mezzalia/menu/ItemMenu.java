@@ -89,6 +89,11 @@ public class ItemMenu extends EntidadConTenant {
     @Column(name = "modelo_usdz_url", length = 500)
     private String modeloUsdzUrl;
 
+    /** Como se muestran sus ingredientes en la carta (ver PresentacionIngredientes). */
+    @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+    @Column(name = "presentacion_ingredientes", nullable = false, length = 20)
+    private PresentacionIngredientes presentacionIngredientes = PresentacionIngredientes.APILADO;
+
     @Column(nullable = false)
     private boolean disponible = true;
 

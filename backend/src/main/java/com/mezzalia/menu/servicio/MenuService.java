@@ -4,6 +4,8 @@ import com.mezzalia.menu.CategoriaMenu;
 import com.mezzalia.menu.CategoriaMenuRepository;
 import com.mezzalia.menu.HistorialPrecioItem;
 import com.mezzalia.menu.HistorialPrecioItemRepository;
+import com.mezzalia.menu.IngredienteItem;
+import com.mezzalia.menu.IngredienteItemRepository;
 import com.mezzalia.menu.ItemMenu;
 import com.mezzalia.menu.ItemMenuRepository;
 import com.mezzalia.menu.excepcion.MenuExceptions;
@@ -28,6 +30,7 @@ public class MenuService {
     private final ItemMenuRepository itemMenuRepository;
     private final HistorialPrecioItemRepository historialPrecioItemRepository;
     private final AlmacenamientoImagenService almacenamientoImagenService;
+    private final IngredienteItemRepository ingredienteItemRepository;
 
     /**
      * Defensa explicita, mismo criterio que crearCategoria()/obtenerItem():
@@ -239,7 +242,20 @@ public class MenuService {
                 copiaItem.setModeloGlbUrl(itemOriginal.getModeloGlbUrl());
                 copiaItem.setModeloUsdzUrl(itemOriginal.getModeloUsdzUrl());
                 copiaItem.setDisponible(itemOriginal.isDisponible());
-                itemMenuRepository.save(copiaItem);
+                copiaItem.setPresentacionIngredientes(itemOriginal.getPresentacionIngredientes());
+                copiaItem = itemMenuRepository.save(copiaItem);
+                // Los ingredientes viajan con el plato (misma foto por capa:
+                // no cambia porque cambie la sucursal que lo sirve).
+                for (IngredienteItem ing : ingredienteItemRepository.findByItemMenuIdOrderByOrdenAscIdAsc(itemOriginal.getId())) {
+                    IngredienteItem copiaIng = new IngredienteItem();
+                    copiaIng.setTenantId(ing.getTenantId());
+                    copiaIng.setItemMenuId(copiaItem.getId());
+                    copiaIng.setNombre(ing.getNombre());
+                    copiaIng.setImagenUrl(ing.getImagenUrl());
+                    copiaIng.setOrden(ing.getOrden());
+                    copiaIng.setRemovible(ing.isRemovible());
+                    ingredienteItemRepository.save(copiaIng);
+                }
             }
         }
         return categoriasNuevas;
@@ -284,6 +300,45 @@ public class MenuService {
      * del mismo tenant cae en el mismo "no encontrado" generico que ya usa
      * el resto de este servicio, en vez de aceptarse silenciosamente.
      */
+    /**
+     * Para IngredienteService: el plato del tenant Y la sucursal actuales,
+     * con la misma defensa explicita que obtenerItem() (que es privado).
+     */
+    @Transactional(readOnly = true)
+    public ItemMenu obtenerItemDelContexto(Long itemId) {
+        return obtenerItem(itemId);
+    }
+
+    /**
+     * "Sin cebolla" (2026-11-26): valida que cada id sea un ingrediente
+     * QUITABLE de ESE plato y devuelve sus nombres para copiarlos en el
+     * pedido. Cualquier id ajeno (de otro plato, otra sucursal u otro
+     * restaurante) o no quitable rechaza todo el pedido con un 400 claro, en
+     * vez de ignorarse en silencio: la cocina nunca debe recibir un pedido
+     * distinto del que el comensal cree haber hecho.
+     */
+    @Transactional(readOnly = true)
+    public List<String> nombresDeIngredientesQuitables(ItemMenu item, List<Long> idsQuitados) {
+        if (idsQuitados == null || idsQuitados.isEmpty()) {
+            return List.of();
+        }
+        var quitables = new java.util.HashMap<Long, String>();
+        for (IngredienteItem ing : ingredienteItemRepository.findByItemMenuIdOrderByOrdenAscIdAsc(item.getId())) {
+            if (ing.isRemovible()) {
+                quitables.put(ing.getId(), ing.getNombre());
+            }
+        }
+        List<String> nombres = new ArrayList<>();
+        for (Long id : new java.util.LinkedHashSet<>(idsQuitados)) {
+            String nombre = quitables.get(id);
+            if (nombre == null) {
+                throw new MenuExceptions.IngredienteNoQuitableException(item.getNombre());
+            }
+            nombres.add(nombre);
+        }
+        return nombres;
+    }
+
     @Transactional(readOnly = true)
     public ItemMenu obtenerItemDisponibleParaPedido(Long itemId) {
         ItemMenu item = obtenerItem(itemId);

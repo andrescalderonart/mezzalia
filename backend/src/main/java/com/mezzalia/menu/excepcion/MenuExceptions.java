@@ -106,4 +106,17 @@ public final class MenuExceptions {
             super("Un modelo 3D requiere modeloGlbUrl y modeloUsdzUrl juntos (o ninguno de los dos)");
         }
     }
+
+    public static class IngredienteNoEncontradoException extends RuntimeException {
+        public IngredienteNoEncontradoException(Long id) {
+            super("Ingrediente no encontrado con id: " + id);
+        }
+    }
+
+    /** El comensal pidio quitar algo que no es de ese plato o que no se puede quitar. */
+    public static class IngredienteNoQuitableException extends RuntimeException {
+        public IngredienteNoQuitableException(String nombrePlato) {
+            super("Uno de los ingredientes que quieres quitar no se puede quitar de \"" + nombrePlato + "\"");
+        }
+    }
 }

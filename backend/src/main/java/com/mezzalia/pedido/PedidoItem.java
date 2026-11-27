@@ -51,4 +51,13 @@ public class PedidoItem extends EntidadConTenant {
 
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal subtotal;
+
+    /**
+     * Ingredientes que el comensal quito ("sin cebolla"), separados por salto
+     * de linea. Es una COPIA de los nombres al momento del pedido, como
+     * nombreItem/precioUnitario: renombrar o borrar el ingrediente despues no
+     * cambia lo que se pidio. null = el plato tal cual.
+     */
+    @Column(name = "sin_ingredientes", length = 500)
+    private String sinIngredientes;
 }
