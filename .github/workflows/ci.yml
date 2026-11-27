@@ -29,9 +29,18 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Build + tests (mvn verify)
+      # mvn verify incluye el umbral de cobertura de JaCoCo (ver pom.xml).
+      - name: Build + tests + cobertura (mvn verify)
         working-directory: backend
         run: mvn -B verify
+
+      - name: Publicar reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-backend
+          path: backend/target/site/jacoco/
+          if-no-files-found: ignore
 
   # app-cliente ya no es una carpeta vacia. npm ci (no install) a proposito:
   # falla si package-lock.json no coincide con package.json -- exactamente lo
@@ -53,6 +62,9 @@ jobs:
           cache-dependency-path: frontend/app-cliente/package-lock.json
 
       - run: npm ci
+      # OWASP ASVS 5.0 V15.2: sin dependencias de produccion con
+      # vulnerabilidades conocidas altas o criticas.
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run build
 
   # Auditoria 2026-09-08 paso 6: app-admin ya tiene package.json real y,
@@ -75,5 +87,6 @@ jobs:
           cache-dependency-path: frontend/app-admin/package-lock.json
 
       - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm test
       - run: npm run build

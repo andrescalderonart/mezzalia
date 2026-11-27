@@ -1,5 +1,7 @@
 package com.mezzalia.identidad.servicio;
 
+import com.mezzalia.common.seguridad.EventosSeguridad;
+
 import com.mezzalia.identidad.AsignacionSucursal;
 import com.mezzalia.identidad.AsignacionSucursalRepository;
 import com.mezzalia.identidad.RefreshToken;
@@ -83,15 +85,18 @@ public class AuthService {
 
         if (usuario == null || !contrasenaCoincide) {
             loginAttemptService.registrarFallo(username);
+            EventosSeguridad.loginFallido(username);
             throw new AuthExceptions.CredencialesInvalidasException();
         }
         if (!usuario.isActivo()) {
             // No cuenta como intento fallido de fuerza bruta (la contraseña
             // era correcta); pero tampoco se emite token.
+            EventosSeguridad.loginCuentaInactiva(username);
             throw new AuthExceptions.CuentaInactivaException();
         }
 
         loginAttemptService.registrarExito(username);
+        EventosSeguridad.loginExitoso(username);
         return emitirPar(usuario);
     }
 
@@ -104,8 +109,11 @@ public class AuthService {
     @Transactional(noRollbackFor = AuthExceptions.RefreshTokenInvalidoException.class)
     public TokensRespuesta refrescar(String refreshTokenPlano) {
         String hash = hashear(refreshTokenPlano);
-        RefreshToken token = refreshTokenRepository.findByTokenHash(hash)
-                .orElseThrow(AuthExceptions.RefreshTokenInvalidoException::new);
+        RefreshToken token = refreshTokenRepository.findByTokenHash(hash).orElse(null);
+        if (token == null) {
+            EventosSeguridad.refreshInvalido();
+            throw new AuthExceptions.RefreshTokenInvalidoException();
+        }
 
         if (!token.estaVigente()) {
             if (token.isRevocado()) {
@@ -114,6 +122,7 @@ public class AuthService {
                 // para forzar un login limpio en todos sus dispositivos.
                 refreshTokenRepository.revocarTodosDelUsuario(token.getUsuarioId());
             }
+            EventosSeguridad.refreshInvalido();
             throw new AuthExceptions.RefreshTokenInvalidoException();
         }
 

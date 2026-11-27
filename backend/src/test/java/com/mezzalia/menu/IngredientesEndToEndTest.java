@@ -171,6 +171,13 @@ class IngredientesEndToEndTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.imagenUrl").value(org.hamcrest.Matchers.startsWith("/uploads/")));
 
+        // ASVS V5.2.2: un HTML disfrazado de PNG (Content-Type falso) se rechaza.
+        mvc.perform(multipart("/api/admin/menu/ingredientes/{id}/imagen", capas.get(2))
+                        .file(new MockMultipartFile("archivo", "foto.png", "image/png",
+                                "<html><script>alert(1)</script></html>".getBytes()))
+                        .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isBadRequest());
+
         // Reordenar con un id de mas, de menos o ajeno se rechaza.
         conAdmin(put("/api/admin/menu/items/{id}/ingredientes/orden", hamburguesa), "{\"ids\":" + capas.subList(0, 3) + "}")
                 .andExpect(status().isNotFound());

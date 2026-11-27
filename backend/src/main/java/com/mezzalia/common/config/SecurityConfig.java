@@ -1,6 +1,7 @@
 package com.mezzalia.common.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mezzalia.common.seguridad.EventosSeguridad;
 import com.mezzalia.identidad.seguridad.JwtAuthenticationFilter;
 import com.mezzalia.identidad.servicio.JwtService;
 import jakarta.servlet.http.HttpServletResponse;
@@ -17,6 +18,8 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 
 import java.time.Instant;
 import java.util.Map;
@@ -68,7 +71,17 @@ public class SecurityConfig {
                 + "connect-src 'self'; "
                 + "base-uri 'self'; "
                 + "form-action 'self'; "
-                + "frame-ancestors 'none'")))
+                + "frame-ancestors 'none'"))
+                // OWASP ASVS 5.0 V3.4: Referrer-Policy y Permissions-Policy.
+                // no-referrer porque el token del QR viaja en la URL de la
+                // carta: no debe filtrarse a ningun otro sitio. La API no usa
+                // camara, microfono ni ubicacion, asi que se niegan todos.
+                .referrerPolicy(r -> r.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
+                .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy",
+                        "camera=(), microphone=(), geolocation=(), payment=(), usb=()"))
+                // HSTS: Spring ya lo manda solo en peticiones HTTPS; se fija
+                // en un año para cuando produccion tenga TLS (ASVS V12.1).
+                .httpStrictTransportSecurity(h -> h.maxAgeInSeconds(31536000).includeSubDomains(true)))
             .authorizeHttpRequests(auth -> auth
                 // Login/refresh/logout: por definición, sin autenticación previa.
                 .requestMatchers("/api/auth/**").permitAll()
@@ -100,8 +113,10 @@ public class SecurityConfig {
                 // devuelve el resto de la API vía GlobalExceptionHandler.
                 .authenticationEntryPoint((request, response, authException) ->
                     escribirError(response, HttpStatus.UNAUTHORIZED, "No autenticado"))
-                .accessDeniedHandler((request, response, accessDeniedException) ->
-                    escribirError(response, HttpStatus.FORBIDDEN, "No tiene permisos para este recurso"))
+                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    EventosSeguridad.accesoDenegado(request.getMethod(), request.getRequestURI());
+                    escribirError(response, HttpStatus.FORBIDDEN, "No tiene permisos para este recurso");
+                })
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

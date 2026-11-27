@@ -1,5 +1,7 @@
 package com.mezzalia.identidad.servicio;
 
+import com.mezzalia.common.seguridad.EventosSeguridad;
+
 import com.mezzalia.identidad.excepcion.AuthExceptions;
 import org.springframework.stereotype.Service;
 
@@ -72,6 +74,9 @@ public class LoginAttemptService {
             estado.fallos++;
             estado.ultimoFallo = ahora;
             if (estado.fallos >= MAX_INTENTOS_FALLIDOS) {
+                if (estado.fallos == MAX_INTENTOS_FALLIDOS) {
+                    EventosSeguridad.cuentaBloqueada(username);
+                }
                 estado.bloqueadoHasta = ahora.plus(VENTANA_BLOQUEO);
             }
             return estado;

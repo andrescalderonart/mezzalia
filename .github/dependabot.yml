@@ -1,0 +1,33 @@
+# OWASP ASVS 5.0 V15.2 / OWASP Top 10 A06: componentes con vulnerabilidades
+# conocidas. Dependabot abre un PR cuando sale un parche de seguridad (y una
+# vez por semana para actualizaciones normales, agrupadas para no inundar).
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /backend
+    schedule:
+      interval: weekly
+    groups:
+      backend:
+        patterns: ["*"]
+        update-types: [minor, patch]
+  - package-ecosystem: npm
+    directory: /frontend/app-cliente
+    schedule:
+      interval: weekly
+    groups:
+      app-cliente:
+        patterns: ["*"]
+        update-types: [minor, patch]
+  - package-ecosystem: npm
+    directory: /frontend/app-admin
+    schedule:
+      interval: weekly
+    groups:
+      app-admin:
+        patterns: ["*"]
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

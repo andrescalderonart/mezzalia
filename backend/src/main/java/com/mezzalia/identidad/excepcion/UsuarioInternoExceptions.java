@@ -41,6 +41,13 @@ public final class UsuarioInternoExceptions {
      * mas simple de un escalamiento de privilegios entre tenants).
      */
     @ResponseStatus(HttpStatus.BAD_REQUEST)
+    /** La contraseña no cumple la política de ASVS V6.2 (ver PoliticaPassword). */
+    public static class PasswordInseguraException extends RuntimeException {
+        public PasswordInseguraException(String motivo) {
+            super(motivo);
+        }
+    }
+
     public static class RolNoPermitidoException extends RuntimeException {
         public RolNoPermitidoException(RolUsuario rol) {
             super("No se puede asignar el rol " + rol + " desde este endpoint");
