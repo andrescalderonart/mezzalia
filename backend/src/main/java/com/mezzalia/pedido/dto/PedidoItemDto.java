@@ -9,11 +9,15 @@ public record PedidoItemDto(
         String nombreItem,
         BigDecimal precioUnitario,
         int cantidad,
-        BigDecimal subtotal
+        BigDecimal subtotal,
+        java.util.List<String> sinIngredientes
 ) {
     public static PedidoItemDto desde(PedidoItem item) {
         return new PedidoItemDto(
                 item.getItemMenuId(), item.getNombreItem(), item.getPrecioUnitario(),
-                item.getCantidad(), item.getSubtotal());
+                item.getCantidad(), item.getSubtotal(),
+                item.getSinIngredientes() == null || item.getSinIngredientes().isBlank()
+                        ? java.util.List.of()
+                        : java.util.List.of(item.getSinIngredientes().split("\n")));
     }
 }

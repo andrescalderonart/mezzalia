@@ -57,6 +57,8 @@ class MenuServiceTest {
     @Autowired
     private ItemMenuRepository itemMenuRepository;
     @Autowired
+    private com.mezzalia.menu.IngredienteItemRepository ingredienteItemRepository;
+    @Autowired
     private HistorialPrecioItemRepository historialPrecioItemRepository;
 
     @AfterEach
@@ -381,7 +383,7 @@ class MenuServiceTest {
     private MenuService nuevoMenuService() {
         // AlmacenamientoImagenService en null a propósito: ningún test de
         // esta clase ejerce subida de imágenes.
-        return new MenuService(categoriaMenuRepository, itemMenuRepository, historialPrecioItemRepository, null);
+        return new MenuService(categoriaMenuRepository, itemMenuRepository, historialPrecioItemRepository, null, ingredienteItemRepository);
     }
 
     private void autenticarComo(String username) {

@@ -6,11 +6,16 @@
 // el almacenamiento lleno puede lanzar, y "otra ronda" es una comodidad, no
 // algo que deba romper la carta.
 
+import { claveDe, nombresQuitados, textoSin } from './carrito.js'
+
 const PREFIJO = 'mezzalia.ultimaRonda.'
 
 export function guardarUltimaRonda(token, items) {
   try {
-    localStorage.setItem(PREFIJO + token, JSON.stringify(items.map(({ itemMenuId, cantidad }) => ({ itemMenuId, cantidad }))))
+    localStorage.setItem(
+      PREFIJO + token,
+      JSON.stringify(items.map(({ itemMenuId, cantidad, sinIngredientes }) => ({ itemMenuId, cantidad, sinIngredientes: sinIngredientes || [] }))),
+    )
   } catch {
     // Sin almacenamiento: simplemente no habra boton de "otra ronda".
   }
@@ -35,10 +40,14 @@ export function leerUltimaRonda(token) {
 export function rondaComoCarrito(ronda, itemsPorId) {
   const carrito = {}
   const descartados = []
-  for (const { itemMenuId, cantidad } of ronda) {
+  for (const { itemMenuId, cantidad, sinIngredientes = [] } of ronda) {
     const item = itemsPorId[itemMenuId]
     if (item && item.disponible) {
-      carrito[itemMenuId] = cantidad
+      // "Sin cebolla" se repite tal cual, salvo ingredientes que ya no
+      // existan o ya no se puedan quitar (se ignoran: el plato sale normal).
+      const quitablesHoy = new Set((item.ingredientes || []).filter((i) => i.removible).map((i) => i.id))
+      const clave = claveDe(itemMenuId, sinIngredientes.filter((id) => quitablesHoy.has(id)))
+      carrito[clave] = (carrito[clave] || 0) + cantidad
     } else if (item) {
       descartados.push(item.nombre)
     }
@@ -50,6 +59,9 @@ export function rondaComoCarrito(ronda, itemsPorId) {
 export function resumenRonda(ronda, itemsPorId) {
   return ronda
     .filter(({ itemMenuId }) => itemsPorId[itemMenuId])
-    .map(({ itemMenuId, cantidad }) => `${cantidad}× ${itemsPorId[itemMenuId].nombre}`)
+    .map(({ itemMenuId, cantidad, sinIngredientes = [] }) => {
+      const sin = textoSin(nombresQuitados(itemsPorId[itemMenuId], sinIngredientes))
+      return `${cantidad}× ${itemsPorId[itemMenuId].nombre}${sin ? ` (${sin})` : ''}`
+    })
     .join(', ')
 }

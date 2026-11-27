@@ -248,6 +248,13 @@ class AutorizacionAdminTest {
                 Arguments.of("PUT", "/api/admin/menu/items/1", "{\"nombre\":\"Item\",\"precio\":10.5}"),
                 Arguments.of("PATCH", "/api/admin/menu/items/1/disponibilidad", "{\"disponible\":true}"),
                 Arguments.of("DELETE", "/api/admin/menu/items/1", null),
+                // Editor de ingredientes (2026-11-26)
+                Arguments.of("GET", "/api/admin/menu/items/1/ingredientes", null),
+                Arguments.of("POST", "/api/admin/menu/items/1/ingredientes", "{\"nombre\":\"Cebolla\"}"),
+                Arguments.of("PUT", "/api/admin/menu/items/1/ingredientes/orden", "{\"ids\":[1]}"),
+                Arguments.of("PATCH", "/api/admin/menu/items/1/presentacion", "{\"presentacion\":\"APILADO\"}"),
+                Arguments.of("PUT", "/api/admin/menu/ingredientes/1", "{\"nombre\":\"Cebolla\",\"removible\":true}"),
+                Arguments.of("DELETE", "/api/admin/menu/ingredientes/1", null),
 
                 // MesaAdminController: idem, solo escritura.
                 Arguments.of("POST", "/api/admin/mesas", "{\"codigo\":\"M1\",\"sucursalId\":1}"),

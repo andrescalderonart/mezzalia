@@ -263,9 +263,15 @@ function TarjetaPedido({
 
       <div className="space-y-1 my-3 flex-1">
         {pedido.items.map((item, indice) => (
-          <div key={indice} className="flex items-center justify-between gap-2 text-sm">
+          <div key={indice} className="flex items-start justify-between gap-2 text-sm">
             <span className="text-crema/80">
               {item.cantidad}× {item.nombreItem}
+              {/* "Sin cebolla" (2026-11-26): lo que el comensal quito, bien visible. */}
+              {item.sinIngredientes?.length > 0 && (
+                <span className="block text-xs font-semibold text-red-300 uppercase tracking-wide">
+                  Sin {item.sinIngredientes.join(', ').toLowerCase()}
+                </span>
+              )}
             </span>
             <span className="text-crema/50 whitespace-nowrap">{formatoPrecio.format(item.subtotal)}</span>
           </div>

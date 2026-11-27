@@ -84,6 +84,8 @@ class PedidoServiceTest {
     @Autowired
     private ItemMenuRepository itemMenuRepository;
     @Autowired
+    private com.mezzalia.menu.IngredienteItemRepository ingredienteItemRepository;
+    @Autowired
     private HistorialPrecioItemRepository historialPrecioItemRepository;
     @Autowired
     private MesaRepository mesaRepository;
@@ -477,7 +479,7 @@ class PedidoServiceTest {
     private MenuService nuevoMenuService() {
         // AlmacenamientoImagenService en null a proposito, igual que en
         // MenuServiceTest: ningun test de esta clase sube imagenes.
-        return new MenuService(categoriaMenuRepository, itemMenuRepository, historialPrecioItemRepository, null);
+        return new MenuService(categoriaMenuRepository, itemMenuRepository, historialPrecioItemRepository, null, ingredienteItemRepository);
     }
 
     private Escenario prepararEscenario(String nombreTenant) {

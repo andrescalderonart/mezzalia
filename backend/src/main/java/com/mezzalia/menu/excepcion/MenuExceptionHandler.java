@@ -66,6 +66,16 @@ public class MenuExceptionHandler {
         return respuesta(HttpStatus.CONFLICT, ex.getMessage());
     }
 
+    @ExceptionHandler(MenuExceptions.IngredienteNoEncontradoException.class)
+    public ResponseEntity<Map<String, Object>> handleIngredienteNoEncontrado(MenuExceptions.IngredienteNoEncontradoException ex) {
+        return respuesta(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(MenuExceptions.IngredienteNoQuitableException.class)
+    public ResponseEntity<Map<String, Object>> handleIngredienteNoQuitable(MenuExceptions.IngredienteNoQuitableException ex) {
+        return respuesta(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
     @ExceptionHandler(MenuExceptions.Modelo3dIncompletoException.class)
     public ResponseEntity<Map<String, Object>> handleModelo3dIncompleto(MenuExceptions.Modelo3dIncompletoException ex) {
         return respuesta(HttpStatus.BAD_REQUEST, ex.getMessage());

@@ -13,12 +13,13 @@ public record ItemMenuDto(
         String imagenUrl,
         String modeloGlbUrl,
         String modeloUsdzUrl,
-        boolean disponible
+        boolean disponible,
+        com.mezzalia.menu.PresentacionIngredientes presentacionIngredientes
 ) {
     public static ItemMenuDto desde(ItemMenu item) {
         return new ItemMenuDto(
                 item.getId(), item.getCategoriaId(), item.getNombre(), item.getDescripcion(),
                 item.getPrecio(), item.getImagenUrl(), item.getModeloGlbUrl(), item.getModeloUsdzUrl(),
-                item.isDisponible());
+                item.isDisponible(), item.getPresentacionIngredientes());
     }
 }

@@ -47,9 +47,16 @@ export default {
           '0%': { opacity: 0, transform: 'translateY(8px)' },
           '100%': { opacity: 1, transform: 'translateY(0)' },
         },
+        // Vista de ingredientes: "esto no se puede quitar".
+        sacudir: {
+          '0%, 100%': { transform: 'translateX(0)' },
+          '20%, 60%': { transform: 'translateX(-7px)' },
+          '40%, 80%': { transform: 'translateX(7px)' },
+        },
       },
       animation: {
         fadeInUp: 'fadeInUp 0.35s ease-out both',
+        sacudir: 'sacudir 0.4s ease-in-out',
       },
     },
   },

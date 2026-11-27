@@ -163,6 +163,10 @@ public class PedidoService {
             pedidoItem.setCantidad(solicitado.cantidad());
             BigDecimal subtotal = item.getPrecio().multiply(BigDecimal.valueOf(solicitado.cantidad()));
             pedidoItem.setSubtotal(subtotal);
+            List<String> quitados = menuService.nombresDeIngredientesQuitables(item, solicitado.sinIngredientes());
+            if (!quitados.isEmpty()) {
+                pedidoItem.setSinIngredientes(String.join("\n", quitados));
+            }
 
             items.add(pedidoItem);
             total = total.add(subtotal);

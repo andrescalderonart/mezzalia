@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { crearPedido, llamarDesdeMesa, obtenerCarta } from '../api/publico.js'
 import { guardarUltimaRonda, leerUltimaRonda, resumenRonda, rondaComoCarrito } from './ronda.js'
+import { claveDe, nombresQuitados, parsearClave, textoSin } from './carrito.js'
+import VistaIngredientes from './VistaIngredientes.jsx'
 
 const formatoPrecio = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -50,6 +52,8 @@ export default function CartaPage() {
   // Mensaje corto arriba de la pantalla ("Avisamos al mesero").
   const [aviso, setAviso] = useState(null) // { texto, tipo: 'ok' | 'error' }
   const avisoTimerRef = useRef(null)
+  // Plato abierto en la vista "desarmada" de ingredientes (o null).
+  const [platoIngredientes, setPlatoIngredientes] = useState(null)
 
   // Misma clave de idempotencia (RF-04) mientras el comensal no haya
   // enviado el pedido con exito -- si el POST falla por red y reintenta
@@ -134,28 +138,35 @@ export default function CartaPage() {
     return mapa
   }, [carta])
 
+  // Cada clave del carrito es una linea: el plato tal cual ("12") o con
+  // ingredientes quitados ("12~3.7", ver carrito.js).
   const itemsCarrito = useMemo(
     () =>
       Object.entries(carrito)
-        .map(([itemId, cantidad]) => ({ item: itemsPorId[Number(itemId)], cantidad }))
+        .map(([clave, cantidad]) => {
+          const { itemId, sinIds } = parsearClave(clave)
+          const item = itemsPorId[itemId]
+          return { clave, item, cantidad, sinIds, sinTexto: textoSin(nombresQuitados(item, sinIds)) }
+        })
         .filter((entrada) => entrada.item), // por si un item cambiara/desapareciera de la carta a mitad de sesion
     [carrito, itemsPorId],
   )
   const totalCarrito = itemsCarrito.reduce((acc, { item, cantidad }) => acc + item.precio * cantidad, 0)
   const cantidadTotalCarrito = itemsCarrito.reduce((acc, { cantidad }) => acc + cantidad, 0)
 
-  function agregarUnidad(itemId) {
-    setCarrito((prev) => ({ ...prev, [itemId]: (prev[itemId] || 0) + 1 }))
+  // `clave` = linea del carrito: el id del plato tal cual, o "id~sin" (carrito.js).
+  function agregarUnidad(clave) {
+    setCarrito((prev) => ({ ...prev, [clave]: (prev[clave] || 0) + 1 }))
   }
 
-  function quitarUnidad(itemId) {
+  function quitarUnidad(clave) {
     setCarrito((prev) => {
-      const actual = prev[itemId] || 0
+      const actual = prev[clave] || 0
       if (actual <= 1) {
-        const { [itemId]: _omitido, ...resto } = prev
+        const { [clave]: _omitido, ...resto } = prev
         return resto
       }
-      return { ...prev, [itemId]: actual - 1 }
+      return { ...prev, [clave]: actual - 1 }
     })
   }
 
@@ -165,7 +176,11 @@ export default function CartaPage() {
     try {
       const payload = {
         claveIdempotencia: claveIdempotenciaRef.current,
-        items: itemsCarrito.map(({ item, cantidad }) => ({ itemMenuId: item.id, cantidad })),
+        items: itemsCarrito.map(({ item, cantidad, sinIds }) => ({
+          itemMenuId: item.id,
+          cantidad,
+          ...(sinIds.length > 0 ? { sinIngredientes: sinIds } : {}),
+        })),
         notas: notas.trim() || undefined,
         // Sin consentimiento explicito, no se manda absolutamente ningun
         // dato del comensal -- ni siquiera un objeto vacio (ver
@@ -231,6 +246,16 @@ export default function CartaPage() {
       setLlamados((prev) => ({ ...prev, [tipo]: 'idle' }))
       mostrarAviso(e.message, 'error')
     }
+  }
+
+  /** Desde la vista de ingredientes: suma una unidad de la linea con lo quitado. */
+  function onAgregarDesdeIngredientes(sinIds) {
+    const item = platoIngredientes
+    const clave = claveDe(item.id, sinIds)
+    setCarrito((prev) => ({ ...prev, [clave]: (prev[clave] || 0) + 1 }))
+    setPlatoIngredientes(null)
+    const sin = textoSin(nombresQuitados(item, sinIds))
+    mostrarAviso(`Agregado: ${item.nombre}${sin ? ` ${sin}` : ''}`)
   }
 
   function onCerrarModal() {
@@ -363,6 +388,7 @@ export default function CartaPage() {
                       cantidadEnCarrito={carrito[item.id] || 0}
                       onAgregar={() => agregarUnidad(item.id)}
                       onQuitar={() => quitarUnidad(item.id)}
+                      onVerIngredientes={() => setPlatoIngredientes(item)}
                     />
                   ))}
                 </div>
@@ -436,6 +462,14 @@ export default function CartaPage() {
         </div>
       )}
 
+      {platoIngredientes && (
+        <VistaIngredientes
+          item={platoIngredientes}
+          onCerrar={() => setPlatoIngredientes(null)}
+          onAgregar={onAgregarDesdeIngredientes}
+        />
+      )}
+
       <ModalCheckout
         abierto={modalAbierto}
         onCerrar={onCerrarModal}
@@ -451,6 +485,8 @@ export default function CartaPage() {
         setComensalConsentimiento={setComensalConsentimiento}
         envio={envio}
         onEnviar={onEnviarPedido}
+        onAgregarLinea={agregarUnidad}
+        onQuitarLinea={quitarUnidad}
       />
     </div>
   )
@@ -496,7 +532,7 @@ function BotonLlamado({ tipo, estado, onLlamar }) {
  * resto de la tarjeta eran áreas de toque separadas pero visualmente
  * confundibles en una lista compacta).
  */
-function ItemFila({ item, expandido, onAlternarExpandido, cantidadEnCarrito, onAgregar, onQuitar }) {
+function ItemFila({ item, expandido, onAlternarExpandido, cantidadEnCarrito, onAgregar, onQuitar, onVerIngredientes }) {
   return (
     <div className={!item.disponible ? 'opacity-60' : ''}>
       <button
@@ -555,6 +591,7 @@ function ItemFila({ item, expandido, onAlternarExpandido, cantidadEnCarrito, onA
           cantidadEnCarrito={cantidadEnCarrito}
           onAgregar={onAgregar}
           onQuitar={onQuitar}
+          onVerIngredientes={onVerIngredientes}
         />
       )}
     </div>
@@ -574,7 +611,7 @@ function ItemFila({ item, expandido, onAlternarExpandido, cantidadEnCarrito, onA
  * ambos no puede ofrecer AR real en los dos sistemas operativos (ver
  * MenuService.actualizarModelo3d, que ya rechaza guardar uno solo).
  */
-function DetalleExpandido({ item, cantidadEnCarrito, onAgregar, onQuitar }) {
+function DetalleExpandido({ item, cantidadEnCarrito, onAgregar, onQuitar, onVerIngredientes }) {
   const [vista, setVista] = useState('foto') // 'foto' | 'modelo3d'
   const tieneModelo3d = Boolean(item.modeloGlbUrl && item.modeloUsdzUrl)
 
@@ -648,6 +685,18 @@ function DetalleExpandido({ item, cantidadEnCarrito, onAgregar, onQuitar }) {
         <div className="w-full aspect-[4/3] rounded-2xl bg-papel-200 flex items-center justify-center text-carbon-900/20 text-xs">
           Sin foto
         </div>
+      )}
+
+      {item.ingredientes?.length > 0 && (
+        <button
+          type="button"
+          onClick={onVerIngredientes}
+          className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-medium"
+          style={{ borderColor: 'var(--color-acento)', color: 'var(--color-acento)' }}
+        >
+          <span aria-hidden="true">✨</span>
+          {item.ingredientes.some((i) => i.removible) ? 'Ver ingredientes y personalizar' : 'Ver ingredientes'}
+        </button>
       )}
 
       {item.disponible && (
@@ -800,6 +849,8 @@ function ModalCheckout({
   setComensalConsentimiento,
   envio,
   onEnviar,
+  onAgregarLinea,
+  onQuitarLinea,
 }) {
   if (!abierto) return null
 
@@ -835,13 +886,35 @@ function ModalCheckout({
               <p className="text-sm text-carbon-900/50 py-6 text-center">Tu pedido está vacío.</p>
             ) : (
               <div className="space-y-2.5 mb-4">
-                {itemsCarrito.map(({ item, cantidad }) => (
-                  <div key={item.id} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="text-carbon-900/80">
+                {itemsCarrito.map(({ clave, item, cantidad, sinTexto }) => (
+                  <div key={clave} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="min-w-0 text-carbon-900/80">
                       {cantidad}× {item.nombre}
+                      {sinTexto && <span className="block text-xs font-semibold text-red-700 first-letter:uppercase">{sinTexto}</span>}
                     </span>
-                    <span className="font-medium text-carbon-950 whitespace-nowrap">
-                      {formatoPrecio.format(item.precio * cantidad)}
+                    <span className="flex items-center gap-2 shrink-0">
+                      <span className="font-medium text-carbon-950 whitespace-nowrap">
+                        {formatoPrecio.format(item.precio * cantidad)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onQuitarLinea(clave)}
+                        disabled={envio.estado === 'enviando'}
+                        aria-label={`Quitar una unidad de ${item.nombre}${sinTexto ? ` ${sinTexto}` : ''}`}
+                        className="w-6 h-6 rounded-full bg-carbon-950/5 text-carbon-950 leading-none"
+                      >
+                        −
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onAgregarLinea(clave)}
+                        disabled={envio.estado === 'enviando'}
+                        aria-label={`Agregar una unidad de ${item.nombre}${sinTexto ? ` ${sinTexto}` : ''}`}
+                        className="w-6 h-6 rounded-full text-white leading-none"
+                        style={{ backgroundColor: 'var(--color-acento)' }}
+                      >
+                        +
+                      </button>
                     </span>
                   </div>
                 ))}
