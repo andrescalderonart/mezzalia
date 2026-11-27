@@ -176,7 +176,7 @@ export default function MenuPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-4 lg:gap-6">
         {/* ── Categorías ─────────────────────────────────────────── */}
         <div className="card p-4 lg:h-fit">
-          <h2 className="text-xs uppercase tracking-wide text-crema/50 mb-3">Categorías</h2>
+          <h2 className="text-[13px] font-medium text-crema/55 mb-3">Categorías</h2>
 
           {cargandoCategorias ? (
             <div className="flex flex-row gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0 lg:space-y-2">
@@ -192,7 +192,7 @@ export default function MenuPage() {
                     onClick={() => setCategoriaId(cat.id)}
                     className={`whitespace-nowrap lg:whitespace-normal lg:w-full text-left rounded-lg px-3 py-2 text-sm transition-colors duration-150 ${
                       cat.id === categoriaId
-                        ? 'bg-carbon-800 text-dorado'
+                        ? 'bg-carbon-800 text-crema font-medium'
                         : 'text-crema/70 hover:bg-carbon-800 hover:text-crema'
                     }`}
                   >
@@ -260,7 +260,7 @@ export default function MenuPage() {
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-2">
                       <h3 className="font-medium text-crema text-sm">{item.nombre}</h3>
-                      <span className="text-dorado text-sm font-medium whitespace-nowrap">
+                      <span className="text-crema text-sm font-semibold tabular-nums whitespace-nowrap">
                         {formatoPrecio.format(item.precio)}
                       </span>
                     </div>

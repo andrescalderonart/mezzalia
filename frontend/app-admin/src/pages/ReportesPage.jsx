@@ -54,7 +54,7 @@ export default function ReportesPage() {
               onClick={() => setDias(valor)}
               aria-pressed={dias === valor}
               className={`text-xs font-medium px-3.5 py-1.5 rounded-full transition-colors duration-150 ${
-                dias === valor ? 'bg-dorado text-carbon-950' : 'bg-carbon-800 text-crema/60'
+                dias === valor ? 'bg-crema text-carbon-950' : 'bg-carbon-800 text-crema/60'
               }`}
             >
               {etiqueta}
@@ -81,7 +81,7 @@ export default function ReportesPage() {
         <div className={`space-y-6 ${cargando ? 'opacity-60' : ''}`}>
           {/* El dato principal en una frase: lo que el dueno se lleva. */}
           {destacado && (
-            <div className="card p-5 border-dorado/30">
+            <div className="card p-5">
               <p className="text-lg text-crema leading-snug">
                 El <strong className="text-dorado">{formatoPct(destacado.porcentaje)}</strong> de las veces que se
                 pide <strong>{destacado.plato}</strong>, lo piden <strong>sin {destacado.nombre.toLowerCase()}</strong>.

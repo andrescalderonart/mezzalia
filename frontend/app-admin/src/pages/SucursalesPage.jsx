@@ -269,7 +269,7 @@ function MeserosAsignadosModal({ sucursal, onCerrar }) {
         <div className="mb-4">
           <h2 className="font-display font-semibold text-lg text-crema">Meseros en {sucursal.nombre}</h2>
           <p className="text-[11px] text-crema/55 mt-1">
-            Quitar a alguien de acá no borra su cuenta, solo hace que ya no pueda elegir esta
+            Quitar a alguien de aquí no borra su cuenta, solo hace que ya no pueda elegir esta
             sucursal para trabajar.
           </p>
         </div>

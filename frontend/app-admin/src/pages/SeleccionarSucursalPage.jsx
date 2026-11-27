@@ -104,10 +104,10 @@ export default function SeleccionarSucursalPage() {
                 key={sucursal.id}
                 onClick={() => onElegir(sucursal)}
                 disabled={eligiendoId !== null}
-                className="btn-secundario w-full text-left px-4 py-3 flex flex-col"
+                className="btn-secundario w-full h-auto text-left px-4 py-3 flex flex-col items-start gap-0.5"
               >
-                <span className="text-sm text-crema">{sucursal.nombre}</span>
-                {sucursal.direccion && <span className="text-[11px] text-crema/55">{sucursal.direccion}</span>}
+                <span className="text-sm font-semibold text-crema">{sucursal.nombre}</span>
+                {sucursal.direccion && <span className="text-xs font-normal text-crema/55">{sucursal.direccion}</span>}
                 {eligiendoId === sucursal.id && <span className="text-[11px] text-dorado mt-1">Entrando…</span>}
               </button>
             ))}

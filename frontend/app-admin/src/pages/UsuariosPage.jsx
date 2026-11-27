@@ -7,6 +7,9 @@ import { useApiJson } from '../context/AuthContext.jsx'
 // Layout.jsx). Backend: identidad.controlador.UsuarioInternoAdminController.
 const ROLES_ASIGNABLES = ['ADMIN_RESTAURANTE', 'MESERO']
 
+
+const NOMBRE_ROL = { ADMIN_RESTAURANTE: 'Administrador', MESERO: 'Mesero' }
+
 export default function UsuariosPage() {
   const apiJson = useApiJson()
 
@@ -119,7 +122,7 @@ export default function UsuariosPage() {
         <h1 className="font-display font-semibold text-2xl text-crema">Usuarios</h1>
         <p className="text-sm text-crema/55">
           Da de alta o desactiva cuentas del personal de este restaurante. No hay recuperación de
-          contraseña por email todavía -- si alguien la olvida, reseteala vos desde acá.
+          contraseña por correo todavía: si alguien la olvida, restablécela desde aquí.
         </p>
       </div>
 
@@ -146,7 +149,7 @@ export default function UsuariosPage() {
         <select className="input-carbon sm:w-48" value={rol} onChange={(e) => setRol(e.target.value)}>
           {ROLES_ASIGNABLES.map((r) => (
             <option key={r} value={r}>
-              {r}
+              {NOMBRE_ROL[r] || r}
             </option>
           ))}
         </select>
@@ -168,7 +171,7 @@ export default function UsuariosPage() {
               <div>
                 <div className="text-sm text-crema">{usuario.username}</div>
                 <div className="text-[11px] text-crema/55">
-                  {usuario.rol} · {usuario.activo ? 'activo' : 'inactivo'}
+                  {NOMBRE_ROL[usuario.rol] || usuario.rol} · {usuario.activo ? 'activo' : 'inactivo'}
                 </div>
               </div>
               <div className="flex gap-2">
@@ -195,7 +198,7 @@ export default function UsuariosPage() {
                   }}
                   className="btn-secundario text-xs py-2"
                 >
-                  Resetear contraseña
+                  Restablecer contraseña
                 </button>
                 <button
                   onClick={() => onCambiarActivo(usuario)}
@@ -346,7 +349,7 @@ function GestionSucursalesModal({ usuario, sucursales, onCerrar }) {
         <div>
           <h3 className="font-medium text-crema">Sucursales de {usuario.username}</h3>
           <p className="text-[11px] text-crema/55 mt-1">
-            Solo puede elegir trabajar en las sucursales que marques acá. Sin ninguna, no va a poder
+            Solo puede elegir trabajar en las sucursales que marques aquí. Sin ninguna, no va a poder
             entrar a Pedidos.
           </p>
         </div>
@@ -398,7 +401,7 @@ function GestionSucursalesModal({ usuario, sucursales, onCerrar }) {
         )}
 
         {!cargando && opciones.length > 0 && asignadasIds.length === 0 && (
-          <p className="text-xs text-dorado/80 bg-dorado/10 border border-dorado/20 rounded-lg px-2.5 py-1.5">
+          <p className="text-xs text-crema/80 bg-carbon-800 rounded-lg px-2.5 py-1.5">
             Todavía no tiene ninguna sucursal asignada.
           </p>
         )}
