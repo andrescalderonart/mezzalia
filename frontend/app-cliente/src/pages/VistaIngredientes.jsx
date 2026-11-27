@@ -62,6 +62,9 @@ export default function VistaIngredientes({ item, onCerrar, onAgregar }) {
   const sin = textoSin(nombresQuitados(item, quitados))
 
   function tocar(ing) {
+    // Plato informativo (nada se puede quitar, p. ej. un sancocho): tocar no
+    // hace nada; la vista solo muestra lo que trae.
+    if (!hayQuitables) return
     if (!ing.removible) {
       setSacudiendoId(null)
       requestAnimationFrame(() => setSacudiendoId(ing.id))
@@ -119,13 +122,31 @@ export default function VistaIngredientes({ item, onCerrar, onAgregar }) {
                     position: 'relative',
                   }}
                 >
-                  <Capa ing={ing} quitado={quitado} sacudiendo={sacudiendoId === ing.id} onTocar={() => tocar(ing)} apilado sinMovimiento={sinMovimiento} />
+                  <Capa ing={ing} quitado={quitado} sacudiendo={sacudiendoId === ing.id} onTocar={() => tocar(ing)} apilado sinMovimiento={sinMovimiento} informativo={!hayQuitables} />
                 </li>
               )
             })}
           </ul>
         ) : (
-          <ul className="max-w-md mx-auto grid grid-cols-2 gap-3">
+          <div className="max-w-md mx-auto">
+          {/* Esparcido: arriba el plato completo (lo que el cliente va a
+              recibir) y debajo lo que trae. Sirve igual para una bandeja con
+              partes quitables que para una sopa donde todo viene incluido. */}
+          {item.imagenUrl && (
+            <img
+              src={item.imagenUrl}
+              alt={item.nombre}
+              className="w-full max-h-[30vh] object-cover rounded-2xl mb-4"
+              style={{
+                opacity: abierto ? 1 : 0,
+                transition: sinMovimiento ? 'none' : 'opacity 400ms ease',
+              }}
+            />
+          )}
+          <p className="text-xs font-medium uppercase tracking-wide text-carbon-900/40 mb-2">
+            {hayQuitables ? 'Lo que trae' : 'Lo que trae este plato'}
+          </p>
+          <ul className="grid grid-cols-2 gap-3">
             {ingredientes.map((ing, i) => (
               <li
                 key={ing.id}
@@ -135,10 +156,11 @@ export default function VistaIngredientes({ item, onCerrar, onAgregar }) {
                   transition: sinMovimiento ? 'none' : `opacity 450ms ease ${i * 60}ms, transform 550ms cubic-bezier(.2,.8,.2,1) ${i * 60}ms`,
                 }}
               >
-                <Capa ing={ing} quitado={quitados.includes(ing.id)} sacudiendo={sacudiendoId === ing.id} onTocar={() => tocar(ing)} sinMovimiento={sinMovimiento} />
+                <Capa ing={ing} quitado={quitados.includes(ing.id)} sacudiendo={sacudiendoId === ing.id} onTocar={() => tocar(ing)} sinMovimiento={sinMovimiento} informativo={!hayQuitables} />
               </li>
             ))}
           </ul>
+          </div>
         )}
       </div>
 
@@ -172,28 +194,34 @@ export default function VistaIngredientes({ item, onCerrar, onAgregar }) {
   )
 }
 
-function Capa({ ing, quitado, sacudiendo, onTocar, apilado = false, sinMovimiento }) {
+function Capa({ ing, quitado, sacudiendo, onTocar, apilado = false, sinMovimiento, informativo = false }) {
   const conFoto = Boolean(ing.imagenUrl)
   // Con foto, la etiqueta nombra el ingrediente. Sin foto el nombre ya va en
   // la pastilla, asi que la etiqueta solo dice el estado (o no aparece).
+  // "Incluido" marca lo que no se puede quitar, solo cuando hay algo que SI
+  // se puede quitar; en un plato informativo (sancocho) no hace falta.
+  const marcaIncluido = !ing.removible && !informativo
   const etiqueta = quitado
     ? `Sin ${ing.nombre.toLowerCase()}`
     : conFoto
-      ? `${ing.nombre}${ing.removible ? '' : ' · fijo'}`
-      : ing.removible
-        ? null
-        : 'fijo'
+      ? `${ing.nombre}${marcaIncluido ? ' · incluido' : ''}`
+      : marcaIncluido
+        ? 'incluido'
+        : null
   return (
     <button
       type="button"
       onClick={onTocar}
-      aria-pressed={ing.removible ? quitado : undefined}
+      aria-pressed={ing.removible && !informativo ? quitado : undefined}
       aria-label={
-        ing.removible
-          ? `${ing.nombre}${quitado ? ', quitado. Toca para volver a ponerlo' : '. Toca para quitarlo'}`
-          : `${ing.nombre}, no se puede quitar`
+        informativo
+          ? ing.nombre
+          : ing.removible
+            ? `${ing.nombre}${quitado ? ', quitado. Toca para volver a ponerlo' : '. Toca para quitarlo'}`
+            : `${ing.nombre}, incluido, no se puede quitar`
       }
-      className={`relative w-full flex items-center justify-center rounded-2xl outline-offset-2 ${sacudiendo ? 'animate-sacudir' : ''} ${
+      tabIndex={informativo ? -1 : undefined}
+      className={`relative w-full flex items-center justify-center rounded-2xl outline-offset-2 ${informativo ? 'cursor-default' : ''} ${sacudiendo ? 'animate-sacudir' : ''} ${
         apilado ? '' : `flex-col bg-white/60 border border-carbon-950/5 p-3 ${conFoto ? 'aspect-square' : 'min-h-[5.5rem]'}`
       }`}
     >
