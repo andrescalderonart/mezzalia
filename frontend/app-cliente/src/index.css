@@ -8,15 +8,49 @@ html, body, #root {
 
 body {
   @apply bg-papel-100 text-carbon-900 font-sans antialiased;
+  /* Sin la espera de ~300 ms del doble toque en botones, y sin el destello
+     gris de iOS al tocar (el feedback lo dan los propios botones). */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Foco visible al navegar con teclado (Web Interface Guidelines / WCAG 2.4.7):
+   un solo anillo en el color del restaurante para todo lo interactivo. */
+:focus-visible {
+  outline: 2px solid var(--color-acento, #18181b);
+  outline-offset: 2px;
+}
+
+/* Quien pide menos movimiento en su celular no ve entradas, giros ni
+   sacudidas; los cambios de estado siguen ocurriendo, solo sin animarse. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 ::selection {
-  background-color: rgba(212, 162, 76, 0.35);
+  background-color: rgba(24, 24, 27, 0.12);
+}
+
+/* Títulos con interletrado apretado y sin viudas: el gesto tipográfico que
+   separa una interfaz cuidada de una genérica. */
+h1, h2, h3 {
+  letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 
 @layer components {
   .chip-categoria {
     @apply whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors duration-150 shrink-0;
+  }
+
+  /* Accesos de servicio (mesero, cuenta, mesa): ícono arriba, texto abajo. */
+  .boton-servicio {
+    @apply flex flex-col items-center justify-center gap-1.5 rounded-2xl bg-papel-200 px-2 py-3 text-center text-xs font-medium leading-tight text-carbon-950 transition-colors hover:bg-papel-300;
   }
 
   .tarjeta-item {

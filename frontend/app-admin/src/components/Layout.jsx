@@ -38,7 +38,7 @@ export default function Layout() {
       >
         <div className="flex items-center gap-2.5">
           <LogoMark className="w-7 h-7" />
-          <span className="font-display text-base text-crema">Mezzalia</span>
+          <span className="font-display font-semibold text-base text-crema">Mezzalia</span>
         </div>
         <button
           onClick={() => setMenuAbierto(true)}
@@ -72,7 +72,7 @@ export default function Layout() {
           <div className="flex items-center gap-3">
             <LogoMark className="w-9 h-9" />
             <div>
-              <div className="font-display text-lg leading-none text-crema">Mezzalia</div>
+              <div className="font-display font-semibold text-lg leading-none text-crema">Mezzalia</div>
               <div className="text-[11px] text-crema/40 tracking-wide">panel del restaurante</div>
             </div>
           </div>

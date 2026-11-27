@@ -5,6 +5,7 @@ import { guardarUltimaRonda, leerUltimaRonda, resumenRonda, rondaComoCarrito } f
 import { claveDe, nombresQuitados, parsearClave, textoSin } from './carrito.js'
 import VistaIngredientes from './VistaIngredientes.jsx'
 import PedidoDeMesa from './PedidoDeMesa.jsx'
+import { IconoCampana, IconoCapas, IconoCheck, IconoMas, IconoMenos, IconoMesa, IconoRecibo, IconoRonda } from './iconos.jsx'
 
 const formatoPrecio = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -129,13 +130,17 @@ export default function CartaPage() {
     seccionesRef.current[categoriaId]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  const variablesMarca = useMemo(
-    () => ({
-      '--color-acento': carta?.branding?.colorPrimario || '#c1502e',
-      '--color-acento-suave': carta?.branding?.colorSecundario || '#d4a24c',
-    }),
-    [carta],
-  )
+  // Sin color propio, Mezzalia usa tinta (botones negros, estilo app).
+  // --color-sobre-acento se calcula: con un color de marca claro (amarillo,
+  // menta…) el texto blanco no se leería, así que pasa a tinta (WCAG 1.4.3).
+  const variablesMarca = useMemo(() => {
+    const acento = carta?.branding?.colorPrimario || '#18181b'
+    return {
+      '--color-acento': acento,
+      '--color-acento-suave': carta?.branding?.colorSecundario || '#f4f4f2',
+      '--color-sobre-acento': textoSobre(acento),
+    }
+  }, [carta])
 
   // Mapa id -> item de toda la carta, para poder resolver nombre/precio de
   // lo que hay en `carrito` (que solo guarda cantidades por id) sin recorrer
@@ -303,7 +308,7 @@ export default function CartaPage() {
     return (
       <div className="min-h-dvh flex items-center justify-center px-6 text-center">
         <div className="max-w-sm">
-          <h1 className="font-display text-xl text-carbon-950 mb-2">No pudimos abrir la carta</h1>
+          <h1 className="font-display font-semibold text-xl text-carbon-950 mb-2">No pudimos abrir la carta</h1>
           <p className="text-sm text-carbon-900/60">{error}</p>
         </div>
       </div>
@@ -316,55 +321,59 @@ export default function CartaPage() {
           el comensal necesita poder saltar de sección sin scrollear a mano
           desde el principio. pt-[env(safe-area-inset-top)] para no quedar
           debajo del notch/Dynamic Island de iPhone. */}
-      <header
-        className="sticky top-0 z-20 bg-papel-100/95 backdrop-blur-sm border-b border-carbon-950/10"
-        style={{ paddingTop: 'env(safe-area-inset-top)' }}
-      >
-        <div className="px-4 sm:px-6 pt-4 pb-3 flex items-center gap-3">
+      <header className="px-5 pt-5 pb-4 max-w-3xl mx-auto" style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top))' }}>
+        <div className="flex items-center gap-3">
           {carta.branding?.logoUrl && (
-            <img src={carta.branding.logoUrl} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
+            <img src={carta.branding.logoUrl} alt="" width={44} height={44} className="w-11 h-11 rounded-xl object-cover shrink-0" />
           )}
-          <div className="min-w-0 flex-1">
-            <h1 className="font-display text-xl text-carbon-950 truncate">{carta.nombreRestaurante}</h1>
-            <p className="text-xs text-carbon-900/40">Carta digital</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setVerMesa(true)}
-            className="shrink-0 text-xs font-semibold rounded-full px-3 py-1.5 border"
-            style={{ borderColor: 'var(--color-acento)', color: 'var(--color-acento)' }}
-          >
-            🍽️ Pedido de la mesa
-          </button>
+          <h1 className="min-w-0 text-[26px] leading-tight font-semibold text-carbon-950 line-clamp-2">{carta.nombreRestaurante}</h1>
         </div>
 
-        {/* Enfoque en bares: pedirle cosas al personal sin levantar la mano. */}
-        <div className="flex gap-2 px-4 sm:px-6 pb-3">
+        {/* Enfoque en bares: pedirle cosas al personal sin levantar la mano,
+            y ver lo que ya pidió toda la mesa. */}
+        <div className="mt-4 grid grid-cols-3 gap-2">
           <BotonLlamado tipo="MESERO" estado={llamados.MESERO} onLlamar={onLlamar} />
           <BotonLlamado tipo="CUENTA" estado={llamados.CUENTA} onLlamar={onLlamar} />
+          <button type="button" onClick={() => setVerMesa(true)} className="boton-servicio">
+            <IconoMesa className="w-5 h-5" />
+            Pedido de la mesa
+          </button>
         </div>
-
-        <nav ref={navRef} className="flex gap-2 overflow-x-auto px-4 sm:px-6 pb-3 -mt-1">
-          {carta.categorias.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => irACategoria(cat.id)}
-              className="chip-categoria"
-              style={
-                categoriaActiva === cat.id
-                  ? { backgroundColor: 'var(--color-acento)', color: '#fff' }
-                  : { backgroundColor: 'rgba(13,12,11,0.06)', color: 'rgba(13,12,11,0.6)' }
-              }
-            >
-              {cat.nombre}
-            </button>
-          ))}
-        </nav>
       </header>
 
+      {/* Solo la fila de categorías es sticky: el encabezado se va al
+          hacer scroll y deja la pantalla a la comida. */}
+      <div
+        className="sticky top-0 z-20 bg-white/85 backdrop-blur-xl border-b border-carbon-950/[0.06]"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
+        <nav ref={navRef} className="flex gap-1 overflow-x-auto px-3 max-w-3xl mx-auto [scrollbar-width:none]">
+          {carta.categorias.map((cat) => {
+            const activa = categoriaActiva === cat.id
+            return (
+              <button
+                key={cat.id}
+                onClick={() => irACategoria(cat.id)}
+                aria-current={activa ? 'true' : undefined}
+                className={`relative shrink-0 whitespace-nowrap px-3 py-3.5 text-sm font-medium transition-colors ${
+                  activa ? 'text-carbon-950' : 'text-carbon-600 hover:text-carbon-950'
+                }`}
+              >
+                {cat.nombre}
+                <span
+                  className={`absolute left-3 right-3 bottom-0 h-0.5 rounded-full transition-opacity ${activa ? 'opacity-100' : 'opacity-0'}`}
+                  style={{ backgroundColor: 'var(--color-acento)' }}
+                  aria-hidden="true"
+                />
+              </button>
+            )
+          })}
+        </nav>
+      </div>
+
       <main
-        className={`px-4 sm:px-6 py-6 max-w-3xl mx-auto ${
-          cantidadTotalCarrito > 0 || ultimaRonda.length > 0 ? 'pb-28' : 'pb-[max(1.5rem,env(safe-area-inset-bottom))]'
+        className={`px-5 pt-5 max-w-3xl mx-auto ${
+          cantidadTotalCarrito > 0 || ultimaRonda.length > 0 ? 'pb-32' : 'pb-[max(1.5rem,env(safe-area-inset-bottom))]'
         }`}
       >
         {carta.categorias.length === 0 && (
@@ -389,20 +398,14 @@ export default function CartaPage() {
               ref={(el) => {
                 seccionesRef.current[cat.id] = el
               }}
-              className="scroll-mt-28 break-inside-avoid mb-10 lg:mb-12"
+              className="scroll-mt-16 break-inside-avoid mb-8 lg:mb-12"
             >
-              <h2 className="font-display text-2xl text-carbon-950 mb-1.5">{cat.nombre}</h2>
-              {/* Doble línea fina bajo el título -- el detalle clásico de
-                  carta impresa que pediste imitar de la referencia. */}
-              <div className="mb-3">
-                <div className="h-px bg-carbon-950/20" />
-                <div className="h-px bg-carbon-950/20 mt-[3px]" />
-              </div>
+              <h2 className="text-xl font-semibold text-carbon-950 mb-1">{cat.nombre}</h2>
 
               {cat.items.length === 0 ? (
                 <p className="text-sm text-carbon-900/40">Sin platos en esta categoría todavía.</p>
               ) : (
-                <div className="divide-y divide-carbon-950/10">
+                <div className="divide-y divide-carbon-950/[0.06]">
                   {cat.items.map((item) => (
                     <ItemFila
                       key={item.id}
@@ -412,6 +415,7 @@ export default function CartaPage() {
                         setExpandidoId((prev) => (prev === item.id ? null : item.id))
                       }
                       cantidadEnCarrito={carrito[item.id] || 0}
+                      cantidadTotalDelPlato={cantidadDelPlato(carrito, item.id)}
                       onAgregar={() => agregarUnidad(item.id)}
                       onQuitar={() => quitarUnidad(item.id)}
                       onVerIngredientes={() => setPlatoIngredientes(item)}
@@ -423,7 +427,7 @@ export default function CartaPage() {
           ))}
         </div>
 
-        <p className="text-center text-[11px] text-carbon-900/30 pt-10">
+        <p className="text-center text-xs text-carbon-600/70 pt-6">
           Carta digital por Mezzalia
         </p>
       </main>
@@ -433,46 +437,44 @@ export default function CartaPage() {
           padding de safe-area para no quedar debajo de la barra de gestos
           de iPhone/Android. */}
       {cantidadTotalCarrito > 0 && (
-        <button
-          type="button"
-          onClick={() => setModalAbierto(true)}
-          // Un lector de pantalla leia solo los dos <span> sueltos
-          // ("3 ítems", "Ver pedido · $…"); el aria-label lo dice en una
-          // frase y aria-haspopup avisa que abre el modal del pedido.
-          aria-label={`Ver pedido: ${cantidadTotalCarrito} ${cantidadTotalCarrito === 1 ? 'ítem' : 'ítems'}, total ${formatoPrecio.format(totalCarrito)}`}
-          aria-haspopup="dialog"
-          className="fixed bottom-0 inset-x-0 z-30 flex items-center justify-between gap-3 px-4 sm:px-6 py-3.5 text-white animate-fadeInUp shadow-[0_-4px_20px_rgba(0,0,0,0.15)]"
-          style={{
-            backgroundColor: 'var(--color-acento)',
-            paddingBottom: 'max(0.875rem, env(safe-area-inset-bottom))',
-          }}
-        >
-          <span className="text-sm font-medium">
-            {cantidadTotalCarrito} {cantidadTotalCarrito === 1 ? 'ítem' : 'ítems'}
-          </span>
-          <span className="text-sm font-semibold">Ver pedido · {formatoPrecio.format(totalCarrito)}</span>
-        </button>
+        <div className="fixed inset-x-0 bottom-0 z-30 px-3 animate-fadeInUp" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
+          <button
+            type="button"
+            onClick={() => setModalAbierto(true)}
+            aria-label={`Ver pedido: ${cantidadTotalCarrito} ${cantidadTotalCarrito === 1 ? 'plato' : 'platos'}, total ${formatoPrecio.format(totalCarrito)}`}
+            aria-haspopup="dialog"
+            className="w-full max-w-md mx-auto flex items-center gap-3 rounded-2xl h-14 pl-2 pr-5 shadow-flotante active:scale-[0.99] transition-transform"
+            style={{ backgroundColor: 'var(--color-acento)', color: 'var(--color-sobre-acento)' }}
+          >
+            <span className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-sm font-semibold tabular-nums">
+              {cantidadTotalCarrito}
+            </span>
+            <span className="flex-1 text-left text-[15px] font-semibold">Ver pedido</span>
+            <span className="text-[15px] font-semibold tabular-nums">{formatoPrecio.format(totalCarrito)}</span>
+          </button>
+        </div>
       )}
 
       {/* "Otra ronda": solo cuando el carrito esta vacio (si no, manda la
           barra del carrito) y este celular ya pidio algo en esta mesa. */}
       {cantidadTotalCarrito === 0 && ultimaRonda.length > 0 && !modalAbierto && (
-        <button
-          type="button"
-          onClick={onOtraRonda}
-          aria-label={`Pedir otra ronda: ${resumenRonda(ultimaRonda, itemsPorId)}`}
-          className="fixed bottom-0 inset-x-0 z-30 flex items-center gap-3 px-4 sm:px-6 py-3.5 text-white animate-fadeInUp shadow-[0_-4px_20px_rgba(0,0,0,0.15)]"
-          style={{
-            backgroundColor: 'var(--color-acento)',
-            paddingBottom: 'max(0.875rem, env(safe-area-inset-bottom))',
-          }}
-        >
-          <span className="text-xl leading-none" aria-hidden="true">🍻</span>
-          <span className="min-w-0 text-left">
-            <span className="block text-sm font-semibold">Otra ronda</span>
-            <span className="block text-xs text-white/80 truncate">{resumenRonda(ultimaRonda, itemsPorId)}</span>
-          </span>
-        </button>
+        <div className="fixed inset-x-0 bottom-0 z-30 px-3 animate-fadeInUp" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
+          <button
+            type="button"
+            onClick={onOtraRonda}
+            aria-label={`Pedir otra ronda: ${resumenRonda(ultimaRonda, itemsPorId)}`}
+            className="w-full max-w-md mx-auto flex items-center gap-3 rounded-2xl h-14 pl-2 pr-4 shadow-flotante active:scale-[0.99] transition-transform"
+            style={{ backgroundColor: 'var(--color-acento)', color: 'var(--color-sobre-acento)' }}
+          >
+            <span className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center">
+              <IconoRonda className="w-5 h-5" />
+            </span>
+            <span className="min-w-0 flex-1 text-left">
+              <span className="block text-[15px] font-semibold leading-tight">Otra ronda</span>
+              <span className="block text-xs opacity-75 truncate">{resumenRonda(ultimaRonda, itemsPorId)}</span>
+            </span>
+          </button>
+        </div>
       )}
 
       {/* El centrado va en el contenedor y la animacion en el hijo: si
@@ -486,7 +488,7 @@ export default function CartaPage() {
           <div
             role="status"
             className={`max-w-md px-4 py-2.5 rounded-full text-sm font-medium text-center shadow-lg animate-fadeInUp ${
-              aviso.tipo === 'error' ? 'bg-red-700 text-white' : 'bg-carbon-950 text-white'
+              aviso.tipo === 'error' ? 'bg-sin text-white' : 'bg-carbon-950 text-white'
             }`}
           >
             {aviso.texto}
@@ -540,29 +542,45 @@ export default function CartaPage() {
 }
 
 const TEXTO_LLAMADO = {
-  MESERO: { idle: 'Llamar al mesero', enviando: 'Avisando…', avisado: 'Mesero avisado ✓', icono: '🙋' },
-  CUENTA: { idle: 'Pedir la cuenta', enviando: 'Avisando…', avisado: 'Cuenta pedida ✓', icono: '🧾' },
+  MESERO: { idle: 'Llamar al mesero', enviando: 'Avisando…', avisado: 'Mesero avisado', Icono: IconoCampana },
+  CUENTA: { idle: 'Pedir la cuenta', enviando: 'Avisando…', avisado: 'Cuenta pedida', Icono: IconoRecibo },
 }
 
 function BotonLlamado({ tipo, estado, onLlamar }) {
   const t = TEXTO_LLAMADO[tipo]
   const avisado = estado === 'avisado'
+  const Icono = avisado ? IconoCheck : t.Icono
   return (
     <button
       type="button"
       onClick={() => onLlamar(tipo)}
       disabled={estado === 'enviando'}
-      className="flex-1 flex items-center justify-center gap-1.5 rounded-full border text-sm font-medium py-2 transition-colors duration-150 disabled:opacity-60"
-      style={
-        avisado
-          ? { borderColor: 'transparent', backgroundColor: 'rgba(21,128,61,0.12)', color: 'rgb(21,128,61)' }
-          : { borderColor: 'rgba(13,12,11,0.15)', color: 'rgba(13,12,11,0.75)' }
-      }
+      className={`boton-servicio disabled:opacity-60 ${avisado ? '!bg-emerald-50 !text-emerald-700' : ''}`}
     >
-      <span aria-hidden="true">{t.icono}</span>
+      <Icono className="w-5 h-5" />
       {t[estado]}
     </button>
   )
+}
+
+/** Unidades de un plato en el carrito, sumando sus variantes ("sin cebolla"). */
+function cantidadDelPlato(carrito, itemId) {
+  return Object.entries(carrito).reduce(
+    (acc, [clave, cantidad]) => (parsearClave(clave).itemId === itemId ? acc + cantidad : acc),
+    0,
+  )
+}
+
+/** Tinta o blanco, lo que más contraste dé sobre `hex` (luminancia WCAG). */
+function textoSobre(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '')
+  if (!m) return '#ffffff'
+  const canal = (i) => {
+    const c = parseInt(m[1].slice(i, i + 2), 16) / 255
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  }
+  const l = 0.2126 * canal(0) + 0.7152 * canal(2) + 0.0722 * canal(4)
+  return (l + 0.05) / 0.05 > 1.05 / (l + 0.05) ? '#18181b' : '#ffffff'
 }
 
 /**
@@ -579,58 +597,75 @@ function BotonLlamado({ tipo, estado, onLlamar }) {
  * resto de la tarjeta eran áreas de toque separadas pero visualmente
  * confundibles en una lista compacta).
  */
-function ItemFila({ item, expandido, onAlternarExpandido, cantidadEnCarrito, onAgregar, onQuitar, onVerIngredientes }) {
+function ItemFila({ item, expandido, onAlternarExpandido, cantidadEnCarrito, cantidadTotalDelPlato, onAgregar, onQuitar, onVerIngredientes }) {
+  const personalizable = item.ingredientes?.some((i) => i.removible)
   return (
-    <div className={!item.disponible ? 'opacity-60' : ''}>
-      <button
-        onClick={onAlternarExpandido}
-        aria-expanded={expandido}
-        className="w-full text-left py-3.5 group"
-      >
-        <div className="flex items-baseline gap-2">
-          <span className="font-medium text-carbon-950 text-[15px] shrink-0">{item.nombre}</span>
-          {/* Línea punteada "de relleno" entre el nombre y el precio -- el
-              detalle clásico de carta impresa. flex-1 + overflow-hidden en
-              vez de border-dotted directo en un elemento de ancho fijo,
-              para que se estire solo lo que falta sea cual sea el largo del
-              nombre. */}
-          <span className="flex-1 min-w-[12px] border-b border-dotted border-carbon-950/30 translate-y-[-4px]" aria-hidden="true" />
-          {item.disponible ? (
-            <span className="text-sm font-semibold whitespace-nowrap shrink-0" style={{ color: 'var(--color-acento)' }}>
-              {formatoPrecio.format(item.precio)}
-            </span>
-          ) : (
-            // RF-02: agotado se muestra distinto, nunca desaparece de la
-            // carta -- ver el mismo criterio que tenía la tarjeta anterior.
-            <span className="text-[11px] font-medium uppercase tracking-wide text-carbon-900/40 shrink-0">
-              Agotado
+    <div className={!item.disponible ? 'opacity-50' : ''}>
+      <div className="flex gap-4 py-4">
+        <button onClick={onAlternarExpandido} aria-expanded={expandido} className="flex-1 min-w-0 text-left">
+          <span className="flex items-center gap-2">
+            <span className="text-[15px] font-semibold text-carbon-950 break-words">{item.nombre}</span>
+            {cantidadTotalDelPlato > 0 && (
+              <span
+                className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-semibold flex items-center justify-center tabular-nums"
+                style={{ backgroundColor: 'var(--color-acento)', color: 'var(--color-sobre-acento)' }}
+                aria-label={`${cantidadTotalDelPlato} en tu pedido`}
+              >
+                {cantidadTotalDelPlato}
+              </span>
+            )}
+          </span>
+          {item.descripcion && (
+            <span className={`block text-[13px] leading-snug text-carbon-600 mt-1 ${expandido ? '' : 'line-clamp-2'}`}>
+              {item.descripcion}
             </span>
           )}
-          <svg
-            viewBox="0 0 24 24"
-            className={`w-4 h-4 shrink-0 text-carbon-900/30 transition-transform duration-200 ${expandido ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </div>
-        {item.descripcion && (
-          <p className={`text-xs text-carbon-900/50 mt-1 pr-2 ${expandido ? '' : 'line-clamp-1'}`}>
-            {item.descripcion}
-          </p>
-        )}
-      </button>
+          <span className="mt-2 flex items-center gap-2">
+            {item.disponible ? (
+              <span className="text-sm font-semibold text-carbon-950 tabular-nums">{formatoPrecio.format(item.precio)}</span>
+            ) : (
+              // RF-02: lo agotado se muestra distinto, nunca desaparece.
+              <span className="text-[13px] font-medium text-carbon-600">Agotado</span>
+            )}
+            {personalizable && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-papel-200 px-2 py-0.5 text-[11px] font-medium text-carbon-700">
+                <IconoCapas className="w-3 h-3" />
+                Personalizable
+              </span>
+            )}
+          </span>
+        </button>
 
-      {/* key={item.id}: fuerza a React a desmontar/remontar DetalleExpandido
-          cada vez que cambia el plato expandido (y también al colapsar y
-          volver a expandir el mismo), para que `vista` (foto vs 3D) siempre
-          arranque en 'foto' -- mismo criterio que ya usaba FotoZoomable para
-          resetear su propio zoom. */}
+        {/* Abierto, la foto grande ya está abajo: la miniatura sobraría. */}
+        {item.imagenUrl && !expandido && (
+          <div className="relative shrink-0 self-start">
+            <button onClick={onAlternarExpandido} tabIndex={-1} aria-hidden="true" className="block">
+              <img
+                src={item.imagenUrl}
+                alt=""
+                width={96}
+                height={96}
+                loading="lazy"
+                decoding="async"
+                className="w-24 h-24 rounded-2xl object-cover bg-papel-200"
+              />
+            </button>
+            {item.disponible && (
+              <button
+                type="button"
+                onClick={onAgregar}
+                aria-label={`Agregar ${item.nombre}`}
+                className="absolute bottom-1.5 right-1.5 w-9 h-9 rounded-full bg-white text-carbon-950 shadow-flotante flex items-center justify-center active:scale-95 transition-transform"
+              >
+                <IconoMas className="w-[18px] h-[18px]" />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* key={item.id}: remonta DetalleExpandido en cada apertura para que
+          `vista` (foto vs 3D) y el zoom arranquen limpios. */}
       {expandido && (
         <DetalleExpandido
           key={item.id}
@@ -686,30 +721,20 @@ function DetalleExpandido({ item, cantidadEnCarrito, onAgregar, onQuitar, onVerI
   }
 
   return (
-    <div className="pb-4 -mt-1 animate-fadeInUp">
+    <div className="pb-5 animate-fadeInUp">
       {tieneModelo3d && (
         <div className="flex gap-2 mb-2.5">
           <button
             onClick={() => setVista('foto')}
-            className="text-[11px] font-medium px-3 py-1 rounded-full"
-            style={
-              vista === 'foto'
-                ? { backgroundColor: 'var(--color-acento)', color: '#fff' }
-                : { backgroundColor: 'rgba(13,12,11,0.06)', color: 'rgba(13,12,11,0.6)' }
-            }
+            className={`text-xs font-medium px-3 h-8 rounded-full ${vista === 'foto' ? 'bg-carbon-950 text-white' : 'bg-papel-200 text-carbon-700'}`}
           >
             Foto
           </button>
           <button
             onClick={verModelo3d}
-            className="text-[11px] font-medium px-3 py-1 rounded-full"
-            style={
-              vista === 'modelo3d'
-                ? { backgroundColor: 'var(--color-acento)', color: '#fff' }
-                : { backgroundColor: 'rgba(13,12,11,0.06)', color: 'rgba(13,12,11,0.6)' }
-            }
+            className={`text-xs font-medium px-3 h-8 rounded-full ${vista === 'modelo3d' ? 'bg-carbon-950 text-white' : 'bg-papel-200 text-carbon-700'}`}
           >
-            Ver en 3D · AR
+            Ver en 3D y AR
           </button>
         </div>
       )}
@@ -748,50 +773,49 @@ function DetalleExpandido({ item, cantidadEnCarrito, onAgregar, onQuitar, onVerI
         </div>
       )}
 
-      {item.ingredientes?.length > 0 && (
-        <button
-          type="button"
-          onClick={onVerIngredientes}
-          className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-medium"
-          style={{ borderColor: 'var(--color-acento)', color: 'var(--color-acento)' }}
-        >
-          <span aria-hidden="true">✨</span>
-          {item.ingredientes.some((i) => i.removible) ? 'Ver ingredientes y personalizar' : 'Ver ingredientes'}
-        </button>
-      )}
+      <div className="mt-3 flex gap-2">
+        {item.ingredientes?.length > 0 && (
+          <button
+            type="button"
+            onClick={onVerIngredientes}
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl h-12 text-sm font-semibold bg-papel-200 text-carbon-950 hover:bg-papel-300 transition-colors"
+          >
+            <IconoCapas className="w-4 h-4" />
+            {item.ingredientes.some((i) => i.removible) ? 'Personalizar' : 'Ver ingredientes'}
+          </button>
+        )}
 
-      {item.disponible && (
-        <div className="mt-3.5 flex justify-end">
-          {cantidadEnCarrito > 0 ? (
-            <div className="flex items-center gap-3 bg-papel-200 rounded-full pl-1 pr-1 py-1">
+        {item.disponible &&
+          (cantidadEnCarrito > 0 ? (
+            <div className="flex items-center gap-1 rounded-xl bg-papel-200 p-1 h-12">
               <button
                 onClick={onQuitar}
                 aria-label={`Quitar una unidad de ${item.nombre}`}
-                className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-carbon-950 font-semibold leading-none"
+                className="w-10 h-10 rounded-lg bg-white text-carbon-950 flex items-center justify-center"
               >
-                −
+                <IconoMenos />
               </button>
-              <span className="text-sm font-semibold w-4 text-center tabular-nums">{cantidadEnCarrito}</span>
+              <span className="w-8 text-center text-[15px] font-semibold tabular-nums">{cantidadEnCarrito}</span>
               <button
                 onClick={onAgregar}
                 aria-label={`Agregar una unidad de ${item.nombre}`}
-                className="w-7 h-7 rounded-full flex items-center justify-center text-white font-semibold leading-none"
-                style={{ backgroundColor: 'var(--color-acento)' }}
+                className="w-10 h-10 rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: 'var(--color-acento)', color: 'var(--color-sobre-acento)' }}
               >
-                +
+                <IconoMas />
               </button>
             </div>
           ) : (
             <button
               onClick={onAgregar}
-              className="text-xs font-medium px-3.5 py-1.5 rounded-full text-white"
-              style={{ backgroundColor: 'var(--color-acento)' }}
+              className={`${item.ingredientes?.length > 0 ? '' : 'flex-1'} flex items-center justify-center gap-1.5 rounded-xl h-12 px-5 text-sm font-semibold`}
+              style={{ backgroundColor: 'var(--color-acento)', color: 'var(--color-sobre-acento)' }}
             >
-              + Agregar
+              <IconoMas className="w-4 h-4" />
+              Agregar
             </button>
-          )}
-        </div>
-      )}
+          ))}
+      </div>
     </div>
   )
 }
@@ -888,7 +912,7 @@ function FotoZoomable({ src, alt, apagada }) {
       />
       {transform.escala === 1 && (
         <span className="absolute bottom-2 right-2 text-[10px] bg-carbon-950/60 text-white px-2 py-1 rounded-full pointer-events-none">
-          Pellizcá o doble-toque para acercar
+          Pellizca o toca dos veces para acercar
         </span>
       )}
     </div>
@@ -928,7 +952,7 @@ function ModalCheckout({
         role="dialog"
         aria-modal="true"
         aria-label="Tu pedido"
-        className="relative w-full sm:max-w-md sm:mx-4 bg-papel-100 rounded-t-3xl sm:rounded-2xl max-h-[90dvh] overflow-y-auto animate-fadeInUp"
+        className="relative w-full sm:max-w-md sm:mx-4 bg-papel-100 rounded-t-3xl sm:rounded-2xl max-h-[90dvh] overflow-y-auto overscroll-contain animate-fadeInUp"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {envio.estado === 'exito' ? (
@@ -936,7 +960,7 @@ function ModalCheckout({
         ) : (
           <div className="p-5 sm:p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-xl text-carbon-950">Tu pedido</h2>
+              <h2 className="font-display font-semibold text-xl text-carbon-950">Tu pedido</h2>
               <button
                 onClick={onCerrar}
                 aria-label="Cerrar"
@@ -953,10 +977,11 @@ function ModalCheckout({
             ) : (
               <div className="space-y-2.5 mb-4">
                 {itemsCarrito.map(({ clave, item, cantidad, sinTexto }) => (
-                  <div key={clave} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="min-w-0 text-carbon-900/80">
-                      {cantidad}× {item.nombre}
-                      {sinTexto && <span className="block text-xs font-semibold text-red-700 first-letter:uppercase">{sinTexto}</span>}
+                  <div key={clave} className="flex items-center justify-between gap-3 text-sm py-1">
+                    <span className="min-w-0 text-carbon-950 font-medium">
+                      <span className="tabular-nums text-carbon-600">{cantidad}×</span> {item.nombre}
+                      <br />
+                      {sinTexto && <span className="mt-1 inline-block rounded-full bg-sin-suave px-2 py-0.5 text-[11px] font-semibold text-sin first-letter:uppercase">{sinTexto}</span>}
                     </span>
                     <span className="flex items-center gap-2 shrink-0">
                       <span className="font-medium text-carbon-950 whitespace-nowrap">
@@ -967,19 +992,19 @@ function ModalCheckout({
                         onClick={() => onQuitarLinea(clave)}
                         disabled={envio.estado === 'enviando'}
                         aria-label={`Quitar una unidad de ${item.nombre}${sinTexto ? ` ${sinTexto}` : ''}`}
-                        className="w-6 h-6 rounded-full bg-carbon-950/5 text-carbon-950 leading-none"
+                        className="w-8 h-8 rounded-lg bg-papel-200 text-carbon-950 flex items-center justify-center"
                       >
-                        −
+                        <IconoMenos className="w-4 h-4" />
                       </button>
                       <button
                         type="button"
                         onClick={() => onAgregarLinea(clave)}
                         disabled={envio.estado === 'enviando'}
                         aria-label={`Agregar una unidad de ${item.nombre}${sinTexto ? ` ${sinTexto}` : ''}`}
-                        className="w-6 h-6 rounded-full text-white leading-none"
-                        style={{ backgroundColor: 'var(--color-acento)' }}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center"
+                        style={{ backgroundColor: 'var(--color-acento)', color: 'var(--color-sobre-acento)' }}
                       >
-                        +
+                        <IconoMas className="w-4 h-4" />
                       </button>
                     </span>
                   </div>
@@ -989,33 +1014,37 @@ function ModalCheckout({
 
             <div className="flex items-center justify-between text-base font-semibold border-t border-carbon-950/10 pt-3 mb-5">
               <span className="text-carbon-950">Total</span>
-              <span style={{ color: 'var(--color-acento)' }}>{formatoPrecio.format(total)}</span>
+              <span className="tabular-nums">{formatoPrecio.format(total)}</span>
             </div>
 
-            <label htmlFor="apodo-pedido" className="block text-xs uppercase tracking-wide text-carbon-900/40 mb-1.5">
+            <label htmlFor="apodo-pedido" className="block text-[13px] font-medium text-carbon-950 mb-1.5">
               ¿A nombre de quién? (opcional)
             </label>
             <input
               id="apodo-pedido"
               value={apodo}
               onChange={(e) => setApodo(e.target.value)}
-              placeholder="Tu nombre o apodo"
+              name="apodo"
+              placeholder="Tu nombre o apodo…"
               maxLength={40}
               autoComplete="given-name"
-              className="w-full rounded-xl border border-carbon-950/10 bg-white px-3 py-2 text-sm mb-1 focus:outline-none focus:ring-2 focus:ring-carbon-950/15"
+              className="w-full rounded-xl border border-carbon-950/10 bg-white px-3.5 h-11 text-base mb-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-carbon-950/40"
             />
             <p className="text-[11px] text-carbon-900/40 mb-4">Así el mesero sabe a quién darle cada plato.</p>
 
-            <label className="block text-xs uppercase tracking-wide text-carbon-900/40 mb-1.5">
+            <label htmlFor="notas-pedido" className="block text-[13px] font-medium text-carbon-950 mb-1.5">
               Notas para cocina (opcional)
             </label>
             <textarea
+              id="notas-pedido"
+              name="notas"
+              autoComplete="off"
               value={notas}
               onChange={(e) => setNotas(e.target.value)}
               placeholder="Ej. sin cebolla, término de la carne, alergias…"
               rows={2}
               maxLength={500}
-              className="w-full rounded-xl border border-carbon-950/10 bg-white px-3 py-2 text-sm mb-5 focus:outline-none focus:ring-2 focus:ring-carbon-950/15"
+              className="w-full rounded-xl border border-carbon-950/10 bg-white px-3.5 py-2.5 text-base mb-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-carbon-950/40"
             />
 
             <div className="rounded-xl border border-carbon-950/10 bg-white p-4 mb-5">
@@ -1044,24 +1073,31 @@ function ModalCheckout({
                   <input
                     value={comensalNombre}
                     onChange={(e) => setComensalNombre(e.target.value)}
-                    placeholder="Tu nombre (opcional)"
+                    name="nombre"
+                    autoComplete="name"
+                    aria-label="Tu nombre"
+                    placeholder="Tu nombre (opcional)…"
                     maxLength={150}
-                    className="rounded-lg border border-carbon-950/10 bg-papel-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-carbon-950/15"
+                    className="rounded-xl border border-carbon-950/10 bg-white px-3.5 h-11 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-carbon-950/40"
                   />
                   <input
                     value={comensalTelefono}
                     onChange={(e) => setComensalTelefono(e.target.value)}
-                    placeholder="Tu teléfono (opcional)"
+                    name="telefono"
+                    type="tel"
+                    autoComplete="tel"
+                    aria-label="Tu teléfono"
+                    placeholder="Tu teléfono (opcional)…"
                     inputMode="tel"
                     maxLength={30}
-                    className="rounded-lg border border-carbon-950/10 bg-papel-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-carbon-950/15"
+                    className="rounded-xl border border-carbon-950/10 bg-white px-3.5 h-11 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-carbon-950/40"
                   />
                 </div>
               )}
             </div>
 
             {envio.estado === 'error' && (
-              <div className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <div role="alert" className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 {envio.error}
               </div>
             )}
@@ -1069,10 +1105,11 @@ function ModalCheckout({
             <button
               onClick={onEnviar}
               disabled={envio.estado === 'enviando' || itemsCarrito.length === 0}
-              className="w-full rounded-xl py-3 text-sm font-semibold text-white transition-opacity duration-150 disabled:opacity-50"
-              style={{ backgroundColor: 'var(--color-acento)' }}
+              className="w-full rounded-xl h-14 px-5 flex items-center justify-between text-[15px] font-semibold transition-opacity duration-150 disabled:opacity-50"
+              style={{ backgroundColor: 'var(--color-acento)', color: 'var(--color-sobre-acento)' }}
             >
-              {envio.estado === 'enviando' ? 'Enviando…' : `Enviar pedido · ${formatoPrecio.format(total)}`}
+              <span>{envio.estado === 'enviando' ? 'Enviando…' : 'Enviar pedido'}</span>
+              <span className="tabular-nums">{formatoPrecio.format(total)}</span>
             </button>
           </div>
         )}
@@ -1084,20 +1121,20 @@ function ModalCheckout({
 function ConfirmacionPedido({ pedido, onCerrar }) {
   return (
     <div className="p-6 sm:p-8 text-center">
-      <div className="w-14 h-14 rounded-full bg-green-100 text-green-700 flex items-center justify-center mx-auto mb-4">
+      <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4">
         <svg viewBox="0 0 24 24" className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M20 6L9 17l-5-5" />
         </svg>
       </div>
-      <h2 className="font-display text-xl text-carbon-950 mb-1">¡Pedido enviado!</h2>
+      <h2 className="font-display font-semibold text-xl text-carbon-950 mb-1">Pedido enviado</h2>
       <p className="text-sm text-carbon-900/50 mb-6">
         {pedido?.id ? `Tu pedido #${pedido.id} quedó en el pedido de la mesa.` : 'Tu pedido quedó en el pedido de la mesa.'} El
         mesero pasará a confirmarlo antes de mandarlo a la cocina.
       </p>
       <button
         onClick={onCerrar}
-        className="w-full rounded-xl py-3 text-sm font-semibold text-white"
-        style={{ backgroundColor: 'var(--color-acento)' }}
+        className="w-full rounded-xl h-12 text-sm font-semibold"
+        style={{ backgroundColor: 'var(--color-acento)', color: 'var(--color-sobre-acento)' }}
       >
         Seguir viendo la carta
       </button>

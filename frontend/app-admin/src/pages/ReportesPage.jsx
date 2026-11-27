@@ -44,7 +44,7 @@ export default function ReportesPage() {
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
         <div>
-          <h1 className="font-display text-2xl text-crema">Qué quitan tus clientes</h1>
+          <h1 className="font-display font-semibold text-2xl text-crema">Qué quitan tus clientes</h1>
           <p className="text-sm text-crema/40">Lo que tus clientes sacan de cada plato al pedir desde la carta.</p>
         </div>
         <div className="flex gap-2" role="group" aria-label="Período">

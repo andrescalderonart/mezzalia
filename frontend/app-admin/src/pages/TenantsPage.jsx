@@ -98,7 +98,7 @@ export default function TenantsPage() {
     <div>
       <div className="flex items-center justify-between mb-6 gap-3">
         <div>
-          <h1 className="font-display text-2xl text-crema">Restaurantes</h1>
+          <h1 className="font-display font-semibold text-2xl text-crema">Restaurantes</h1>
           <p className="text-sm text-crema/40">
             Alta y suspensión de tenants. El equipo Mezzalia administra esto, no cada restaurante.
           </p>

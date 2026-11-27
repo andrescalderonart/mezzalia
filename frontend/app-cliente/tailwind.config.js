@@ -3,43 +3,35 @@ export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
+      // 2026-11-27, rediseño "startup": neutros limpios para que manden las
+      // fotos de comida y el color propio de cada restaurante (--color-acento).
+      // Se conservan los nombres papel/carbon para no tocar cada clase: papel =
+      // superficies claras, carbon = tinta. Sin crema ni terracota por defecto.
       colors: {
-        // Mismos valores de marca que frontend/app-admin/tailwind.config.js
-        // (logo terracota/dorado sobre negro) -- pero invertidos de rol: acá
-        // "papel" (claro, cálido) es el fondo, no "carbon". Una carta digital
-        // se lee con luz de restaurante variable (ventana, sol de terraza,
-        // luz de vela) y se decide qué pedir mirando fotos de comida; un
-        // tema oscuro tipo panel-de-control no es lo más apetecible ni lo
-        // más legible ahí, a diferencia del panel de administración interno.
         papel: {
-          50: '#fffdf9',
-          100: '#faf6ef',
-          200: '#f0e6d2',
-          300: '#e4d4b5',
+          50: '#ffffff',
+          100: '#ffffff',
+          200: '#f4f4f2',
+          300: '#e7e7e4',
         },
         carbon: {
-          950: '#0d0c0b',
-          900: '#141311',
-          800: '#1d1b18',
-          700: '#2a2723',
-          600: '#3d3933',
+          950: '#18181b',
+          900: '#27272a',
+          800: '#3f3f46',
+          700: '#52525b',
+          600: '#71717a',
         },
-        crema: '#f3ecdf',
-        terracota: {
-          DEFAULT: '#c1502e',
-          light: '#d97a52',
-          dark: '#8f3a20',
-        },
-        dorado: {
-          DEFAULT: '#d4a24c',
-          light: '#e6c17a',
+        sin: {
+          DEFAULT: '#dc2626',
+          suave: '#fef2f2',
         },
       },
       fontFamily: {
-        display: ['"Playfair Display"', 'serif'],
-        sans: ['Sora', 'system-ui', 'sans-serif'],
+        display: ['Geist', 'system-ui', 'sans-serif'],
+        sans: ['Geist', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
+        flotante: '0 10px 30px -10px rgba(24,24,27,0.35), 0 2px 6px rgba(24,24,27,0.08)',
         carta: '0 1px 2px rgba(13,12,11,0.06), 0 8px 20px -10px rgba(13,12,11,0.18)',
       },
       keyframes: {
@@ -55,7 +47,7 @@ export default {
         },
       },
       animation: {
-        fadeInUp: 'fadeInUp 0.35s ease-out both',
+        fadeInUp: 'fadeInUp 0.28s cubic-bezier(.2,.8,.2,1) both',
         sacudir: 'sacudir 0.4s ease-in-out',
       },
     },

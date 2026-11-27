@@ -156,7 +156,7 @@ export default function EditorIngredientes({ item, onCerrar, onPresentacionCambi
     <div className="fixed inset-0 bg-carbon-950/80 backdrop-blur-sm flex items-center justify-center px-4 py-6 z-50 animate-fadeInUp">
       <div className="card w-full max-w-lg p-6 max-h-[90dvh] overflow-y-auto" role="dialog" aria-modal="true" aria-label={`Ingredientes de ${item.nombre}`}>
         <div className="flex items-start justify-between gap-3 mb-1">
-          <h2 className="font-display text-xl text-crema">Ingredientes · {item.nombre}</h2>
+          <h2 className="font-display font-semibold text-xl text-crema">Ingredientes · {item.nombre}</h2>
           <button onClick={onCerrar} className="text-crema/50 hover:text-crema text-sm" aria-label="Cerrar">
             ✕
           </button>

@@ -65,18 +65,18 @@ export default function PedidoDeMesa({ token, miApodo, sinEnviar = 0, onVerMiPed
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-label="Pedido de la mesa">
       <div className="absolute inset-0 bg-carbon-950/50" onClick={onCerrar} aria-hidden="true" />
       <div
-        className="relative w-full sm:max-w-md bg-papel-100 rounded-t-3xl sm:rounded-2xl max-h-[90dvh] overflow-y-auto animate-fadeInUp"
+        className="relative w-full sm:max-w-md bg-papel-100 rounded-t-3xl sm:rounded-2xl max-h-[90dvh] overflow-y-auto overscroll-contain animate-fadeInUp"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="sticky top-0 bg-papel-100 px-5 pt-5 pb-3 flex items-center justify-between border-b border-carbon-950/10">
-          <h2 className="font-display text-xl text-carbon-950">Pedido de la mesa</h2>
+          <h2 className="font-display font-semibold text-xl text-carbon-950">Pedido de la mesa</h2>
           <button onClick={onCerrar} aria-label="Cerrar" className="w-9 h-9 rounded-full bg-carbon-950/5 text-carbon-950">
             ✕
           </button>
         </div>
 
         <div className="px-5 py-4">
-          {error && <p className="text-sm text-red-700 mb-3">{error}</p>}
+          {error && <p role="alert" className="text-sm text-red-700 mb-3">{error}</p>}
           {sinEnviar > 0 && (
             <div className="rounded-xl border border-carbon-950/10 bg-white p-3 mb-4 flex items-center justify-between gap-3">
               <p className="text-sm text-carbon-950">
@@ -128,9 +128,12 @@ export default function PedidoDeMesa({ token, miApodo, sinEnviar = 0, onVerMiPed
                               <span className={`text-carbon-900/80 ${p.estado === 'CANCELADO' ? 'line-through' : ''}`}>
                                 {it.cantidad}× {it.nombreItem}
                                 {it.sinIngredientes?.length > 0 && (
-                                  <span className="block text-xs font-semibold text-red-700">
-                                    Sin {it.sinIngredientes.join(', ').toLowerCase()}
-                                  </span>
+                                  <>
+                                    <br />
+                                    <span className="mt-1 inline-block rounded-full bg-sin-suave px-2 py-0.5 text-[11px] font-semibold text-sin first-letter:uppercase">
+                                      Sin {it.sinIngredientes.join(', ').toLowerCase()}
+                                    </span>
+                                  </>
                                 )}
                               </span>
                               <span className="text-carbon-900/60 whitespace-nowrap">{formatoPrecio.format(it.subtotal)}</span>

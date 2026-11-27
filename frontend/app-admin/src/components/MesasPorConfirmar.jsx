@@ -107,7 +107,7 @@ export default function MesasPorConfirmar({ nombreMesa, onConfirmada }) {
                       <div key={i} className="pl-3 text-crema/80">
                         {it.cantidad}× {it.nombreItem}
                         {it.sinIngredientes?.length > 0 && (
-                          <span className="ml-1 text-xs font-semibold uppercase text-red-300">
+                          <span className="ml-2 pastilla-sin">
                             sin {it.sinIngredientes.join(', ').toLowerCase()}
                           </span>
                         )}

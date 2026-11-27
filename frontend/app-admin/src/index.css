@@ -8,60 +8,79 @@ html, body, #root {
 
 body {
   @apply bg-carbon-950 text-crema font-sans antialiased;
-  background-image: radial-gradient(circle at 15% 0%, rgba(193,80,46,0.08), transparent 40%),
-                     radial-gradient(circle at 85% 100%, rgba(212,162,76,0.06), transparent 45%);
-  background-attachment: fixed;
 }
 
 ::selection {
-  background-color: rgba(212, 162, 76, 0.35);
+  background-color: rgba(251, 146, 60, 0.3);
 }
 
 /* Scrollbar oscuro discreto, en vez del default gris claro del navegador */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #3d3933; border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: #524c43; }
+::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #52525b; }
+
+h1, h2, h3 {
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+:focus-visible {
+  outline: 2px solid #fb923c;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
 
 @layer components {
+  /* Botón principal claro sobre fondo oscuro (estilo Linear/Vercel): sin
+     degradado ni brillo, el contraste ya lo hace protagonista. */
   .btn-primario {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-carbon-950
-           bg-gradient-to-r from-terracota to-dorado
-           shadow-glow transition-all duration-200
-           hover:brightness-110 hover:-translate-y-0.5
-           active:translate-y-0 active:brightness-95
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 h-9 text-sm font-medium text-carbon-950
+           bg-crema hover:bg-zinc-200 active:bg-zinc-300
+           transition-colors duration-150
            disabled:opacity-50 disabled:pointer-events-none;
   }
 
   .btn-secundario {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-crema
-           bg-carbon-800 border border-carbon-600
-           transition-all duration-200
-           hover:border-dorado/60 hover:-translate-y-0.5
-           active:translate-y-0
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 h-9 text-sm font-medium text-crema
+           bg-carbon-800 border border-carbon-700
+           transition-colors duration-150
+           hover:bg-carbon-700
            disabled:opacity-50 disabled:pointer-events-none;
   }
 
   .btn-peligro {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium text-crema
-           bg-carbon-800 border border-red-900/60
-           transition-all duration-200
-           hover:bg-red-950 hover:border-red-700
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 h-8 text-xs font-medium text-red-300
+           bg-carbon-800 border border-carbon-700
+           transition-colors duration-150
+           hover:bg-red-950/60 hover:border-red-900
            disabled:opacity-50 disabled:pointer-events-none;
   }
 
   .card {
-    @apply bg-carbon-900/80 border border-carbon-700 rounded-2xl backdrop-blur-sm;
+    @apply bg-carbon-900 border border-carbon-700/80 rounded-xl;
   }
 
   .input-carbon {
-    @apply w-full rounded-lg bg-carbon-800 border border-carbon-600 px-3 py-2 text-sm text-crema
+    @apply w-full rounded-lg bg-carbon-950 border border-carbon-700 px-3 h-9 text-sm text-crema
            placeholder:text-crema/30
-           focus:outline-none focus:ring-2 focus:ring-dorado/50 focus:border-dorado/50
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-crema/20 focus:border-carbon-600
            transition-colors duration-150;
   }
 
   .label-carbon {
-    @apply block text-xs uppercase tracking-wide text-crema/50 mb-1.5;
+    @apply block text-[13px] font-medium text-crema/70 mb-1.5;
+  }
+
+  /* "Sin cebolla": la misma pastilla roja que ve el comensal en la carta. */
+  .pastilla-sin {
+    @apply inline-block rounded-full bg-sin-fondo px-2 py-0.5 text-xs font-semibold text-sin first-letter:uppercase;
   }
 }

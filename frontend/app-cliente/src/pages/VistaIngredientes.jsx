@@ -145,8 +145,8 @@ export default function VistaIngredientes({ item, onCerrar, onAgregar }) {
     >
       <header className="flex items-start justify-between gap-3 px-4 sm:px-6 pt-4 pb-2">
         <div className="min-w-0">
-          <h2 className="font-display text-2xl text-carbon-950 truncate">{item.nombre}</h2>
-          <p className="text-xs text-carbon-900/50">
+          <h2 className="font-display font-semibold text-2xl text-carbon-950 truncate">{item.nombre}</h2>
+          <p className="text-[13px] text-carbon-600 mt-0.5">
             {armado
               ? 'Así te llega tu plato.'
               : hayQuitables
@@ -159,13 +159,15 @@ export default function VistaIngredientes({ item, onCerrar, onAgregar }) {
           type="button"
           onClick={onCerrar}
           aria-label="Cerrar ingredientes"
-          className="w-9 h-9 shrink-0 rounded-full bg-carbon-950/5 flex items-center justify-center text-carbon-950"
+          className="w-10 h-10 shrink-0 rounded-full bg-papel-200 hover:bg-papel-300 flex items-center justify-center text-carbon-950 transition-colors"
         >
-          ✕
+          <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
         </button>
       </header>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-4">
         {apilado ? (
           <ul className="relative max-w-sm mx-auto flex flex-col items-center" style={{ gap: SEPARACION }}>
             {ingredientes.map((ing, i) => {
@@ -249,14 +251,14 @@ export default function VistaIngredientes({ item, onCerrar, onAgregar }) {
       </div>
 
       <footer
-        className="border-t border-carbon-950/10 bg-papel-100 px-4 sm:px-6 pt-3"
+        className="border-t border-carbon-950/[0.06] bg-white px-4 sm:px-6 pt-3"
         style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
       >
         <p className="min-h-[1.25rem] text-sm text-center mb-2" role="status" aria-live="polite">
           {mensaje ? (
             <span className="text-carbon-900/60">{mensaje}</span>
           ) : sin ? (
-            <span className="font-semibold text-red-700 first-letter:uppercase inline-block">{sin}</span>
+            <span className="inline-block rounded-full bg-sin-suave px-3 py-1 text-[13px] font-semibold text-sin first-letter:uppercase">{sin}</span>
           ) : (
             <span className="text-carbon-900/40">Con todos sus ingredientes</span>
           )}
@@ -266,20 +268,20 @@ export default function VistaIngredientes({ item, onCerrar, onAgregar }) {
             type="button"
             onClick={alternarArmado}
             aria-pressed={Boolean(armado)}
-            className="w-full rounded-xl py-2.5 mb-2 text-sm font-semibold border"
-            style={{ borderColor: 'var(--color-acento)', color: 'var(--color-acento)' }}
+            className="w-full rounded-xl h-12 mb-2 text-sm font-semibold bg-papel-200 hover:bg-papel-300 text-carbon-950 transition-colors"
           >
-            {armado ? 'Volver a desarmar' : '👀 Ver cómo te llega'}
+            {armado ? 'Volver a desarmar' : 'Ver cómo te llega'}
           </button>
         )}
         {item.disponible ? (
           <button
             type="button"
             onClick={() => onAgregar(quitados)}
-            className="w-full rounded-xl py-3 text-sm font-semibold text-white"
-            style={{ backgroundColor: 'var(--color-acento)' }}
+            className="w-full rounded-xl h-14 px-5 flex items-center justify-between text-[15px] font-semibold"
+            style={{ backgroundColor: 'var(--color-acento)', color: 'var(--color-sobre-acento)' }}
           >
-            Agregar al pedido · {formatoPrecio.format(item.precio)}
+            <span>Agregar al pedido</span>
+            <span className="tabular-nums">{formatoPrecio.format(item.precio)}</span>
           </button>
         ) : (
           <p className="text-center text-sm text-carbon-900/50 py-3">Este plato está agotado.</p>
@@ -360,7 +362,7 @@ function Capa({ ing, quitado, sacudiendo, onTocar, apilado = false, sinMovimient
         style={{ opacity: ocultarEtiqueta ? 0 : 1, transition: 'opacity 250ms ease' }}
         className={`text-[11px] font-semibold rounded-full px-2 py-0.5 whitespace-nowrap ${
           apilado ? 'absolute right-0 top-1/2 -translate-y-1/2' : 'mt-1.5'
-        } ${quitado ? 'bg-red-700 text-white' : ing.removible ? 'bg-white/95 text-carbon-900/75 shadow-sm' : 'bg-white/80 text-carbon-900/45'}`}
+        } ${quitado ? 'bg-sin text-white' : ing.removible ? 'bg-white/95 text-carbon-900/75 shadow-sm' : 'bg-white/80 text-carbon-900/45'}`}
       >
         {etiqueta}
       </span>

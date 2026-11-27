@@ -71,11 +71,11 @@ export default function SeleccionarSucursalPage() {
       <div className="card w-full max-w-sm p-8 animate-fadeInUp">
         <div className="flex flex-col items-center mb-6">
           <LogoMark className="w-14 h-14 mb-3" />
-          <h1 className="font-display text-2xl text-crema">¿En qué sucursal trabajás?</h1>
+          <h1 className="font-display font-semibold text-2xl text-crema">¿En qué sucursal trabajas?</h1>
           <p className="text-xs text-crema/40 mt-1 text-center">
             {esMesero
-              ? 'Elegí una sucursal para ver y atender sus mesas y pedidos.'
-              : 'Opcional: elegí una sucursal para enfocar tu vista, o mirá todas.'}
+              ? 'Elige una sucursal para ver y atender sus mesas y pedidos.'
+              : 'Opcional: elige una sucursal para enfocar tu vista, o mira todas.'}
           </p>
         </div>
 
@@ -94,7 +94,7 @@ export default function SeleccionarSucursalPage() {
         ) : sucursales.length === 0 ? (
           <div className="text-sm text-crema/40 text-center py-6">
             {esMesero
-              ? 'Todavía no tenés ninguna sucursal asignada. Pedile a un administrador que te asigne una para poder trabajar.'
+              ? 'Todavía no tienes ninguna sucursal asignada. Pídele a un administrador que te asigne una para poder trabajar.'
               : 'Este restaurante todavía no tiene sucursales creadas.'}
           </div>
         ) : (

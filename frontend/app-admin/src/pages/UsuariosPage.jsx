@@ -116,7 +116,7 @@ export default function UsuariosPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="font-display text-2xl text-crema">Usuarios</h1>
+        <h1 className="font-display font-semibold text-2xl text-crema">Usuarios</h1>
         <p className="text-sm text-crema/40">
           Da de alta o desactiva cuentas del personal de este restaurante. No hay recuperación de
           contraseña por email todavía -- si alguien la olvida, reseteala vos desde acá.
