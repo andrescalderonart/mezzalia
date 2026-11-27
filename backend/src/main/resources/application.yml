@@ -28,6 +28,8 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  config:
+    import: classpath:actuator.yml
 
 app:
   uploads:
@@ -48,6 +50,10 @@ app:
 
 server:
   port: 8080
+
+# Health check: la config vive en actuator.yml (importado tambien por el
+# application.yml de tests, para que HealthCheckTest valide ESTA config y no
+# los defaults de Spring).
 
 logging:
   pattern:

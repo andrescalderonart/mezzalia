@@ -87,7 +87,7 @@ Ambos tokens viven en `localStorage` (`client.js`), no en cookies `httpOnly`. Es
 - ~~Tests de autorización por rol (§1.1).~~ Resuelto.
 - Agregar una CSP básica (§1.5) — sigue sin hacer, es el único hallazgo de seguridad de este informe sin ningún avance.
 - Cerrar el gap de sucursales inactivas en la UI (decisión de Sebas, pero técnicamente barato: reusar `obtenerSucursalDelTenantActualSinImportarEstado` para una vista de "sucursales inactivas con asignaciones" en `SucursalesPage.jsx`, y hacer que `GestionSucursalesModal` incluya las sucursales ya asignadas aunque estén inactivas en su lista de opciones, no solo en el conteo).
-- Health check (`/actuator/health`) — mencionado en el roadmap propio (§11) y no implementado todavía; es prácticamente gratis con `spring-boot-starter-actuator` y cualquier hosting lo va a pedir para reiniciar instancias caídas.
+- ~~Health check (`/actuator/health`)~~ ✅ Resuelto 2026-11-25 (rama `feature/actuator-health`): solo `health` expuesto, sin detalles, público; `HealthCheckTest` falla si se publica otro endpoint de Actuator. Texto original: mencionado en el roadmap propio (§11) y no implementado todavía; es prácticamente gratis con `spring-boot-starter-actuator` y cualquier hosting lo va a pedir para reiniciar instancias caídas.
 - Backups de MySQL automatizados y probados — sigue sin mención en el repo (no es código, es infraestructura, pero es exactamente el tipo de cosa que "nadie prioriza hasta que ya es tarde", como dice su propio documento).
 
 ---
@@ -121,14 +121,14 @@ Ordenado por lo que bloquea o expone más, no por lo más entretenido de constru
 1. ~~Loggear el catch-all de excepciones (§1.2).~~ ✅ Hecho.
 2. ~~Excluir `test.html` de producción (§1.3).~~ ✅ Hecho.
 3. Decidir y documentar explícitamente el trade-off de revocación de sucursal (§1.4). ✅ Hecho.
-4. Agregar una CSP básica (§1.5). ❌ Sigue pendiente.
+4. ~~Agregar una CSP básica (§1.5).~~ ✅ Hecho (verificado 2026-11-25: `SecurityConfig` ya manda `Content-Security-Policy`; falta replicarla en el servidor que sirva las SPA en producción).
 5. ~~Escribir tests de autorización por rol para los controladores admin (§1.1).~~ ✅ Hecho — y encontró 2 bugs reales.
 
 **Paso 3 — Cerrar el hueco legal de RF-13/14 (no técnico, pero bloqueante).** Parcialmente avanzado: consentimiento explícito ya se registra (V19) y hay un borrador de aviso de privacidad/retención agregado a `documentacion-tecnica.md §15.3` para que la revisión legal tenga de dónde partir. Sigue sin revisión legal real y sin el endpoint de borrado pusheado.
 
 **Paso 4 — Cerrar el gap de sucursales inactivas en la UI.** ❌ Sigue pendiente, decisión de Sebas.
 
-**Paso 5 — Observabilidad mínima antes de tener el primer cliente real dependiendo del sistema.** ❌ `/actuator/health` y backups de MySQL siguen sin implementar.
+**Paso 5 — Observabilidad mínima antes de tener el primer cliente real dependiendo del sistema.** 🟡 `/actuator/health` hecho (2026-11-25, más `/liveness` y `/readiness`); backups de MySQL siguen sin implementar.
 
 **Paso 6 — Frontend: agregar un test runner** (Vitest). ❌ Sigue pendiente.
 
