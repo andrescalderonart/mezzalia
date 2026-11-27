@@ -45,7 +45,7 @@ export default function ReportesPage() {
       <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
         <div>
           <h1 className="font-display font-semibold text-2xl text-crema">Qué quitan tus clientes</h1>
-          <p className="text-sm text-crema/40">Lo que tus clientes sacan de cada plato al pedir desde la carta.</p>
+          <p className="text-sm text-crema/55">Lo que tus clientes sacan de cada plato al pedir desde la carta.</p>
         </div>
         <div className="flex gap-2" role="group" aria-label="Período">
           {PERIODOS.map(([valor, etiqueta]) => (
@@ -64,7 +64,7 @@ export default function ReportesPage() {
       </div>
 
       {error && (
-        <div className="mb-4 text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2">{error}</div>
+        <div className="mb-4 text-sm text-peligro bg-peligro/10 border border-peligro/25 rounded-lg px-3 py-2">{error}</div>
       )}
 
       {cargando && !reporte ? (
@@ -72,7 +72,7 @@ export default function ReportesPage() {
       ) : reporte && reporte.unidadesPersonalizadas === 0 ? (
         <div className="card p-8 text-center">
           <p className="text-crema/70 mb-1">Todavía no hay platos personalizados en este período.</p>
-          <p className="text-sm text-crema/40">
+          <p className="text-sm text-crema/55">
             Cuando tus clientes quiten ingredientes desde la carta, aquí verás qué sacan y con qué frecuencia.
             {reporte.unidadesVendidas > 0 && ` Llevas ${reporte.unidadesVendidas} platos vendidos.`}
           </p>
@@ -99,9 +99,9 @@ export default function ReportesPage() {
               <ol className="card divide-y divide-carbon-700">
                 {reporte.masQuitados.map((q, i) => (
                   <li key={`${q.plato}-${q.nombre}`} className="flex items-center gap-3 px-4 py-3">
-                    <span className="text-crema/30 w-5 text-sm tabular-nums">{i + 1}</span>
+                    <span className="text-crema/45 w-5 text-sm tabular-nums">{i + 1}</span>
                     <span className="flex-1 text-sm text-crema">
-                      Sin {q.nombre.toLowerCase()} <span className="text-crema/40">· {q.plato}</span>
+                      Sin {q.nombre.toLowerCase()} <span className="text-crema/55">· {q.plato}</span>
                     </span>
                     <span className="text-sm font-semibold text-dorado tabular-nums">{formatoPct(q.porcentaje)}</span>
                   </li>
@@ -117,7 +117,7 @@ export default function ReportesPage() {
                 <article key={plato.itemMenuId} className="card p-4">
                   <div className="flex items-baseline justify-between gap-2 mb-1">
                     <h3 className="font-medium text-crema">{plato.nombre}</h3>
-                    <span className="text-xs text-crema/40 whitespace-nowrap">{plato.unidadesVendidas} vendidos</span>
+                    <span className="text-xs text-crema/55 whitespace-nowrap">{plato.unidadesVendidas} vendidos</span>
                   </div>
                   <p className="text-xs text-crema/50 mb-3">
                     {formatoPct(plato.porcentajePersonalizado)} se pidió personalizado
@@ -128,7 +128,7 @@ export default function ReportesPage() {
                         <div className="flex justify-between text-sm mb-1">
                           <span className="text-crema/80">Sin {ing.nombre.toLowerCase()}</span>
                           <span className="text-crema/60 tabular-nums">
-                            {formatoPct(ing.porcentaje)} <span className="text-crema/30">({ing.unidades})</span>
+                            {formatoPct(ing.porcentaje)} <span className="text-crema/45">({ing.unidades})</span>
                           </span>
                         </div>
                         <div className="h-1.5 rounded-full bg-carbon-700 overflow-hidden" aria-hidden="true">

@@ -117,14 +117,14 @@ export default function UsuariosPage() {
     <div>
       <div className="mb-6">
         <h1 className="font-display font-semibold text-2xl text-crema">Usuarios</h1>
-        <p className="text-sm text-crema/40">
+        <p className="text-sm text-crema/55">
           Da de alta o desactiva cuentas del personal de este restaurante. No hay recuperación de
           contraseña por email todavía -- si alguien la olvida, reseteala vos desde acá.
         </p>
       </div>
 
       {error && (
-        <div className="mb-4 text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2 animate-fadeInUp">
+        <div className="mb-4 text-sm text-peligro bg-peligro/10 border border-peligro/25 rounded-lg px-3 py-2 animate-fadeInUp">
           {error}
         </div>
       )}
@@ -167,7 +167,7 @@ export default function UsuariosPage() {
             <div key={usuario.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
               <div>
                 <div className="text-sm text-crema">{usuario.username}</div>
-                <div className="text-[11px] text-crema/40">
+                <div className="text-[11px] text-crema/55">
                   {usuario.rol} · {usuario.activo ? 'activo' : 'inactivo'}
                 </div>
               </div>
@@ -201,8 +201,8 @@ export default function UsuariosPage() {
                   onClick={() => onCambiarActivo(usuario)}
                   className={`text-xs py-2 px-3 rounded-lg transition-colors duration-150 ${
                     usuario.activo
-                      ? 'text-crema/40 hover:text-red-300'
-                      : 'text-crema/40 hover:text-green-300'
+                      ? 'text-crema/55 hover:text-peligro'
+                      : 'text-crema/55 hover:text-exito'
                   }`}
                 >
                   {usuario.activo ? 'Desactivar' : 'Reactivar'}
@@ -212,7 +212,7 @@ export default function UsuariosPage() {
           ))}
 
           {usuarios.length === 0 && (
-            <div className="text-sm text-crema/40 py-10 text-center">Todavía no hay usuarios creados.</div>
+            <div className="text-sm text-crema/55 py-10 text-center">Todavía no hay usuarios creados.</div>
           )}
         </div>
       )}
@@ -345,14 +345,14 @@ function GestionSucursalesModal({ usuario, sucursales, onCerrar }) {
       <div onClick={(e) => e.stopPropagation()} className="card p-5 w-full max-w-sm flex flex-col gap-3">
         <div>
           <h3 className="font-medium text-crema">Sucursales de {usuario.username}</h3>
-          <p className="text-[11px] text-crema/40 mt-1">
+          <p className="text-[11px] text-crema/55 mt-1">
             Solo puede elegir trabajar en las sucursales que marques acá. Sin ninguna, no va a poder
             entrar a Pedidos.
           </p>
         </div>
 
         {error && (
-          <div className="text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2 animate-fadeInUp">
+          <div className="text-sm text-peligro bg-peligro/10 border border-peligro/25 rounded-lg px-3 py-2 animate-fadeInUp">
             {error}
           </div>
         )}
@@ -364,7 +364,7 @@ function GestionSucursalesModal({ usuario, sucursales, onCerrar }) {
             ))}
           </div>
         ) : opciones.length === 0 ? (
-          <p className="text-sm text-crema/40 py-4 text-center">
+          <p className="text-sm text-crema/55 py-4 text-center">
             Este restaurante todavía no tiene sucursales creadas -- creá una primero en
             "Sucursales".
           </p>
@@ -382,7 +382,7 @@ function GestionSucursalesModal({ usuario, sucursales, onCerrar }) {
                 >
                   <span className="text-sm text-crema">
                     {sucursal.nombre}
-                    {esInactivaNoReasignable && <span className="text-[10px] text-crema/40"> (inactiva)</span>}
+                    {esInactivaNoReasignable && <span className="text-[10px] text-crema/55"> (inactiva)</span>}
                   </span>
                   <input
                     type="checkbox"
@@ -465,11 +465,11 @@ function HorasPorDiaModal({ usuario, onCerrar }) {
       <div onClick={(e) => e.stopPropagation()} className="card p-5 w-full max-w-sm flex flex-col gap-3">
         <div>
           <h3 className="font-medium text-crema">Horas de {usuario.username}</h3>
-          <p className="text-[11px] text-crema/40 mt-1">Últimos 14 días, según sus marcas de entrada/salida.</p>
+          <p className="text-[11px] text-crema/55 mt-1">Últimos 14 días, según sus marcas de entrada/salida.</p>
         </div>
 
         {error && (
-          <div className="text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2 animate-fadeInUp">
+          <div className="text-sm text-peligro bg-peligro/10 border border-peligro/25 rounded-lg px-3 py-2 animate-fadeInUp">
             {error}
           </div>
         )}
@@ -481,7 +481,7 @@ function HorasPorDiaModal({ usuario, onCerrar }) {
             ))}
           </div>
         ) : diasOrdenados.length === 0 ? (
-          <p className="text-sm text-crema/40 py-4 text-center">
+          <p className="text-sm text-crema/55 py-4 text-center">
             Todavía no marcó ninguna entrada en los últimos 14 días.
           </p>
         ) : (

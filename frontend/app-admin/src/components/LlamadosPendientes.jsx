@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useApiJson } from '../context/AuthContext.jsx'
+import { IconoCampana, IconoCuenta } from './iconos.jsx'
 
 /**
  * Mesas que llamaron al mesero o pidieron la cuenta desde el QR (enfoque en
@@ -12,8 +13,8 @@ import { useApiJson } from '../context/AuthContext.jsx'
 const INTERVALO_POLLING_MS = 6000
 
 const TEXTO = {
-  MESERO: { icono: '🙋', accion: 'llama al mesero' },
-  CUENTA: { icono: '🧾', accion: 'pide la cuenta' },
+  MESERO: { Icono: IconoCampana, accion: 'llama al mesero' },
+  CUENTA: { Icono: IconoCuenta, accion: 'pide la cuenta' },
 }
 
 const formatoHora = new Intl.DateTimeFormat('es-CO', { hour: '2-digit', minute: '2-digit' })
@@ -56,19 +57,17 @@ export default function LlamadosPendientes({ nombreMesa }) {
 
   return (
     <section aria-label="Mesas que llaman" className="mb-6 space-y-2">
-      {llamados.map((llamado) => (
-        <div
-          key={llamado.id}
-          className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 animate-fadeInUp ${
-            llamado.tipo === 'CUENTA' ? 'border-dorado/40 bg-dorado/10' : 'border-terracota/50 bg-terracota/15'
-          }`}
-        >
-          <p className="text-sm text-crema">
-            <span className="mr-2" aria-hidden="true">
-              {TEXTO[llamado.tipo]?.icono}
-            </span>
-            <strong className="font-semibold">{nombreMesa(llamado.mesaId)}</strong> {TEXTO[llamado.tipo]?.accion}
-            <span className="text-crema/40 ml-2 text-xs">{formatoHora.format(new Date(llamado.creadoEn))}</span>
+      {llamados.map((llamado) => {
+        const { Icono, accion } = TEXTO[llamado.tipo] || TEXTO.MESERO
+        return (
+        <div key={llamado.id} className="card flex items-center gap-3 px-3 py-2.5 animate-fadeInUp">
+          <span className="relative w-9 h-9 shrink-0 rounded-full bg-dorado/10 text-dorado flex items-center justify-center">
+            <Icono className="w-[18px] h-[18px]" />
+            <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-dorado ring-2 ring-carbon-900" aria-hidden="true" />
+          </span>
+          <p className="flex-1 min-w-0 text-sm text-crema">
+            <strong className="font-semibold">{nombreMesa(llamado.mesaId)}</strong> {accion}
+            <span className="block text-xs text-crema/50">{formatoHora.format(new Date(llamado.creadoEn))}</span>
           </p>
           <button
             type="button"
@@ -79,7 +78,8 @@ export default function LlamadosPendientes({ nombreMesa }) {
             {atendiendoId === llamado.id ? '…' : 'Atendido'}
           </button>
         </div>
-      ))}
+        )
+      })}
     </section>
   )
 }

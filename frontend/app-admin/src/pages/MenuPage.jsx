@@ -159,12 +159,12 @@ export default function MenuPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="font-display font-semibold text-2xl text-crema">Carta</h1>
-          <p className="text-sm text-crema/40">Categorías y platos de tu restaurante</p>
+          <p className="text-sm text-crema/55">Categorías y platos de tu restaurante</p>
         </div>
       </div>
 
       {error && (
-        <div className="mb-4 text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2 animate-fadeInUp">
+        <div className="mb-4 text-sm text-peligro bg-peligro/10 border border-peligro/25 rounded-lg px-3 py-2 animate-fadeInUp">
           {error}
         </div>
       )}
@@ -201,7 +201,7 @@ export default function MenuPage() {
                 </li>
               ))}
               {categorias.length === 0 && (
-                <li className="text-sm text-crema/40 px-1 py-2">Sin categorías todavía.</li>
+                <li className="text-sm text-crema/55 px-1 py-2">Sin categorías todavía.</li>
               )}
             </ul>
           )}
@@ -265,7 +265,7 @@ export default function MenuPage() {
                       </span>
                     </div>
                     {item.descripcion && (
-                      <p className="text-xs text-crema/40 mt-1 line-clamp-2">{item.descripcion}</p>
+                      <p className="text-xs text-crema/55 mt-1 line-clamp-2">{item.descripcion}</p>
                     )}
 
                     <div className="mt-3 space-y-2">
@@ -274,8 +274,8 @@ export default function MenuPage() {
                         disabled={!puedeEditar}
                         className={`text-[11px] px-2 py-1 rounded-full border transition-colors duration-150 ${
                           item.disponible
-                            ? 'border-green-800 text-green-300 bg-green-950/40'
-                            : 'border-carbon-600 text-crema/40 bg-carbon-800'
+                            ? 'border-exito/30 text-exito bg-exito/10'
+                            : 'border-carbon-600 text-crema/55 bg-carbon-800'
                         } ${puedeEditar ? 'cursor-pointer hover:brightness-110' : 'cursor-default'}`}
                       >
                         {item.disponible ? 'Disponible' : 'Agotado'}
@@ -308,7 +308,7 @@ export default function MenuPage() {
               ))}
 
               {items.length === 0 && categoriaId && (
-                <div className="col-span-full text-sm text-crema/40 py-10 text-center">
+                <div className="col-span-full text-sm text-crema/55 py-10 text-center">
                   Esta categoría todavía no tiene platos.
                 </div>
               )}

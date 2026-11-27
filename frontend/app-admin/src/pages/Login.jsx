@@ -34,7 +34,7 @@ export default function Login() {
         <div className="flex flex-col items-center mb-8">
           <LogoMark className="w-14 h-14 mb-3" />
           <h1 className="font-display font-semibold text-2xl text-crema">Mezzalia</h1>
-          <p className="text-xs text-crema/40 mt-1">Panel del restaurante</p>
+          <p className="text-xs text-crema/55 mt-1">Panel del restaurante</p>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4">
@@ -62,7 +62,7 @@ export default function Login() {
           </div>
 
           {error && (
-            <div className="text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2 animate-fadeInUp">
+            <div className="text-sm text-peligro bg-peligro/10 border border-peligro/25 rounded-lg px-3 py-2 animate-fadeInUp">
               {error}
             </div>
           )}

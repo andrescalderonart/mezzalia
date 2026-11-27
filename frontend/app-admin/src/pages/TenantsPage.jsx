@@ -99,7 +99,7 @@ export default function TenantsPage() {
       <div className="flex items-center justify-between mb-6 gap-3">
         <div>
           <h1 className="font-display font-semibold text-2xl text-crema">Restaurantes</h1>
-          <p className="text-sm text-crema/40">
+          <p className="text-sm text-crema/55">
             Alta y suspensión de tenants. El equipo Mezzalia administra esto, no cada restaurante.
           </p>
         </div>
@@ -109,7 +109,7 @@ export default function TenantsPage() {
       </div>
 
       {error && (
-        <div className="mb-4 text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2 animate-fadeInUp">
+        <div className="mb-4 text-sm text-peligro bg-peligro/10 border border-peligro/25 rounded-lg px-3 py-2 animate-fadeInUp">
           {error}
         </div>
       )}
@@ -144,7 +144,7 @@ export default function TenantsPage() {
             <button type="submit" disabled={creando} className="btn-primario w-full sm:w-auto">
               {creando ? 'Creando…' : 'Crear restaurante'}
             </button>
-            <p className="text-[11px] text-crema/40 mt-2">
+            <p className="text-[11px] text-crema/55 mt-2">
               Esto solo da de alta el tenant. Crear el primer usuario admin_restaurante para que puedan entrar
               todavía es un paso manual aparte (no hay CRUD de usuarios todavía).
             </p>
@@ -170,14 +170,14 @@ export default function TenantsPage() {
                     <span
                       className={`text-[10px] px-2 py-0.5 rounded-full border ${
                         suspendido
-                          ? 'text-red-300 border-red-900/60 bg-red-950/40'
-                          : 'text-emerald-300 border-emerald-900/60 bg-emerald-950/40'
+                          ? 'text-peligro border-peligro/25 bg-peligro/10'
+                          : 'text-exito border-exito/30 bg-exito/10'
                       }`}
                     >
                       {tenant.estado}
                     </span>
                   </div>
-                  <p className="text-[11px] text-crema/40 mt-1">
+                  <p className="text-[11px] text-crema/55 mt-1">
                     {tenant.plan} · {tenant.moneda} · {tenant.zonaHoraria}
                   </p>
                 </div>
@@ -193,7 +193,7 @@ export default function TenantsPage() {
           })}
 
           {tenants.length === 0 && (
-            <div className="text-sm text-crema/40 py-10 text-center">Todavía no hay restaurantes dados de alta.</div>
+            <div className="text-sm text-crema/55 py-10 text-center">Todavía no hay restaurantes dados de alta.</div>
           )}
         </div>
       )}

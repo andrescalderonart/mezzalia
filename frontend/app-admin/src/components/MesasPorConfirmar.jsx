@@ -77,13 +77,16 @@ export default function MesasPorConfirmar({ nombreMesa, onConfirmada }) {
 
   return (
     <section aria-label="Mesas por confirmar" className="mb-6">
-      <h2 className="text-sm font-semibold text-dorado mb-2">Por confirmar</h2>
-      {error && <p className="text-sm text-red-300 mb-2">{error}</p>}
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-crema mb-2">
+        <span className="w-2 h-2 rounded-full bg-dorado" aria-hidden="true" />
+        Por confirmar
+      </h2>
+      {error && <p className="text-sm text-peligro mb-2">{error}</p>}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {[...porMesa.entries()].map(([mesaId, suyos]) => {
           const total = suyos.reduce((acc, p) => acc + Number(p.total), 0)
           return (
-            <article key={mesaId} className="rounded-2xl border-2 border-dorado/50 bg-dorado/5 p-4 animate-fadeInUp">
+            <article key={mesaId} className="card p-4 ring-1 ring-dorado/40 animate-fadeInUp">
               <div className="flex items-baseline justify-between gap-2 mb-3">
                 <h3 className="text-lg font-semibold text-crema">{nombreMesa(mesaId)}</h3>
                 <span className="text-xs text-crema/50">
@@ -98,7 +101,7 @@ export default function MesasPorConfirmar({ nombreMesa, onConfirmada }) {
                       <button
                         onClick={() => descartar(p)}
                         disabled={ocupado === `p${p.id}`}
-                        className="text-[11px] text-crema/40 hover:text-red-300"
+                        className="text-[11px] text-crema/55 hover:text-peligro"
                       >
                         Descartar
                       </button>
@@ -113,12 +116,25 @@ export default function MesasPorConfirmar({ nombreMesa, onConfirmada }) {
                         )}
                       </div>
                     ))}
-                    {p.notas && <p className="pl-3 text-xs text-dorado/80">“{p.notas}”</p>}
+                    {p.notas && <p className="ml-3 mt-1 text-xs text-crema/80 bg-carbon-800 rounded-md px-2 py-1">“{p.notas}”</p>}
                   </li>
                 ))}
               </ul>
-              <button onClick={() => confirmarMesa(mesaId)} disabled={ocupado === mesaId} className="btn-primario w-full">
-                {ocupado === mesaId ? 'Confirmando…' : `Confirmar mesa y enviar a cocina · ${formatoPrecio.format(total)}`}
+              <button
+                onClick={() => confirmarMesa(mesaId)}
+                disabled={ocupado === mesaId}
+                className="btn-primario w-full h-11 justify-between px-4"
+              >
+                <span>
+                  {ocupado === mesaId ? (
+                    'Confirmando…'
+                  ) : (
+                    <>
+                      Confirmar mesa<span className="hidden sm:inline"> y enviar a cocina</span>
+                    </>
+                  )}
+                </span>
+                <span className="tabular-nums">{formatoPrecio.format(total)}</span>
               </button>
             </article>
           )
