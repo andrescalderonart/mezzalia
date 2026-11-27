@@ -17,7 +17,7 @@ body {
 /* Foco visible al navegar con teclado (Web Interface Guidelines / WCAG 2.4.7):
    un solo anillo en el color del restaurante para todo lo interactivo. */
 :focus-visible {
-  outline: 2px solid var(--color-acento, #8a4b2a);
+  outline: 2px solid var(--color-acento, #18181b);
   outline-offset: 2px;
 }
 
@@ -33,12 +33,24 @@ body {
 }
 
 ::selection {
-  background-color: rgba(212, 162, 76, 0.35);
+  background-color: rgba(24, 24, 27, 0.12);
+}
+
+/* Títulos con interletrado apretado y sin viudas: el gesto tipográfico que
+   separa una interfaz cuidada de una genérica. */
+h1, h2, h3 {
+  letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 
 @layer components {
   .chip-categoria {
     @apply whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors duration-150 shrink-0;
+  }
+
+  /* Accesos de servicio (mesero, cuenta, mesa): ícono arriba, texto abajo. */
+  .boton-servicio {
+    @apply flex flex-col items-center justify-center gap-1.5 rounded-2xl bg-papel-200 px-2 py-3 text-center text-xs font-medium leading-tight text-carbon-950 transition-colors hover:bg-papel-300;
   }
 
   .tarjeta-item {
