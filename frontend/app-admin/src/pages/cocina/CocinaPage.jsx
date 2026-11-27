@@ -238,6 +238,15 @@ function TarjetaCocina({ pedido, nombreMesa, minutos, accion, estiloBoton, actua
           <li key={i} className="text-xl leading-snug">
             <span className="font-bold text-dorado mr-2">{item.cantidad}×</span>
             {item.nombreItem}
+            {/* "Sin cebolla" (ingredientes quitables, 2026-11-26): en cocina es lo
+                que mas importa ver, asi que va grande y en rojo. Hasta que se
+                mergee feature/ingredientes-quitables el campo no existe y esto
+                no muestra nada. */}
+            {item.sinIngredientes?.length > 0 && (
+              <span className="block text-base font-bold uppercase tracking-wide text-red-300">
+                Sin {item.sinIngredientes.join(', ').toLowerCase()}
+              </span>
+            )}
           </li>
         ))}
       </ul>

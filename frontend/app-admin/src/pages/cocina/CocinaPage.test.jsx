@@ -135,6 +135,16 @@ describe('CocinaPage', () => {
     }
   })
 
+  it('muestra en grande lo que el comensal quito ("SIN CEBOLLA")', async () => {
+    datos.RECIBIDO = [
+      pedido(1, 'RECIBIDO', {
+        items: [{ cantidad: 1, nombreItem: 'Hamburguesa', subtotal: 32000, sinIngredientes: ['Cebolla', 'Tomate'] }],
+      }),
+    ]
+    montar()
+    expect(await screen.findByText('Sin cebolla, tomate')).toBeInTheDocument()
+  })
+
   it('columnas vacias muestran un mensaje en vez de nada', async () => {
     montar()
     expect(await screen.findByText('Sin pedidos nuevos.')).toBeInTheDocument()
