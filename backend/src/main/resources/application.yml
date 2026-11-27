@@ -32,6 +32,9 @@ spring:
     import: classpath:actuator.yml
 
 app:
+  # Ver common.config.ZonaHorariaConfig: todas las fechas del dominio son
+  # LocalDateTime, asi que la JVM corre siempre en esta zona.
+  zona-horaria: ${APP_ZONA_HORARIA:America/Bogota}
   uploads:
     # DISCO LOCAL a proposito (ver AlmacenamientoImagenService.java para el porque
     # y la limitacion conocida): un solo VPS/instancia, no S3 todavia.
