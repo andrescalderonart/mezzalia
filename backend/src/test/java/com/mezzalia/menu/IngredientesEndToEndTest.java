@@ -209,6 +209,64 @@ class IngredientesEndToEndTest {
                 .andExpect(jsonPath("$.categorias[0].items[0].ingredientes[2].nombre").value("Cebolla"));
     }
 
+    // --- reporte "que quitan tus clientes" ---------------------------------
+
+    @Test
+    void elReporteCuentaUnidadesQuitadasPorPlatoYExcluyeCancelados() throws Exception {
+        long cebolla = capas.get(2), lechuga = capas.get(1);
+        // 3 hamburguesas sin cebolla en una linea, 1 sin cebolla ni lechuga,
+        // 4 normales y 2 limonadas.
+        pedir("[{\"itemMenuId\":" + hamburguesa + ",\"cantidad\":3,\"sinIngredientes\":[" + cebolla + "]},"
+                + "{\"itemMenuId\":" + hamburguesa + ",\"cantidad\":1,\"sinIngredientes\":[" + cebolla + "," + lechuga + "]},"
+                + "{\"itemMenuId\":" + hamburguesa + ",\"cantidad\":4},"
+                + "{\"itemMenuId\":" + limonada + ",\"cantidad\":2}]").andExpect(status().isCreated());
+        // Un pedido cancelado no cuenta.
+        long cancelado = idDe(pedir("[{\"itemMenuId\":" + hamburguesa + ",\"cantidad\":5,\"sinIngredientes\":[" + lechuga + "]}]"));
+        conAdmin(patch("/api/admin/pedidos/{id}/estado", cancelado), "{\"estado\":\"CANCELADO\"}").andExpect(status().isOk());
+
+        mvc.perform(get("/api/admin/reportes/ingredientes-quitados").param("dias", "30").header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.unidadesVendidas").value(10))
+                .andExpect(jsonPath("$.unidadesPersonalizadas").value(4))
+                .andExpect(jsonPath("$.porcentajePersonalizado").value(40.0))
+                // La limonada nadie la personaliza: no aparece.
+                .andExpect(jsonPath("$.platos", hasSize(1)))
+                .andExpect(jsonPath("$.platos[0].nombre").value("Hamburguesa clásica"))
+                .andExpect(jsonPath("$.platos[0].unidadesVendidas").value(8))
+                .andExpect(jsonPath("$.platos[0].porcentajePersonalizado").value(50.0))
+                .andExpect(jsonPath("$.platos[0].ingredientes[0].nombre").value("Cebolla"))
+                .andExpect(jsonPath("$.platos[0].ingredientes[0].unidades").value(4))
+                .andExpect(jsonPath("$.platos[0].ingredientes[0].porcentaje").value(50.0))
+                .andExpect(jsonPath("$.platos[0].ingredientes[1].nombre").value("Lechuga"))
+                .andExpect(jsonPath("$.platos[0].ingredientes[1].porcentaje").value(12.5))
+                .andExpect(jsonPath("$.masQuitados[0].nombre").value("Cebolla"))
+                .andExpect(jsonPath("$.masQuitados[0].plato").value("Hamburguesa clásica"));
+    }
+
+    @Test
+    void elReporteEsSoloDelAdminYDeSuRestaurante() throws Exception {
+        long cebolla = capas.get(2);
+        pedir("[{\"itemMenuId\":" + hamburguesa + ",\"cantidad\":2,\"sinIngredientes\":[" + cebolla + "]}]");
+
+        String mesero = token(tenantId, RolUsuario.MESERO, sucursalId);
+        mvc.perform(get("/api/admin/reportes/ingredientes-quitados").header("Authorization", "Bearer " + mesero))
+                .andExpect(status().isForbidden());
+
+        Long otroTenant = tenant();
+        String otroAdmin = token(otroTenant, RolUsuario.ADMIN_RESTAURANTE, sucursal(otroTenant));
+        mvc.perform(get("/api/admin/reportes/ingredientes-quitados").header("Authorization", "Bearer " + otroAdmin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.unidadesVendidas").value(0))
+                .andExpect(jsonPath("$.platos", hasSize(0)));
+    }
+
+    @Test
+    void unRangoDeDiasFueraDeLimitesSeAjustaEnVezDeFallar() throws Exception {
+        mvc.perform(get("/api/admin/reportes/ingredientes-quitados").param("dias", "5000").header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dias").value(365));
+    }
+
     // --- ayudantes --------------------------------------------------------
 
     private ResultActions conAdmin(MockHttpServletRequestBuilder req, String cuerpo) throws Exception {
