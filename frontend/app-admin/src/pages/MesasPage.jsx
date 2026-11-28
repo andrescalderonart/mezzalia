@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuth, useApiJson } from '../context/AuthContext.jsx'
@@ -155,20 +156,20 @@ export default function MesasPage() {
       <div className="flex items-center justify-between mb-6 print:hidden">
         <div>
           <h1 className="font-display font-semibold text-2xl text-crema">Mesas</h1>
-          <p className="text-sm text-crema/40">
+          <p className="text-sm text-crema/55">
             Genera el código QR que cada mesa usa para ver la carta sin iniciar sesión.
           </p>
         </div>
       </div>
 
       {error && (
-        <div className="mb-4 text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2 animate-fadeInUp print:hidden">
+        <div className="mb-4 text-sm text-peligro bg-peligro/10 border border-peligro/25 rounded-lg px-3 py-2 animate-fadeInUp print:hidden">
           {error}
         </div>
       )}
 
       {puedeEditar && sucursales.length === 0 && !cargando && (
-        <div className="mb-4 text-sm text-crema/40 bg-carbon-800/60 border border-carbon-700 rounded-lg px-3 py-2 print:hidden">
+        <div className="mb-4 text-sm text-crema/55 bg-carbon-800/60 border border-carbon-700 rounded-lg px-3 py-2 print:hidden">
           Todavía no hay ninguna sucursal activa -- creá una en{' '}
           <a href="/sucursales" className="underline text-dorado">Sucursales</a> antes de poder agregar mesas.
         </div>
@@ -219,13 +220,13 @@ export default function MesasPage() {
                     {/* Solo vale la pena mostrar la sucursal cuando hay mas
                         de una -- con una sola es ruido visual obvio. */}
                     {sucursales.length > 1 && (
-                      <p className="text-[11px] text-crema/40">
+                      <p className="text-[11px] text-crema/55">
                         {sucursales.find((s) => s.id === mesa.sucursalId)?.nombre || 'Sucursal desconocida'}
                       </p>
                     )}
                   </div>
                   {puedeEditar && (
-                    <button onClick={() => onDesactivarMesa(mesa)} className="text-[11px] text-crema/40 hover:text-red-300 transition-colors duration-150">
+                    <button onClick={() => onDesactivarMesa(mesa)} className="text-[11px] text-crema/55 hover:text-peligro transition-colors duration-150">
                       Desactivar
                     </button>
                   )}
@@ -233,16 +234,19 @@ export default function MesasPage() {
 
                 {sesion ? (
                   <div className="flex flex-col items-center gap-2">
-                    <div className="bg-crema rounded-lg p-2">
-                      <QRCodeSVG value={urlCarta} size={128} fgColor="#0d0c0b" bgColor="#f3ecdf" marginSize={1} level="M" />
+                    <div className="bg-white rounded-lg p-2 border border-carbon-700">
+                      <QRCodeSVG value={urlCarta} size={128} fgColor="#18181b" bgColor="#ffffff" marginSize={1} level="M" />
                     </div>
-                    <p className="text-[11px] text-crema/40 text-center">
+                    <p className="text-[11px] text-crema/55 text-center">
                       Válido hasta las {formatoHora.format(new Date(sesion.expiraEn))}
                     </p>
                     <div className="flex gap-2 w-full">
                       <button onClick={() => onImprimir(mesa)} className="btn-secundario flex-1 text-xs py-2">
                         Imprimir
                       </button>
+                      <Link to={`/mesas/${mesa.id}/cuenta`} className="btn-secundario flex-1 text-xs py-2">
+                        Cuenta
+                      </Link>
                       {puedeEditar && (
                         <button
                           onClick={() => onGenerarSesion(mesa)}
@@ -256,7 +260,7 @@ export default function MesasPage() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-3 py-4">
-                    <p className="text-xs text-crema/40 text-center">Esta mesa todavía no tiene un código QR activo.</p>
+                    <p className="text-xs text-crema/55 text-center">Esta mesa todavía no tiene un código QR activo.</p>
                     {puedeEditar && (
                       <button
                         onClick={() => onGenerarSesion(mesa)}
@@ -273,7 +277,7 @@ export default function MesasPage() {
           })}
 
           {mesas.length === 0 && (
-            <div className="col-span-full text-sm text-crema/40 py-10 text-center">
+            <div className="col-span-full text-sm text-crema/55 py-10 text-center">
               Todavía no hay mesas creadas.
             </div>
           )}
@@ -289,7 +293,7 @@ export default function MesasPage() {
           <>
             <div className="text-2xl font-display">Mezzalia</div>
             <div className="text-lg">{mesaImprimiendo.codigo}</div>
-            <QRCodeSVG value={urlQrImprimiendo} size={280} fgColor="#0d0c0b" bgColor="#ffffff" marginSize={2} level="M" />
+            <QRCodeSVG value={urlQrImprimiendo} size={280} fgColor="#18181b" bgColor="#ffffff" marginSize={2} level="M" />
             <div className="text-sm text-center max-w-xs">Escanea para ver la carta y pedir desde tu celular</div>
           </>
         )}

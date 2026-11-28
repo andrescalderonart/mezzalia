@@ -334,6 +334,27 @@ public class PedidoService {
     }
 
     /**
+     * "La cuenta de la mesa" (2026-11-27, pilotos): todo lo que la mesa pidio
+     * desde que se abrio su QR vigente, para imprimir el resumen que el cajero
+     * pasa a su POS (Mezzalia no factura; ver docs/calidad). Misma defensa de
+     * tenant/sucursal que confirmarMesa. Sin QR vigente, la cuenta esta vacia:
+     * la mesa no tiene una sesion abierta.
+     */
+    @Transactional(readOnly = true)
+    public List<Pedido> cuentaDeLaMesa(Long mesaId) {
+        Long sucursalId = sucursalActual();
+        Long sucursalDeLaMesa = mesaService.obtenerSucursalIdDeMesa(mesaId);
+        if (sucursalDeLaMesa == null || (sucursalId != null && !sucursalId.equals(sucursalDeLaMesa))) {
+            throw new PedidoExceptions.PedidoNoEncontradoException(mesaId);
+        }
+        var sesion = mesaService.obtenerSesionesActivas(List.of(mesaId)).get(mesaId);
+        if (sesion == null) {
+            return List.of();
+        }
+        return pedidosDeLaMesaDesde(mesaId, sesion.getCreadaEn());
+    }
+
+    /**
      * "Pedido de la mesa" visto por los comensales: todo lo pedido en esta
      * mesa desde `desde` (cuando se abrio su QR actual), de cualquier
      * celular. Corre en el camino publico, dentro de ejecutarConTenant.

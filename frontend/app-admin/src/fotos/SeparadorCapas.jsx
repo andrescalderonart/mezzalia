@@ -154,7 +154,7 @@ export default function SeparadorCapas({ archivo, capasActuales = 0, onCancelar,
         </p>
 
         {error && (
-          <div className="mb-4 text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2">{error}</div>
+          <div className="mb-4 text-sm text-peligro bg-peligro/10 border border-peligro/25 rounded-lg px-3 py-2">{error}</div>
         )}
 
         {!imagen ? (
@@ -186,7 +186,7 @@ export default function SeparadorCapas({ archivo, capasActuales = 0, onCancelar,
                 </div>
               ))}
               </div>
-              <p className="text-[11px] text-crema/40 mt-2 text-center">Toca la foto para agregar un corte.</p>
+              <p className="text-[11px] text-crema/55 mt-2 text-center">Toca la foto para agregar un corte.</p>
             </div>
 
             {/* Una fila por capa. */}
@@ -227,7 +227,7 @@ export default function SeparadorCapas({ archivo, capasActuales = 0, onCancelar,
                           </button>
                         )}
                         {i < franjas.length - 1 && (
-                          <button onClick={() => unir(i)} className="text-crema/40 hover:text-crema">
+                          <button onClick={() => unir(i)} className="text-crema/55 hover:text-crema">
                             Unir con la de abajo
                           </button>
                         )}
@@ -252,7 +252,7 @@ export default function SeparadorCapas({ archivo, capasActuales = 0, onCancelar,
               Reemplazar las {capasActuales} capas que ya tiene el plato
             </label>
           ) : (
-            <span className="text-xs text-crema/40">{sinNombre ? 'Las capas sin nombre se llamarán "Capa 1", "Capa 2"…' : ''}</span>
+            <span className="text-xs text-crema/55">{sinNombre ? 'Las capas sin nombre se llamarán "Capa 1", "Capa 2"…' : ''}</span>
           )}
           <div className="flex gap-2">
             <button onClick={onCancelar} disabled={creando} className="btn-secundario">

@@ -355,6 +355,28 @@ class IngredientesEndToEndTest {
     }
 
     @Test
+    void laCuentaDeLaMesaTraeLoDeSuQrVigenteYNadaDeOtraSucursal() throws Exception {
+        pedirComo("Andrés", "[{\"itemMenuId\":" + hamburguesa + ",\"cantidad\":1,\"sinIngredientes\":[" + capas.get(2) + "]}]");
+        pedirComo(null, "[{\"itemMenuId\":" + limonada + ",\"cantidad\":2}]");
+
+        mvc.perform(get("/api/admin/pedidos/mesa/{id}/cuenta", mesaId).header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].apodo").value("Andrés"))
+                .andExpect(jsonPath("$[0].items[0].sinIngredientes[0]").value("Cebolla"));
+
+        String meseroOtra = token(tenantId, RolUsuario.MESERO, sucursal(tenantId));
+        mvc.perform(get("/api/admin/pedidos/mesa/{id}/cuenta", mesaId).header("Authorization", "Bearer " + meseroOtra))
+                .andExpect(status().isNotFound());
+
+        // Un QR nuevo (otro grupo en la mesa) empieza una cuenta vacia.
+        Thread.sleep(5);
+        nuevaSesion(mesaId);
+        mvc.perform(get("/api/admin/pedidos/mesa/{id}/cuenta", mesaId).header("Authorization", "Bearer " + admin))
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
     void unApodoDeMasDe40CaracteresSeRechaza() throws Exception {
         pedirComo("x".repeat(41), "[{\"itemMenuId\":" + limonada + ",\"cantidad\":1}]")
                 .andExpect(status().isBadRequest())

@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import Login from './pages/Login.jsx'
 import MenuPage from './pages/MenuPage.jsx'
 import MesasPage from './pages/MesasPage.jsx'
+import CuentaMesaPage from './pages/CuentaMesaPage.jsx'
 import PedidosPage from './pages/PedidosPage.jsx'
 import TenantsPage from './pages/TenantsPage.jsx'
 import SucursalesPage from './pages/SucursalesPage.jsx'
@@ -48,6 +49,7 @@ export default function App() {
               <Route path="/menu" element={<MenuPage />} />
               <Route path="/mesas" element={<MesasPage />} />
               <Route path="/pedidos" element={<PedidosPage />} />
+              <Route path="/mesas/:mesaId/cuenta" element={<CuentaMesaPage />} />
             </Route>
           </Route>
 

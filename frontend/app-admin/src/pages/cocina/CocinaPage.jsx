@@ -52,20 +52,20 @@ const COLUMNAS = [
     vacio: 'Nada en preparación.',
     siguiente: 'LISTO',
     accion: '¡Listo!',
-    estiloBoton: 'bg-green-500 text-carbon-950 hover:bg-green-400',
+    estiloBoton: 'bg-exito text-carbon-950 hover:bg-exito',
   },
 ]
 
 const ESTILO_URGENCIA = {
   normal: 'text-crema/60',
   atencion: 'text-dorado font-semibold',
-  urgente: 'text-red-300 font-bold animate-pulseSoft',
+  urgente: 'text-peligro font-bold animate-pulseSoft',
 }
 
 const BORDE_URGENCIA = {
   normal: 'border-carbon-700',
   atencion: 'border-dorado/50',
-  urgente: 'border-red-500/70',
+  urgente: 'border-peligro/60',
 }
 
 export default function CocinaPage() {
@@ -158,7 +158,7 @@ export default function CocinaPage() {
   const nombreMesa = (mesaId) => mesasPorId[mesaId] ?? `Mesa #${mesaId}`
 
   return (
-    <div className="min-h-dvh bg-carbon-950 text-crema p-4 md:p-6">
+    <div className="tema-oscuro min-h-dvh bg-carbon-950 text-crema p-4 md:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-4">
           <Link to="/pedidos" className="text-sm text-crema/50 hover:text-crema">
@@ -178,7 +178,7 @@ export default function CocinaPage() {
       </header>
 
       {error && (
-        <div role="alert" className="mb-4 text-base text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-4 py-3">
+        <div role="alert" className="mb-4 text-base text-peligro bg-peligro/10 border border-peligro/25 rounded-lg px-4 py-3">
           {error}
         </div>
       )}
@@ -198,7 +198,7 @@ export default function CocinaPage() {
             {cargando ? (
               <div className="h-40 rounded-2xl bg-carbon-800 animate-pulseSoft" />
             ) : pedidos[col.estado].length === 0 ? (
-              <p className="text-crema/40 text-lg py-10 text-center border border-dashed border-carbon-700 rounded-2xl">
+              <p className="text-crema/55 text-lg py-10 text-center border border-dashed border-carbon-700 rounded-2xl">
                 {col.vacio}
               </p>
             ) : (
@@ -262,7 +262,7 @@ function TarjetaCocina({ pedido, nombreMesa, minutos, accion, estiloBoton, actua
       )}
 
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs text-crema/30">#{pedido.id}</span>
+        <span className="text-xs text-crema/45">#{pedido.id}</span>
         <button
           onClick={onAvanzar}
           disabled={actualizando}

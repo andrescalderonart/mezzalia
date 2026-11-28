@@ -42,6 +42,42 @@ jobs:
           path: backend/target/site/jacoco/
           if-no-files-found: ignore
 
+  # Migraciones contra MySQL REAL (2026-11-27): los demas tests usan H2 con el
+  # esquema generado por Hibernate, asi que solo aqui se ejecutan las
+  # migraciones de Flyway y se valida que el esquema coincide con las entidades.
+  migraciones-mysql:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: carta_digital
+          MYSQL_USER: mezzalia
+          MYSQL_PASSWORD: prueba_ci
+          MYSQL_ROOT_PASSWORD: prueba_ci_root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -u root -pprueba_ci_root"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Flyway + Hibernate validate contra MySQL 8.4
+        working-directory: backend
+        env:
+          MEZZALIA_TEST_MYSQL_URL: jdbc:mysql://localhost:3306/carta_digital?serverTimezone=America/Bogota&allowPublicKeyRetrieval=true&useSSL=false
+          MEZZALIA_TEST_MYSQL_USER: mezzalia
+          MEZZALIA_TEST_MYSQL_PASSWORD: prueba_ci
+        run: mvn -B test -Dtest=MigracionesMySqlTest -Dsurefire.failIfNoSpecifiedTests=false
+
   # app-cliente ya no es una carpeta vacia. npm ci (no install) a proposito:
   # falla si package-lock.json no coincide con package.json -- exactamente lo
   # que paso en main con @google/model-viewer (commit bb1b642) sin que nada

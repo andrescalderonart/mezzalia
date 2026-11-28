@@ -1,28 +1,22 @@
 /**
- * Monograma inline (SVG) inspirado en la paleta del logo real de Mezzalia
- * (circulo terracota/dorado). NO es el logo ilustrado real -- ese vive hoy
- * solo como una foto de un letrero de mesa, no como un archivo vectorial o
- * PNG limpio que se pueda incrustar. En cuanto tengan el archivo real
- * (SVG o PNG con fondo transparente), este componente se reemplaza por un
- * <img> apuntando a ese archivo -- avisenme cuando lo tengan.
+ * Monograma provisional de Mezzalia (2026-11-27, rediseño): una "M" sobre un
+ * cuadrado redondeado en tinta, con un punto del naranja de la marca. Toma
+ * los colores del tema (claro en el panel, oscuro en la cocina). NO es el
+ * logo real: cuando exista el archivo (SVG o PNG con fondo transparente),
+ * este componente se reemplaza por un <img>.
  */
 export default function LogoMark({ className = 'w-8 h-8' }) {
   return (
     <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
-      <defs>
-        <linearGradient id="mezzaliaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#c1502e" />
-          <stop offset="100%" stopColor="#d4a24c" />
-        </linearGradient>
-      </defs>
-      <circle cx="32" cy="32" r="29" fill="none" stroke="url(#mezzaliaGrad)" strokeWidth="2.5" />
+      <rect width="64" height="64" rx="16" fill="rgb(var(--tinta))" />
       <text
-        x="32" y="41" textAnchor="middle"
-        fontFamily="'Playfair Display', serif" fontWeight="700" fontSize="24"
-        fill="url(#mezzaliaGrad)"
+        x="31" y="44" textAnchor="middle"
+        fontFamily="Geist, system-ui, sans-serif" fontWeight="700" fontSize="32" letterSpacing="-1"
+        fill="rgb(var(--c-950))"
       >
-        MZ
+        M
       </text>
+      <circle cx="49" cy="44" r="4" fill="rgb(var(--acento))" />
     </svg>
   )
 }

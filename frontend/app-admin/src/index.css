@@ -2,6 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Tema claro (panel) por defecto; .tema-oscuro para la cocina. Valores en
+   "R G B" para que Tailwind pueda aplicar opacidad (bg-carbon-800/50). */
+:root {
+  --c-950: 250 250 250;  /* fondo de página */
+  --c-900: 255 255 255;  /* tarjetas */
+  --c-800: 244 244 245;  /* campos, hover */
+  --c-700: 228 228 231;  /* bordes */
+  --c-600: 212 212 216;  /* bordes fuertes */
+  --tinta: 24 24 27;
+  --acento: 234 88 12;
+  --peligro: 220 38 38;
+  --exito: 5 150 105;
+  --info: 37 99 235;
+  color-scheme: light;
+}
+
+.tema-oscuro {
+  --c-950: 9 9 11;
+  --c-900: 17 17 19;
+  --c-800: 24 24 27;
+  --c-700: 39 39 42;
+  --c-600: 63 63 70;
+  --tinta: 250 250 250;
+  --acento: 251 146 60;
+  --peligro: 248 113 113;
+  --exito: 52 211 153;
+  --info: 96 165 250;
+  color-scheme: dark;
+}
+
 html, body, #root {
   height: 100%;
 }
@@ -17,8 +47,8 @@ body {
 /* Scrollbar oscuro discreto, en vez del default gris claro del navegador */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: #52525b; }
+::-webkit-scrollbar-thumb { background: rgb(var(--c-600)); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--c-600) / 0.8); }
 
 h1, h2, h3 {
   letter-spacing: -0.02em;
@@ -26,7 +56,7 @@ h1, h2, h3 {
 }
 
 :focus-visible {
-  outline: 2px solid #fb923c;
+  outline: 2px solid rgb(var(--acento));
   outline-offset: 2px;
 }
 
@@ -43,7 +73,7 @@ h1, h2, h3 {
      degradado ni brillo, el contraste ya lo hace protagonista. */
   .btn-primario {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 h-9 text-sm font-medium text-carbon-950
-           bg-crema hover:bg-zinc-200 active:bg-zinc-300
+           bg-crema hover:bg-crema/85 active:bg-crema/75
            transition-colors duration-150
            disabled:opacity-50 disabled:pointer-events-none;
   }
@@ -57,21 +87,21 @@ h1, h2, h3 {
   }
 
   .btn-peligro {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 h-8 text-xs font-medium text-red-300
-           bg-carbon-800 border border-carbon-700
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 h-8 text-xs font-medium text-peligro
+           bg-carbon-900 border border-carbon-700
            transition-colors duration-150
-           hover:bg-red-950/60 hover:border-red-900
+           hover:bg-peligro/10 hover:border-peligro/30
            disabled:opacity-50 disabled:pointer-events-none;
   }
 
   .card {
-    @apply bg-carbon-900 border border-carbon-700/80 rounded-xl;
+    @apply bg-carbon-900 border border-carbon-700 rounded-xl shadow-[0_1px_2px_rgb(0_0_0/0.04)];
   }
 
   .input-carbon {
-    @apply w-full rounded-lg bg-carbon-950 border border-carbon-700 px-3 h-9 text-sm text-crema
-           placeholder:text-crema/30
-           focus:outline-none focus-visible:ring-2 focus-visible:ring-crema/20 focus:border-carbon-600
+    @apply w-full rounded-lg bg-carbon-900 border border-carbon-700 px-3 h-9 text-sm text-crema
+           placeholder:text-crema/40
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-crema/15 focus:border-crema/40
            transition-colors duration-150;
   }
 

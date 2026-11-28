@@ -159,12 +159,12 @@ export default function MenuPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="font-display font-semibold text-2xl text-crema">Carta</h1>
-          <p className="text-sm text-crema/40">Categorías y platos de tu restaurante</p>
+          <p className="text-sm text-crema/55">Categorías y platos de tu restaurante</p>
         </div>
       </div>
 
       {error && (
-        <div className="mb-4 text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2 animate-fadeInUp">
+        <div className="mb-4 text-sm text-peligro bg-peligro/10 border border-peligro/25 rounded-lg px-3 py-2 animate-fadeInUp">
           {error}
         </div>
       )}
@@ -176,7 +176,7 @@ export default function MenuPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-4 lg:gap-6">
         {/* ── Categorías ─────────────────────────────────────────── */}
         <div className="card p-4 lg:h-fit">
-          <h2 className="text-xs uppercase tracking-wide text-crema/50 mb-3">Categorías</h2>
+          <h2 className="text-[13px] font-medium text-crema/55 mb-3">Categorías</h2>
 
           {cargandoCategorias ? (
             <div className="flex flex-row gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0 lg:space-y-2">
@@ -192,7 +192,7 @@ export default function MenuPage() {
                     onClick={() => setCategoriaId(cat.id)}
                     className={`whitespace-nowrap lg:whitespace-normal lg:w-full text-left rounded-lg px-3 py-2 text-sm transition-colors duration-150 ${
                       cat.id === categoriaId
-                        ? 'bg-carbon-800 text-dorado'
+                        ? 'bg-carbon-800 text-crema font-medium'
                         : 'text-crema/70 hover:bg-carbon-800 hover:text-crema'
                     }`}
                   >
@@ -201,7 +201,7 @@ export default function MenuPage() {
                 </li>
               ))}
               {categorias.length === 0 && (
-                <li className="text-sm text-crema/40 px-1 py-2">Sin categorías todavía.</li>
+                <li className="text-sm text-crema/55 px-1 py-2">Sin categorías todavía.</li>
               )}
             </ul>
           )}
@@ -260,12 +260,12 @@ export default function MenuPage() {
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-2">
                       <h3 className="font-medium text-crema text-sm">{item.nombre}</h3>
-                      <span className="text-dorado text-sm font-medium whitespace-nowrap">
+                      <span className="text-crema text-sm font-semibold tabular-nums whitespace-nowrap">
                         {formatoPrecio.format(item.precio)}
                       </span>
                     </div>
                     {item.descripcion && (
-                      <p className="text-xs text-crema/40 mt-1 line-clamp-2">{item.descripcion}</p>
+                      <p className="text-xs text-crema/55 mt-1 line-clamp-2">{item.descripcion}</p>
                     )}
 
                     <div className="mt-3 space-y-2">
@@ -274,8 +274,8 @@ export default function MenuPage() {
                         disabled={!puedeEditar}
                         className={`text-[11px] px-2 py-1 rounded-full border transition-colors duration-150 ${
                           item.disponible
-                            ? 'border-green-800 text-green-300 bg-green-950/40'
-                            : 'border-carbon-600 text-crema/40 bg-carbon-800'
+                            ? 'border-exito/30 text-exito bg-exito/10'
+                            : 'border-carbon-600 text-crema/55 bg-carbon-800'
                         } ${puedeEditar ? 'cursor-pointer hover:brightness-110' : 'cursor-default'}`}
                       >
                         {item.disponible ? 'Disponible' : 'Agotado'}
@@ -308,7 +308,7 @@ export default function MenuPage() {
               ))}
 
               {items.length === 0 && categoriaId && (
-                <div className="col-span-full text-sm text-crema/40 py-10 text-center">
+                <div className="col-span-full text-sm text-crema/55 py-10 text-center">
                   Esta categoría todavía no tiene platos.
                 </div>
               )}

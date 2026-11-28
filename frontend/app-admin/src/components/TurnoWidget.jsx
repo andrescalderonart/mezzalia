@@ -63,10 +63,10 @@ export default function TurnoWidget() {
   return (
     <div className="px-4 py-3 border-t border-carbon-700">
       <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="text-[11px] text-crema/40">{estado.enTurno ? `En turno desde ${horaInicio}` : 'Fuera de turno'}</span>
-        <span className={`w-2 h-2 rounded-full ${estado.enTurno ? 'bg-green-400' : 'bg-crema/20'}`} aria-hidden="true" />
+        <span className="text-[11px] text-crema/55">{estado.enTurno ? `En turno desde ${horaInicio}` : 'Fuera de turno'}</span>
+        <span className={`w-2 h-2 rounded-full ${estado.enTurno ? 'bg-exito' : 'bg-crema/20'}`} aria-hidden="true" />
       </div>
-      {error && <div className="text-[11px] text-red-300 mb-2">{error}</div>}
+      {error && <div className="text-[11px] text-peligro mb-2">{error}</div>}
       <button
         onClick={onToggle}
         disabled={enviando}

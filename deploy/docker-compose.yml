@@ -1,0 +1,77 @@
+# Produccion de Mezzalia en UN servidor (VPS): MySQL + backend + web (Caddy
+# con HTTPS). Guia paso a paso: docs/despliegue.md.
+#   cd deploy && cp .env.example .env   # completar
+#   docker compose up -d --build
+name: mezzalia
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: carta_digital
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      TZ: America/Bogota
+    volumes:
+      - mysql_data:/var/lib/mysql
+    # Sin "ports": MySQL solo es visible dentro de la red de Docker.
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ../backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      # Red interna de Docker, sin salir del servidor: por eso useSSL=false.
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/carta_digital?serverTimezone=America/Bogota&allowPublicKeyRetrieval=true&useSSL=false
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      COMENSAL_ENCRYPTION_KEY: ${COMENSAL_ENCRYPTION_KEY}
+      COMENSAL_ENCRYPTION_KEY_PREVIOUS: ${COMENSAL_ENCRYPTION_KEY_PREVIOUS:-}
+      MEZZALIA_PRIMER_SUPERADMIN_USUARIO: ${MEZZALIA_PRIMER_SUPERADMIN_USUARIO:-}
+      MEZZALIA_PRIMER_SUPERADMIN_PASSWORD: ${MEZZALIA_PRIMER_SUPERADMIN_PASSWORD:-}
+      # Detras de Caddy: respeta X-Forwarded-Proto para saber que es HTTPS.
+      SERVER_FORWARD_HEADERS_STRATEGY: native
+    volumes:
+      - uploads:/data/uploads
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8080"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+      args:
+        URL_CARTA: https://${DOMINIO_CARTA}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      DOMINIO_CARTA: ${DOMINIO_CARTA}
+      DOMINIO_PANEL: ${DOMINIO_PANEL}
+      ACME_EMAIL: ${ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  mysql_data:
+  uploads:
+  caddy_data:
+  caddy_config:

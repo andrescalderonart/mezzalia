@@ -72,7 +72,7 @@ export default function SeleccionarSucursalPage() {
         <div className="flex flex-col items-center mb-6">
           <LogoMark className="w-14 h-14 mb-3" />
           <h1 className="font-display font-semibold text-2xl text-crema">¿En qué sucursal trabajas?</h1>
-          <p className="text-xs text-crema/40 mt-1 text-center">
+          <p className="text-xs text-crema/55 mt-1 text-center">
             {esMesero
               ? 'Elige una sucursal para ver y atender sus mesas y pedidos.'
               : 'Opcional: elige una sucursal para enfocar tu vista, o mira todas.'}
@@ -80,7 +80,7 @@ export default function SeleccionarSucursalPage() {
         </div>
 
         {error && (
-          <div className="mb-4 text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2 animate-fadeInUp">
+          <div className="mb-4 text-sm text-peligro bg-peligro/10 border border-peligro/25 rounded-lg px-3 py-2 animate-fadeInUp">
             {error}
           </div>
         )}
@@ -92,7 +92,7 @@ export default function SeleccionarSucursalPage() {
             ))}
           </div>
         ) : sucursales.length === 0 ? (
-          <div className="text-sm text-crema/40 text-center py-6">
+          <div className="text-sm text-crema/55 text-center py-6">
             {esMesero
               ? 'Todavía no tienes ninguna sucursal asignada. Pídele a un administrador que te asigne una para poder trabajar.'
               : 'Este restaurante todavía no tiene sucursales creadas.'}
@@ -104,10 +104,10 @@ export default function SeleccionarSucursalPage() {
                 key={sucursal.id}
                 onClick={() => onElegir(sucursal)}
                 disabled={eligiendoId !== null}
-                className="btn-secundario w-full text-left px-4 py-3 flex flex-col"
+                className="btn-secundario w-full h-auto text-left px-4 py-3 flex flex-col items-start gap-0.5"
               >
-                <span className="text-sm text-crema">{sucursal.nombre}</span>
-                {sucursal.direccion && <span className="text-[11px] text-crema/40">{sucursal.direccion}</span>}
+                <span className="text-sm font-semibold text-crema">{sucursal.nombre}</span>
+                {sucursal.direccion && <span className="text-xs font-normal text-crema/55">{sucursal.direccion}</span>}
                 {eligiendoId === sucursal.id && <span className="text-[11px] text-dorado mt-1">Entrando…</span>}
               </button>
             ))}
@@ -120,7 +120,7 @@ export default function SeleccionarSucursalPage() {
           </button>
         )}
 
-        <button onClick={logout} className="text-xs text-crema/40 hover:text-crema/70 transition-colors duration-150 w-full text-center py-1">
+        <button onClick={logout} className="text-xs text-crema/55 hover:text-crema/70 transition-colors duration-150 w-full text-center py-1">
           Cerrar sesión
         </button>
       </div>

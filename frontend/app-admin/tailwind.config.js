@@ -3,31 +3,36 @@ export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
-      // 2026-11-27, rediseño "startup": neutros oscuros (zinc) y un solo
-      // acento naranja derivado de la marca. Se conservan los nombres
-      // carbon/crema/dorado/terracota para no tocar cada clase del panel.
+      // 2026-11-27, rediseño: los colores salen de variables CSS (index.css)
+      // para que el panel sea CLARO como la carta y la cocina siga OSCURA
+      // (clase .tema-oscuro), sin duplicar clases. Nombres históricos:
+      // carbon = superficies (950 fondo … 600 borde fuerte), crema = tinta,
+      // dorado/terracota = acento naranja de la marca.
       colors: {
         carbon: {
-          950: '#09090b',
-          900: '#111113',
-          800: '#18181b',
-          700: '#27272a',
-          600: '#3f3f46',
+          950: 'rgb(var(--c-950) / <alpha-value>)',
+          900: 'rgb(var(--c-900) / <alpha-value>)',
+          800: 'rgb(var(--c-800) / <alpha-value>)',
+          700: 'rgb(var(--c-700) / <alpha-value>)',
+          600: 'rgb(var(--c-600) / <alpha-value>)',
         },
-        crema: '#fafafa',
+        crema: 'rgb(var(--tinta) / <alpha-value>)',
         terracota: {
-          DEFAULT: '#f97316',
-          light: '#fb923c',
-          dark: '#c2410c',
+          DEFAULT: 'rgb(var(--acento) / <alpha-value>)',
+          light: 'rgb(var(--acento) / <alpha-value>)',
+          dark: 'rgb(var(--acento) / <alpha-value>)',
         },
         dorado: {
-          DEFAULT: '#fb923c',
-          light: '#fdba74',
+          DEFAULT: 'rgb(var(--acento) / <alpha-value>)',
+          light: 'rgb(var(--acento) / <alpha-value>)',
         },
         sin: {
-          DEFAULT: '#f87171',
-          fondo: 'rgba(248,113,113,0.12)',
+          DEFAULT: 'rgb(var(--peligro) / <alpha-value>)',
+          fondo: 'rgb(var(--peligro) / 0.1)',
         },
+        peligro: 'rgb(var(--peligro) / <alpha-value>)',
+        exito: 'rgb(var(--exito) / <alpha-value>)',
+        info: 'rgb(var(--info) / <alpha-value>)',
       },
       fontFamily: {
         display: ['Geist', 'system-ui', 'sans-serif'],

@@ -161,7 +161,7 @@ export default function EditorIngredientes({ item, onCerrar, onPresentacionCambi
             ✕
           </button>
         </div>
-        <p className="text-xs text-crema/40 mb-5">
+        <p className="text-xs text-crema/55 mb-5">
           El comensal ve el plato "desarmado" en estas capas y puede quitar las que marques como quitables. La
           cocina recibe "SIN …".
         </p>
@@ -183,7 +183,7 @@ export default function EditorIngredientes({ item, onCerrar, onPresentacionCambi
                 }`}
               >
                 <span className="block text-sm text-crema">{titulo}</span>
-                <span className="block text-[11px] text-crema/40">{ejemplo}</span>
+                <span className="block text-[11px] text-crema/55">{ejemplo}</span>
               </button>
             ))}
           </div>
@@ -224,7 +224,7 @@ export default function EditorIngredientes({ item, onCerrar, onPresentacionCambi
         )}
 
         {error && (
-          <div className="mb-4 text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2">{error}</div>
+          <div className="mb-4 text-sm text-peligro bg-peligro/10 border border-peligro/25 rounded-lg px-3 py-2">{error}</div>
         )}
 
         <p className="label-carbon">
@@ -233,7 +233,7 @@ export default function EditorIngredientes({ item, onCerrar, onPresentacionCambi
         {cargando ? (
           <div className="h-24 rounded-xl bg-carbon-800 animate-pulseSoft" />
         ) : ingredientes.length === 0 ? (
-          <p className="text-sm text-crema/40 py-4">Este plato todavía no tiene ingredientes.</p>
+          <p className="text-sm text-crema/55 py-4">Este plato todavía no tiene ingredientes.</p>
         ) : (
           <ul className="space-y-2 mb-4">
             {ingredientes.map((ing, i) => (
@@ -242,7 +242,7 @@ export default function EditorIngredientes({ item, onCerrar, onPresentacionCambi
                   {ing.imagenUrl ? (
                     <img src={ing.imagenUrl} alt="" className="w-full h-full object-contain" />
                   ) : (
-                    <span className="absolute inset-0 flex items-center justify-center text-[10px] text-crema/40 text-center leading-tight">
+                    <span className="absolute inset-0 flex items-center justify-center text-[10px] text-crema/55 text-center leading-tight">
                       Subir
                       <br />
                       foto
@@ -285,7 +285,7 @@ export default function EditorIngredientes({ item, onCerrar, onPresentacionCambi
                     ▼
                   </button>
                 </div>
-                <button onClick={() => eliminar(ing)} className="text-crema/30 hover:text-red-300 text-xs px-1" aria-label={`Eliminar ${ing.nombre}`}>
+                <button onClick={() => eliminar(ing)} className="text-crema/45 hover:text-peligro text-xs px-1" aria-label={`Eliminar ${ing.nombre}`}>
                   ✕
                 </button>
               </li>

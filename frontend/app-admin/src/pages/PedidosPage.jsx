@@ -29,10 +29,10 @@ const TRANSICIONES = {
 const ESTILO_ESTADO = {
   POR_CONFIRMAR: 'bg-dorado/15 text-dorado border-dorado/30',
   RECIBIDO: 'bg-dorado/15 text-dorado border-dorado/30',
-  EN_PREPARACION: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-  LISTO: 'bg-green-500/15 text-green-300 border-green-500/30',
-  ENTREGADO: 'bg-carbon-700 text-crema/40 border-carbon-600',
-  CANCELADO: 'bg-red-950/40 text-red-300 border-red-900/60',
+  EN_PREPARACION: 'bg-info/10 text-info border-info/30',
+  LISTO: 'bg-exito/10 text-exito border-exito/30',
+  ENTREGADO: 'bg-carbon-700 text-crema/55 border-carbon-600',
+  CANCELADO: 'bg-peligro/10 text-peligro border-peligro/25',
 }
 
 const ETIQUETA_ESTADO = {
@@ -193,11 +193,19 @@ export default function PedidosPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="font-display font-semibold text-2xl text-crema">Pedidos</h1>
-          <p className="text-sm text-crema/40">
-            {vista === 'activos'
-              ? `Se actualiza solo cada ${Math.round(INTERVALO_POLLING_MS / 1000)}s. Los pedidos nuevos aparecen arriba.`
-              : 'Pedidos entregados y cancelados.'}
+          <h1 className="text-2xl font-semibold text-crema">Pedidos</h1>
+          <p className="mt-1 flex items-center gap-2 text-sm text-crema/50">
+            {vista === 'activos' ? (
+              <>
+                <span className="relative flex w-2 h-2" aria-hidden="true">
+                  <span className="absolute inset-0 rounded-full bg-exito opacity-60 animate-ping" />
+                  <span className="relative w-2 h-2 rounded-full bg-exito" />
+                </span>
+                En vivo · se actualiza cada {Math.round(INTERVALO_POLLING_MS / 1000)} s
+              </>
+            ) : (
+              'Pedidos entregados y cancelados.'
+            )}
           </p>
         </div>
       </div>
@@ -205,27 +213,28 @@ export default function PedidosPage() {
       <LlamadosPendientes nombreMesa={nombreMesa} />
       {vista === 'activos' && <MesasPorConfirmar nombreMesa={nombreMesa} onConfirmada={() => cargarPedidos('activos', false)} />}
 
-      <div className="flex gap-2 mb-5">
-        <button
-          onClick={() => setVista('activos')}
-          className={`text-xs font-medium px-3.5 py-1.5 rounded-full transition-colors duration-150 ${
-            vista === 'activos' ? 'bg-dorado text-carbon-950' : 'bg-carbon-800 text-crema/60'
-          }`}
-        >
-          Activos
-        </button>
-        <button
-          onClick={() => setVista('historial')}
-          className={`text-xs font-medium px-3.5 py-1.5 rounded-full transition-colors duration-150 ${
-            vista === 'historial' ? 'bg-dorado text-carbon-950' : 'bg-carbon-800 text-crema/60'
-          }`}
-        >
-          Historial
-        </button>
+      {/* Control segmentado: dos vistas de lo mismo, no dos botones sueltos. */}
+      <div className="inline-flex rounded-lg bg-carbon-800 p-1 mb-5" role="tablist" aria-label="Vista de pedidos">
+        {[
+          ['activos', 'Activos'],
+          ['historial', 'Historial'],
+        ].map(([valor, texto]) => (
+          <button
+            key={valor}
+            role="tab"
+            aria-selected={vista === valor}
+            onClick={() => setVista(valor)}
+            className={`text-sm font-medium px-4 h-8 rounded-md transition-colors duration-150 ${
+              vista === valor ? 'bg-carbon-900 text-crema shadow-sm' : 'text-crema/50 hover:text-crema'
+            }`}
+          >
+            {texto}
+          </button>
+        ))}
       </div>
 
       {error && (
-        <div className="mb-4 text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2 animate-fadeInUp">
+        <div className="mb-4 text-sm text-peligro bg-peligro/10 border border-peligro/25 rounded-lg px-3 py-2 animate-fadeInUp">
           {error}
         </div>
       )}
@@ -237,7 +246,7 @@ export default function PedidosPage() {
           ))}
         </div>
       ) : pedidosVisibles.length === 0 ? (
-        <div className="text-sm text-crema/40 py-16 text-center">
+        <div className="text-sm text-crema/55 py-16 text-center">
           {vista === 'activos' ? 'No hay pedidos activos en este momento.' : 'Todavía no hay pedidos en el historial.'}
         </div>
       ) : (
@@ -279,7 +288,7 @@ function TarjetaPedido({
             {nombreMesa}
             {pedido.apodo && <span className="text-crema/60 font-normal"> · para {pedido.apodo}</span>}
           </h3>
-          <p className="text-[11px] text-crema/40">
+          <p className="text-[11px] text-crema/55">
             #{pedido.id} · {formatoHora.format(new Date(pedido.creadoEn))}
           </p>
         </div>
@@ -306,21 +315,21 @@ function TarjetaPedido({
       </div>
 
       {pedido.notas && (
-        <p className="text-xs text-dorado/80 bg-dorado/10 border border-dorado/20 rounded-lg px-2.5 py-1.5 mb-3">
+        <p className="text-xs text-crema/80 bg-carbon-800 rounded-lg px-2.5 py-1.5 mb-3">
           “{pedido.notas}”
         </p>
       )}
 
       {pedido.comensal && (pedido.comensal.nombre || pedido.comensal.telefono) && (
         <div className="flex items-center justify-between gap-2 mb-3">
-          <p className="text-[11px] text-crema/40">
+          <p className="text-[11px] text-crema/55">
             {[pedido.comensal.nombre, pedido.comensal.telefono].filter(Boolean).join(' · ')}
           </p>
           {puedeEliminarDatosComensal && (
             <button
               onClick={onEliminarDatosComensal}
               disabled={eliminandoDatosComensal}
-              className="text-[10px] text-crema/30 hover:text-red-300 transition-colors duration-150 whitespace-nowrap"
+              className="text-[10px] text-crema/45 hover:text-peligro transition-colors duration-150 whitespace-nowrap"
             >
               {eliminandoDatosComensal ? '…' : 'Eliminar datos'}
             </button>
@@ -340,7 +349,7 @@ function TarjetaPedido({
               key={estado}
               onClick={() => onCambiarEstado(estado)}
               disabled={actualizando}
-              className={estado === 'CANCELADO' ? 'btn-peligro flex-1' : 'btn-secundario flex-1 text-xs py-2'}
+              className={estado === 'CANCELADO' ? 'btn-peligro h-9 shrink-0 whitespace-nowrap' : 'btn-primario flex-1 whitespace-nowrap'}
             >
               {actualizando ? '…' : ETIQUETA_ACCION[estado]}
             </button>

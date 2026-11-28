@@ -1,0 +1,23 @@
+# Las dos apps web (carta del comensal y panel del restaurante) compiladas y
+# servidas por Caddy, que ademas saca y renueva solo el certificado HTTPS
+# (Let's Encrypt). Contexto de build: la raiz del repositorio.
+FROM node:20-alpine AS carta
+WORKDIR /app
+COPY frontend/app-cliente/package*.json ./
+RUN npm ci
+COPY frontend/app-cliente/ ./
+RUN npm run build
+
+FROM node:20-alpine AS panel
+# El panel imprime los QR de las mesas con esta URL: tiene que ser la publica.
+ARG URL_CARTA
+WORKDIR /app
+COPY frontend/app-admin/package*.json ./
+RUN npm ci
+COPY frontend/app-admin/ ./
+RUN test -n "$URL_CARTA" && VITE_APP_CLIENTE_URL="$URL_CARTA" npm run build
+
+FROM caddy:2.8-alpine
+COPY deploy/Caddyfile /etc/caddy/Caddyfile
+COPY --from=carta /app/dist /srv/carta
+COPY --from=panel /app/dist /srv/panel

@@ -123,14 +123,14 @@ export default function SucursalesPage() {
     <div>
       <div className="mb-6">
         <h1 className="font-display font-semibold text-2xl text-crema">Sucursales</h1>
-        <p className="text-sm text-crema/40">
+        <p className="text-sm text-crema/55">
           La mayoría de restaurantes opera con una sola sucursal. Agrega más solo si de verdad
           tienes más de un local.
         </p>
       </div>
 
       {error && (
-        <div className="mb-4 text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2 animate-fadeInUp">
+        <div className="mb-4 text-sm text-peligro bg-peligro/10 border border-peligro/25 rounded-lg px-3 py-2 animate-fadeInUp">
           {error}
         </div>
       )}
@@ -169,9 +169,9 @@ export default function SucursalesPage() {
               <div>
                 <div className="text-sm text-crema">
                   {sucursal.nombre}
-                  {!sucursal.activa && <span className="ml-2 text-[11px] text-crema/40">(inactiva)</span>}
+                  {!sucursal.activa && <span className="ml-2 text-[11px] text-crema/55">(inactiva)</span>}
                 </div>
-                <div className="text-[11px] text-crema/40">{sucursal.direccion || 'Sin dirección registrada'}</div>
+                <div className="text-[11px] text-crema/55">{sucursal.direccion || 'Sin dirección registrada'}</div>
               </div>
               <div className="flex items-center gap-2">
                 {sucursal.activa && (
@@ -191,11 +191,11 @@ export default function SucursalesPage() {
                   Meseros
                 </button>
                 {sucursal.activa ? (
-                  <button onClick={() => onDesactivar(sucursal)} className="text-xs py-2 px-3 rounded-lg text-crema/40 hover:text-red-300 transition-colors duration-150">
+                  <button onClick={() => onDesactivar(sucursal)} className="text-xs py-2 px-3 rounded-lg text-crema/55 hover:text-peligro transition-colors duration-150">
                     Desactivar
                   </button>
                 ) : (
-                  <button onClick={() => onReactivar(sucursal)} className="text-xs py-2 px-3 rounded-lg text-crema/40 hover:text-emerald-300 transition-colors duration-150">
+                  <button onClick={() => onReactivar(sucursal)} className="text-xs py-2 px-3 rounded-lg text-crema/55 hover:text-exito transition-colors duration-150">
                     Reactivar
                   </button>
                 )}
@@ -204,7 +204,7 @@ export default function SucursalesPage() {
           ))}
 
           {sucursales.length === 0 && (
-            <div className="text-sm text-crema/40 py-10 text-center">Todavía no hay sucursales creadas.</div>
+            <div className="text-sm text-crema/55 py-10 text-center">Todavía no hay sucursales creadas.</div>
           )}
         </div>
       )}
@@ -268,14 +268,14 @@ function MeserosAsignadosModal({ sucursal, onCerrar }) {
       <div className="card w-full max-w-sm p-6 animate-fadeInUp" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4">
           <h2 className="font-display font-semibold text-lg text-crema">Meseros en {sucursal.nombre}</h2>
-          <p className="text-[11px] text-crema/40 mt-1">
-            Quitar a alguien de acá no borra su cuenta, solo hace que ya no pueda elegir esta
+          <p className="text-[11px] text-crema/55 mt-1">
+            Quitar a alguien de aquí no borra su cuenta, solo hace que ya no pueda elegir esta
             sucursal para trabajar.
           </p>
         </div>
 
         {error && (
-          <div className="mb-3 text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-lg px-3 py-2">
+          <div className="mb-3 text-sm text-peligro bg-peligro/10 border border-peligro/25 rounded-lg px-3 py-2">
             {error}
           </div>
         )}
@@ -287,7 +287,7 @@ function MeserosAsignadosModal({ sucursal, onCerrar }) {
             ))}
           </div>
         ) : usuarios.length === 0 ? (
-          <div className="text-sm text-crema/40 text-center py-6">
+          <div className="text-sm text-crema/55 text-center py-6">
             Todavía no hay ningún mesero asignado a esta sucursal.
           </div>
         ) : (
@@ -296,12 +296,12 @@ function MeserosAsignadosModal({ sucursal, onCerrar }) {
               <div key={usuario.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-carbon-800/60">
                 <div>
                   <div className="text-sm text-crema">{usuario.username}</div>
-                  {!usuario.activo && <div className="text-[11px] text-crema/40">Usuario desactivado</div>}
+                  {!usuario.activo && <div className="text-[11px] text-crema/55">Usuario desactivado</div>}
                 </div>
                 <button
                   onClick={() => onQuitar(usuario)}
                   disabled={quitandoId === usuario.id}
-                  className="text-xs py-1.5 px-2.5 rounded-lg text-crema/40 hover:text-red-300 transition-colors duration-150"
+                  className="text-xs py-1.5 px-2.5 rounded-lg text-crema/55 hover:text-peligro transition-colors duration-150"
                 >
                   {quitandoId === usuario.id ? 'Quitando…' : 'Quitar'}
                 </button>
