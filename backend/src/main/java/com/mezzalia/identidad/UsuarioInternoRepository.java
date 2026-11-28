@@ -20,6 +20,9 @@ public interface UsuarioInternoRepository extends JpaRepository<UsuarioInterno, 
 
     boolean existsByUsername(String username);
 
+    /** Para el arranque en produccion (PrimerSuperAdminConfig): ¿ya hay alguno? */
+    boolean existsByRol(RolUsuario rol);
+
     /**
      * Uso exclusivo de UsuarioInternoAdminService (RF-09: gestión de
      * usuarios internos con roles, §2 del MVP -- "gestión de usuarios

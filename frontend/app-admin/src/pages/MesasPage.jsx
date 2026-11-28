@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuth, useApiJson } from '../context/AuthContext.jsx'
@@ -233,7 +234,7 @@ export default function MesasPage() {
 
                 {sesion ? (
                   <div className="flex flex-col items-center gap-2">
-                    <div className="bg-crema rounded-lg p-2">
+                    <div className="bg-white rounded-lg p-2 border border-carbon-700">
                       <QRCodeSVG value={urlCarta} size={128} fgColor="#18181b" bgColor="#ffffff" marginSize={1} level="M" />
                     </div>
                     <p className="text-[11px] text-crema/55 text-center">
@@ -243,6 +244,9 @@ export default function MesasPage() {
                       <button onClick={() => onImprimir(mesa)} className="btn-secundario flex-1 text-xs py-2">
                         Imprimir
                       </button>
+                      <Link to={`/mesas/${mesa.id}/cuenta`} className="btn-secundario flex-1 text-xs py-2">
+                        Cuenta
+                      </Link>
                       {puedeEditar && (
                         <button
                           onClick={() => onGenerarSesion(mesa)}

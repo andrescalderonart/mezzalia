@@ -52,6 +52,10 @@ public final class EventosSeguridad {
         log.warn("evento=archivo_rechazado motivo={}", limpiar(motivo));
     }
 
+    public static void primerSuperAdminCreado(String username) {
+        log.warn("evento=primer_superadmin_creado usuario={}", limpiar(username));
+    }
+
     public static void passwordCambiada(Long usuarioId) {
         log.info("evento=password_cambiada usuarioId={}", usuarioId);
     }

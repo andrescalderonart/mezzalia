@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useApiJson } from '../context/AuthContext.jsx'
+import { Link } from 'react-router-dom'
 import { IconoCampana, IconoCuenta } from './iconos.jsx'
 
 /**
@@ -69,6 +70,11 @@ export default function LlamadosPendientes({ nombreMesa }) {
             <strong className="font-semibold">{nombreMesa(llamado.mesaId)}</strong> {accion}
             <span className="block text-xs text-crema/50">{formatoHora.format(new Date(llamado.creadoEn))}</span>
           </p>
+          {llamado.tipo === 'CUENTA' && (
+            <Link to={`/mesas/${llamado.mesaId}/cuenta`} className="btn-primario h-8 px-3 text-xs whitespace-nowrap">
+              Ver cuenta
+            </Link>
+          )}
           <button
             type="button"
             onClick={() => atender(llamado)}
