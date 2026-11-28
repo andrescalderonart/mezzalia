@@ -1,0 +1,52 @@
+# Caddy: HTTPS automatico (Let's Encrypt) para los dos dominios, las dos apps
+# web y el paso de /api y /uploads al backend. Las cabeceras de seguridad que
+# el backend ya manda en la API se repiten aqui para el HTML y el JS de las
+# apps, que no pasan por Spring (OWASP ASVS V3.4, docs/calidad).
+{
+	email {$ACME_EMAIL}
+}
+
+(seguridad) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		# 'unsafe-inline' solo en estilos: React pone estilos en linea
+		# (style={...}); los scripts siguen siendo solo 'self'.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		-Server
+	}
+}
+
+(app) {
+	encode zstd gzip
+	import seguridad
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+	handle /uploads/* {
+		reverse_proxy backend:8080
+	}
+	handle {
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+{$DOMINIO_CARTA} {
+	root * /srv/carta
+	import app
+}
+
+{$DOMINIO_PANEL} {
+	root * /srv/panel
+	# Para un monitor de disponibilidad: responde {"status":"UP"} sin detalles.
+	handle /actuator/health {
+		reverse_proxy backend:8080
+	}
+	import app
+}

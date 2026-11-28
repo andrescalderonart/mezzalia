@@ -38,7 +38,7 @@ Leyenda: ✅ cumple la meta · 🟡 parcial / medido pero sin meta cumplida · �
 | | | Tests del frontend | Panel y carta con tests | Panel: 64 tests. Carta: **0** | 🟡 |
 | | | Linter en los frontends | ESLint en CI | No hay | 🔴 |
 | | | Dependencias con soporte | Framework con parches de seguridad | Spring Boot **3.5.16** (subido desde 3.3.5, que ya no recibía parches) | 🟡 planear 4.x (3.5 dejó de tener soporte gratuito en 2026-06) |
-| **Flexibilidad** (portabilidad) | Desplegar en un VPS nuevo sin sorpresas | Despliegue reproducible | Dockerfile + compose de producción | Solo `docker-compose.yml` de desarrollo (MySQL) | 🔴 |
+| **Flexibilidad** (portabilidad) | Desplegar en un VPS nuevo sin sorpresas | Despliegue reproducible | Dockerfile + compose de producción | `backend/Dockerfile` + `deploy/` (compose, Caddy, respaldos); migraciones probadas contra MySQL 8.4 en CI | 🟡 sin ejecutar aún en un servidor |
 | **Seguridad de uso** (*safety*, nueva en 2023) | Un error no daña al comensal | Alérgenos marcados en el plato | Avisar alérgenos y trazas | Solo "quitar ingrediente"; no hay alérgenos | 🔴 riesgo real con comida |
 
 Cómo medir de nuevo:
@@ -73,9 +73,9 @@ Cómo medir de nuevo:
 ## 3. Brechas priorizadas (siguiente trabajo)
 
 **Antes del primer restaurante real (bloqueantes):**
-1. **HTTPS en producción** + cabeceras de seguridad en el servidor que sirva las SPA (V12, V3). Va junto con el despliegue.
+1. **HTTPS en producción** + cabeceras de seguridad en el servidor que sirva las SPA (V12, V3). *Preparado el 2026-11-27*: `deploy/` (Caddy con HTTPS automático y las mismas cabeceras para las SPA) y [docs/despliegue.md](../despliegue.md); falta ejecutarlo en un servidor real.
 2. **Refresh token en cookie `HttpOnly`** en vez de `localStorage` (V7).
-3. **Copias de seguridad** de MySQL y de las fotos, con una restauración probada (ISO: fiabilidad).
+3. **Copias de seguridad** de MySQL y de las fotos, con una restauración probada (ISO: fiabilidad). *Preparado*: `deploy/respaldo.sh` diario con 14 días de retención y pasos de restauración; falta programarlo y probar una restauración en el servidor.
 4. **Política de datos personales**: aviso de privacidad, retención y borrado del teléfono del comensal (V14 / Ley 1581).
 
 **Pronto:**
